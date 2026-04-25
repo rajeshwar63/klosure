@@ -213,8 +213,8 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     })
 
-    // 1. Load deal, context, recent messages
-    const [dealRes, ctxRes, msgRes] = await Promise.all([
+    // 1. Load deal, context, recent messages, commitments
+    const [dealRes, ctxRes, msgRes, commitRes] = await Promise.all([
       supabase.from("deals").select("*").eq("id", dealId).single(),
       supabase.from("deal_context").select("*").eq("deal_id", dealId).maybeSingle(),
       supabase
@@ -223,6 +223,12 @@ Deno.serve(async (req) => {
         .eq("deal_id", dealId)
         .order("created_at", { ascending: true })
         .limit(60),
+      // Phase 3: commitments are part of deal state — Klo coaches around them.
+      supabase
+        .from("commitments")
+        .select("*")
+        .eq("deal_id", dealId)
+        .order("due_date", { ascending: true }),
     ])
 
     if (dealRes.error || !dealRes.data) {
@@ -231,6 +237,7 @@ Deno.serve(async (req) => {
     const deal = dealRes.data
     const dealContext = ctxRes.data
     const messages = msgRes.data ?? []
+    const commitments = commitRes.data ?? []
 
     // 2. Pick the speaker — last non-Klo message
     const lastUserMsg = [...messages].reverse().find((m) => m.sender_type !== "klo")
@@ -242,7 +249,7 @@ Deno.serve(async (req) => {
 
     // 3. Build the volatile user message: deal context + transcript visible to
     //    that role. (Stable persona is in `system` and cached.)
-    const contextBlock = renderDealContext(deal, dealContext, recipientRole)
+    const contextBlock = renderDealContext(deal, dealContext, commitments, recipientRole)
     const transcript = renderTranscript(messages, recipientRole)
     const ask = `Now coach the ${recipientRole} on what to do next. Respond as JSON matching the schema.`
 
@@ -357,6 +364,7 @@ function json(body: unknown, status = 200) {
 function renderDealContext(
   deal: Record<string, unknown>,
   ctx: Record<string, unknown> | null,
+  commitments: Array<Record<string, unknown>>,
   recipientRole: string,
 ) {
   const lines: string[] = [
@@ -385,7 +393,44 @@ function renderDealContext(
   if (ctx?.budget_notes) lines.push(`- Budget notes: ${ctx.budget_notes}`)
   if (ctx?.notes) lines.push(`- Notes: ${ctx.notes}`)
 
+  // Phase 3: commitment state. Klo coaches around what's open and what's
+  // overdue — overdues are the highest-signal item Klo can act on.
+  const open = commitments.filter((c) => c.status === "confirmed")
+  const proposed = commitments.filter((c) => c.status === "proposed")
+  const overdue = commitments.filter((c) => c.status === "overdue")
+  const done = commitments.filter((c) => c.status === "done")
+
+  if (overdue.length > 0) {
+    lines.push(`- OVERDUE commitments (${overdue.length} — name them, don't soften):`)
+    for (const c of overdue) {
+      lines.push(`  - ${describeCommitment(c)}`)
+    }
+  }
+  if (open.length > 0) {
+    lines.push(`- Open commitments (${open.length}):`)
+    for (const c of open) {
+      lines.push(`  - ${describeCommitment(c)}`)
+    }
+  }
+  if (proposed.length > 0) {
+    lines.push(`- Awaiting confirmation (${proposed.length}):`)
+    for (const c of proposed) {
+      lines.push(`  - ${describeCommitment(c)}`)
+    }
+  }
+  if (done.length > 0) {
+    lines.push(`- Completed: ${done.length}`)
+  }
+
   return lines.join("\n")
+}
+
+function describeCommitment(c: Record<string, unknown>) {
+  const owner = (c.owner_name as string) || (c.owner as string) || "someone"
+  const due = c.due_date ? String(c.due_date) : "no date"
+  const days = c.due_date ? daysUntil(String(c.due_date)) : null
+  const dueLabel = days !== null ? (days < 0 ? `${Math.abs(days)}d overdue` : `due in ${days}d`) : "no due date"
+  return `"${c.task}" — ${owner} (${dueLabel}, ${due})`
 }
 
 function renderTranscript(
