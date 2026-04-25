@@ -5,6 +5,8 @@ import { greetingForRole } from '../services/klo.js'
 import { listCommitments } from '../services/commitments.js'
 import { formatCurrency, formatDeadline } from '../lib/format.js'
 import ChatView from './ChatView.jsx'
+import OverviewView from './OverviewView.jsx'
+import DealRoomTabs, { loadLastTab, saveLastTab } from './DealRoomTabs.jsx'
 
 const STAGE_LABEL = {
   discovery: 'Discovery',
@@ -37,8 +39,21 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   const [commitments, setCommitments] = useState([])
   const [kloThinking, setKloThinking] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [tab, setTab] = useState(() => loadLastTab(dealProp?.id))
 
   const stakeholders = dealContext?.stakeholders ?? []
+
+  // If the deal id swaps (rare — e.g. buyer page promoting solo→shared keeps
+  // the same id) re-read the saved tab for that deal so each deal has its own
+  // preference.
+  useEffect(() => {
+    setTab(loadLastTab(deal?.id))
+  }, [deal?.id])
+
+  function handleTabChange(next) {
+    setTab(next)
+    saveLastTab(deal?.id, next)
+  }
 
   // Keep local deal state in sync if the parent ever swaps the prop (e.g. buyer
   // page promoting solo→shared). Realtime updates below override this with the
@@ -197,17 +212,28 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
 
       <KloSummaryBar deal={deal} dealContext={dealContext} />
 
-      <ChatView
-        deal={deal}
-        dealContext={dealContext}
-        role={role}
-        currentUserName={currentUserName}
-        messages={messages}
-        setMessages={setMessages}
-        commitments={commitments}
-        kloThinking={kloThinking}
-        setKloThinking={setKloThinking}
-      />
+      <DealRoomTabs active={tab} onChange={handleTabChange} />
+
+      {tab === 'chat' ? (
+        <ChatView
+          deal={deal}
+          dealContext={dealContext}
+          role={role}
+          currentUserName={currentUserName}
+          messages={messages}
+          setMessages={setMessages}
+          commitments={commitments}
+          kloThinking={kloThinking}
+          setKloThinking={setKloThinking}
+        />
+      ) : (
+        <OverviewView
+          deal={deal}
+          dealContext={dealContext}
+          role={role}
+          commitments={commitments}
+        />
+      )}
 
       {shareOpen && (
         <ShareModal
