@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { greetingForRole } from '../services/klo.js'
 import { listCommitments } from '../services/commitments.js'
+import { markDealWon, markDealLost, reopenDeal, LOSS_REASONS } from '../services/archive.js'
+import { useProfile } from '../hooks/useProfile.jsx'
+import { canShareWithBuyer, nextPlanFor } from '../lib/plans.js'
 import { formatCurrency, formatDeadline } from '../lib/format.js'
 import ChatView from './ChatView.jsx'
 import OverviewView from './OverviewView.jsx'
@@ -32,14 +35,24 @@ const HEALTH_LABEL = {
 // realtime channel, then renders the shared header + body. The body switches
 // between Chat and Overview (Phase 3.5); for step 1 of the refactor we always
 // render ChatView so behavior matches Phase 3 exactly.
-export default function DealRoom({ deal: dealProp, dealContext, role, currentUserName, onBack }) {
+export default function DealRoom({ deal: dealProp, dealContext, role, currentUserName, onBack, autoShare = false }) {
   const navigate = useNavigate()
+  const { plan } = useProfile()
   const [deal, setDeal] = useState(dealProp)
   const [messages, setMessages] = useState([])
   const [commitments, setCommitments] = useState([])
   const [kloThinking, setKloThinking] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [closeOpen, setCloseOpen] = useState(false)
   const [tab, setTab] = useState(() => loadLastTab(dealProp?.id))
+
+  // Onboarding "Invite my buyer" path lands here with ?share=1 — pop the
+  // share modal automatically once the deal is loaded and the plan allows it.
+  useEffect(() => {
+    if (autoShare && role === 'seller' && canShareWithBuyer(plan)) {
+      setShareOpen(true)
+    }
+  }, [autoShare, role, plan])
   // Set when the user clicks a commitment row in the Overview's action zones.
   // ChatView watches this prop, scrolls to the matching card and pulses it.
   const [highlightCommitmentId, setHighlightCommitmentId] = useState(null)
@@ -194,12 +207,44 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
                 : `${deal.buyer_company || 'Buyer'} · ${STAGE_LABEL[deal.stage]} · ${HEALTH_LABEL[deal.health] ?? 'On track'}`}
             </p>
           </div>
-          {role === 'seller' && (
+          {role === 'seller' && !deal.locked && (
+            <>
+              {canShareWithBuyer(plan) ? (
+                <button
+                  onClick={() => setShareOpen(true)}
+                  className="text-xs px-3 py-1.5 rounded-full bg-klo hover:bg-klo/90 font-medium"
+                >
+                  Share
+                </button>
+              ) : (
+                <Link
+                  to="/billing"
+                  className="text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 font-medium border border-white/20"
+                  title={`Upgrade to ${nextPlanFor('share').name} to share with buyers`}
+                >
+                  Share · Pro
+                </Link>
+              )}
+              <button
+                onClick={() => setCloseOpen(true)}
+                className="text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 font-medium border border-white/20"
+                title="Mark this deal as won or lost"
+              >
+                Close
+              </button>
+            </>
+          )}
+          {role === 'seller' && deal.locked && (
             <button
-              onClick={() => setShareOpen(true)}
-              className="text-xs px-3 py-1.5 rounded-full bg-klo hover:bg-klo/90 font-medium"
+              onClick={async () => {
+                if (!confirm('Reopen this deal? The room becomes editable again.')) return
+                const res = await reopenDeal({ dealId: deal.id })
+                if (!res.ok) alert(res.error)
+                else setDeal((d) => ({ ...d, ...res.deal }))
+              }}
+              className="text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 font-medium border border-white/20"
             >
-              Share
+              Reopen
             </button>
           )}
         </div>
@@ -221,6 +266,8 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
 
       <KloSummaryBar deal={deal} dealContext={dealContext} />
 
+      {deal.locked && <LockedBanner deal={deal} />}
+
       <DealRoomTabs active={tab} onChange={handleTabChange} />
 
       {tab === 'chat' ? (
@@ -236,6 +283,7 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
           setKloThinking={setKloThinking}
           highlightCommitmentId={highlightCommitmentId}
           onHighlightConsumed={() => setHighlightCommitmentId(null)}
+          locked={deal.locked}
         />
       ) : (
         <OverviewView
@@ -255,6 +303,166 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
           onClose={() => setShareOpen(false)}
         />
       )}
+      {closeOpen && (
+        <CloseDealModal
+          deal={deal}
+          onClose={() => setCloseOpen(false)}
+          onClosed={(updated) => {
+            setDeal((d) => ({ ...d, ...updated }))
+            setCloseOpen(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function LockedBanner({ deal }) {
+  const tone = deal.status === 'won'
+    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+    : deal.status === 'lost'
+      ? 'bg-red-50 border-red-200 text-red-900'
+      : 'bg-navy/5 border-navy/15 text-navy/70'
+  const label = deal.status === 'won'
+    ? 'Won — room locked as history'
+    : deal.status === 'lost'
+      ? `Lost${deal.closed_reason && deal.closed_reason !== 'won' ? ` · ${prettyReason(deal.closed_reason)}` : ''} — room locked as history`
+      : 'Archived — room locked as history'
+  return (
+    <div className={`shrink-0 border-y ${tone}`}>
+      <div className="max-w-2xl mx-auto px-3 py-2 text-xs flex items-center gap-2">
+        <LockGlyph />
+        <span className="font-semibold">{label}</span>
+        <span className="opacity-70">— read-only. Reopen from the header to edit.</span>
+      </div>
+    </div>
+  )
+}
+
+function LockGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  )
+}
+
+function prettyReason(r) {
+  return (
+    {
+      budget: 'Budget',
+      timing: 'Timing',
+      competitor: 'Competitor',
+      no_decision: 'No decision',
+      other: 'Other',
+    }[r] || r
+  )
+}
+
+// Mark the deal won/lost. Lost requires a reason — Klo + the manager view both
+// learn from these aggregates ("most deals lost on timing this quarter").
+function CloseDealModal({ deal, onClose, onClosed }) {
+  const [outcome, setOutcome] = useState('won')
+  const [reason, setReason] = useState(LOSS_REASONS[0].value)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError('')
+    const res = outcome === 'won'
+      ? await markDealWon({ dealId: deal.id })
+      : await markDealLost({ dealId: deal.id, reason })
+    if (!res.ok) {
+      setError(res.error || 'Could not close the deal.')
+      setSubmitting(false)
+      return
+    }
+    onClosed?.(res.deal)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-30 flex items-end sm:items-center justify-center p-4">
+      <form onSubmit={handleSubmit} className="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h2 className="font-semibold text-navy">Close this deal</h2>
+            <p className="text-xs text-navy/60">
+              The room locks as read-only history. You can reopen any time.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-navy/40 hover:text-navy text-xl leading-none px-2">
+            ×
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setOutcome('won')}
+            className={`py-3 rounded-xl border font-semibold ${
+              outcome === 'won'
+                ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
+                : 'bg-white border-navy/15 text-navy/70'
+            }`}
+          >
+            Won
+          </button>
+          <button
+            type="button"
+            onClick={() => setOutcome('lost')}
+            className={`py-3 rounded-xl border font-semibold ${
+              outcome === 'lost'
+                ? 'bg-red-50 border-red-400 text-red-800'
+                : 'bg-white border-navy/15 text-navy/70'
+            }`}
+          >
+            Lost
+          </button>
+        </div>
+
+        {outcome === 'lost' && (
+          <label className="block mb-4">
+            <span className="block text-xs font-medium text-navy/70 mb-1">Why?</span>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full border border-navy/15 rounded-lg px-3 py-2.5 focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+            >
+              {LOSS_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {error && (
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 mb-3">
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 bg-white border border-navy/15 text-navy/70 hover:text-navy font-semibold py-2.5 rounded-xl"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl"
+          >
+            {submitting ? 'Closing…' : `Mark as ${outcome}`}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

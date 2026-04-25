@@ -1,34 +1,46 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useProfile } from '../hooks/useProfile.jsx'
+import { loadSellerDashboard } from '../services/dashboard.js'
 import { formatCurrency, formatDeadline, formatRelativeDate } from '../lib/format.js'
+import InstallPrompt from '../components/InstallPrompt.jsx'
 
 const HEALTH_DOT = {
   green: 'bg-emerald-500',
   amber: 'bg-amber-500',
-  red: 'bg-red-500'
+  red: 'bg-red-500',
+}
+
+const HEALTH_LABEL = {
+  green: 'On track',
+  amber: 'Stuck',
+  red: 'At risk',
+}
+
+const STATUS_LABEL = {
+  won: 'Won',
+  lost: 'Lost',
+  archived: 'Archived',
 }
 
 export default function DealsListPage() {
   const { user, signOut } = useAuth()
+  const { profile, isManager } = useProfile()
   const navigate = useNavigate()
-  const [deals, setDeals] = useState([])
+  const [data, setData] = useState({ deals: { active: [], archived: [] }, stats: null })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showArchive, setShowArchive] = useState(false)
 
   useEffect(() => {
     if (!user) return
     let mounted = true
     async function load() {
-      const { data, error } = await supabase
-        .from('deals')
-        .select('*')
-        .eq('seller_id', user.id)
-        .order('created_at', { ascending: false })
+      const res = await loadSellerDashboard(user.id)
       if (!mounted) return
-      if (error) setError(error.message)
-      setDeals(data ?? [])
+      if (res.error) setError(res.error)
+      setData({ deals: { active: res.deals.active, archived: res.deals.archived }, stats: res.stats })
       setLoading(false)
     }
     load()
@@ -37,18 +49,34 @@ export default function DealsListPage() {
     }
   }, [user])
 
-  const active = deals.filter((d) => d.status === 'active')
-  const archived = deals.filter((d) => d.status !== 'active')
+  const { active, archived } = data.deals
+  const stats = data.stats
 
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
       <header className="bg-navy text-white">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="font-bold text-lg">Your deals</h1>
-            <p className="text-white/60 text-xs">Klosure — get closure on every deal.</p>
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-bold text-lg truncate">
+              {profile?.name ? `${profile.name.split(' ')[0]}'s deals` : 'Your deals'}
+            </h1>
+            <p className="text-white/60 text-xs">
+              {loading
+                ? 'Loading…'
+                : stats?.activeCount === 0
+                  ? 'No active deals — start one.'
+                  : `${stats.activeCount} active · ${stats.redCount} at risk`}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {isManager && (
+              <Link
+                to="/team"
+                className="text-xs px-3 py-1.5 rounded-lg bg-klo hover:bg-klo/90 font-medium"
+              >
+                Team
+              </Link>
+            )}
             <button
               onClick={async () => {
                 await signOut()
@@ -62,20 +90,53 @@ export default function DealsListPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 pb-32 pt-4">
+      <main className="max-w-3xl mx-auto px-4 pb-32 pt-4">
+        <InstallPrompt />
+
         {loading ? (
-          <div className="text-navy/50 text-sm py-10 text-center">Loading deals…</div>
+          <div className="text-navy/50 text-sm py-10 text-center">Loading dashboard…</div>
         ) : error ? (
           <div className="text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
             {error}
           </div>
-        ) : deals.length === 0 ? (
+        ) : active.length === 0 && archived.length === 0 ? (
           <EmptyState />
         ) : (
           <>
-            <Section title={`Active (${active.length})`} deals={active} />
+            {stats && stats.activeCount > 0 && <StatsStrip stats={stats} />}
+
+            {active.length > 0 && (
+              <Section title={`Needs attention (${active.length})`}>
+                <ul className="bg-white rounded-2xl border border-navy/10 divide-y divide-navy/5 overflow-hidden">
+                  {active.map((d) => (
+                    <DealRow key={d.id} deal={d} />
+                  ))}
+                </ul>
+              </Section>
+            )}
+
             {archived.length > 0 && (
-              <Section title={`Archive (${archived.length})`} deals={archived} muted />
+              <Section
+                title={`Archive (${archived.length})`}
+                muted
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setShowArchive((v) => !v)}
+                    className="text-xs text-klo font-medium"
+                  >
+                    {showArchive ? 'Hide' : 'Show'}
+                  </button>
+                }
+              >
+                {showArchive && (
+                  <ul className="bg-white rounded-2xl border border-navy/10 divide-y divide-navy/5 overflow-hidden">
+                    {archived.map((d) => (
+                      <DealRow key={d.id} deal={d} archived />
+                    ))}
+                  </ul>
+                )}
+              </Section>
             )}
           </>
         )}
@@ -83,11 +144,58 @@ export default function DealsListPage() {
 
       <Link
         to="/deals/new"
-        className="fixed bottom-6 right-6 sm:right-[calc(50%-18rem)] bg-klo hover:bg-klo/90 text-white shadow-lg rounded-full px-5 py-3 font-semibold flex items-center gap-2"
+        className="fixed bottom-6 right-6 sm:right-[calc(50%-22rem)] bg-klo hover:bg-klo/90 text-white shadow-lg rounded-full px-5 py-3 font-semibold flex items-center gap-2"
       >
         <span className="text-xl leading-none">+</span> New deal
       </Link>
     </div>
+  )
+}
+
+function StatsStrip({ stats }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      <Stat label="Pipeline" value={formatCurrency(stats.pipelineValue)} />
+      <Stat
+        label="At risk"
+        value={formatCurrency(stats.valueAtRisk)}
+        tone={stats.valueAtRisk > 0 ? 'red' : 'neutral'}
+      />
+      <Stat
+        label="Overdue"
+        value={String(stats.overdueCount)}
+        tone={stats.overdueCount > 0 ? 'red' : 'neutral'}
+      />
+      <Stat
+        label="Closed"
+        value={`${stats.wonCount}W · ${stats.lostCount}L`}
+      />
+    </div>
+  )
+}
+
+function Stat({ label, value, tone = 'neutral' }) {
+  const valueClass =
+    tone === 'red' ? 'text-red-600' : tone === 'amber' ? 'text-amber-600' : 'text-navy'
+  return (
+    <div className="bg-white border border-navy/10 rounded-xl px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-wider text-navy/50 font-semibold">{label}</p>
+      <p className={`text-base font-semibold ${valueClass}`}>{value}</p>
+    </div>
+  )
+}
+
+function Section({ title, action, muted = false, children }) {
+  return (
+    <section className="mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className={`text-xs font-semibold uppercase tracking-wider ${muted ? 'text-navy/40' : 'text-navy/60'}`}>
+          {title}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -100,49 +208,101 @@ function EmptyState() {
         Create a deal room and start talking to Klo. Solo mode works without a buyer.
       </p>
       <Link
-        to="/deals/new"
+        to="/onboarding"
         className="inline-block bg-klo hover:bg-klo/90 text-white font-semibold rounded-full px-5 py-2.5"
       >
-        Create your first deal
+        Get started
       </Link>
     </div>
   )
 }
 
-function Section({ title, deals, muted = false }) {
+function DealRow({ deal, archived = false }) {
+  const subline = archived
+    ? `${deal.buyer_company || '—'} · ${formatCurrency(deal.value)}`
+    : `${deal.buyer_company || '—'} · ${formatCurrency(deal.value)}`
+
+  const closedTag = archived
+    ? deal.status === 'won'
+      ? { text: 'Won', tone: 'bg-emerald-100 text-emerald-800' }
+      : deal.status === 'lost'
+        ? { text: deal.closed_reason ? `Lost · ${prettyReason(deal.closed_reason)}` : 'Lost', tone: 'bg-red-100 text-red-800' }
+        : { text: STATUS_LABEL[deal.status] || 'Closed', tone: 'bg-navy/10 text-navy/70' }
+    : null
+
   return (
-    <section className="mb-6">
-      <h2 className={`text-xs font-semibold uppercase tracking-wider mb-2 ${muted ? 'text-navy/40' : 'text-navy/60'}`}>
-        {title}
-      </h2>
-      <ul className="bg-white rounded-2xl border border-navy/10 divide-y divide-navy/5 overflow-hidden">
-        {deals.map((d) => (
-          <li key={d.id}>
-            <Link
-              to={`/deals/${d.id}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-navy/5 active:bg-navy/10"
-            >
-              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${HEALTH_DOT[d.health] ?? 'bg-emerald-500'}`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="font-semibold text-navy truncate">{d.title}</p>
-                  <span className="text-xs text-navy/50 shrink-0">
-                    {formatRelativeDate(d.created_at)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-navy/60 mt-0.5">
-                  <span className="truncate">
-                    {d.buyer_company || '—'} · {formatCurrency(d.value)}
-                  </span>
-                  <span className="text-navy/30">·</span>
-                  <span className="shrink-0">{formatDeadline(d.deadline)}</span>
-                </div>
-              </div>
-              <span className="text-navy/30">›</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <li>
+      <Link
+        to={`/deals/${deal.id}`}
+        className="flex items-center gap-3 px-4 py-3 hover:bg-navy/5 active:bg-navy/10"
+      >
+        <span
+          className={`w-2.5 h-2.5 rounded-full shrink-0 ${HEALTH_DOT[deal.health] ?? 'bg-emerald-500'}`}
+          title={HEALTH_LABEL[deal.health] ?? 'On track'}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className={`font-semibold truncate ${archived ? 'text-navy/70' : 'text-navy'}`}>
+              {deal.title}
+            </p>
+            <span className="text-xs text-navy/50 shrink-0">
+              {formatRelativeDate(deal.archived_at || deal.created_at)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-navy/60 mt-0.5">
+            <span className="truncate">{subline}</span>
+            {!archived && (
+              <>
+                <span className="text-navy/30">·</span>
+                <span className="shrink-0">{formatDeadline(deal.deadline)}</span>
+              </>
+            )}
+          </div>
+          {!archived && (deal.overdueCount > 0 || deal.openCount > 0 || deal.summary) && (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[11px]">
+              {deal.overdueCount > 0 && (
+                <Pill tone="red">{deal.overdueCount} overdue</Pill>
+              )}
+              {deal.openCount > 0 && <Pill tone="neutral">{deal.openCount} open</Pill>}
+              {deal.summary && (
+                <span className="text-navy/50 truncate flex-1 min-w-0">{deal.summary}</span>
+              )}
+            </div>
+          )}
+          {archived && closedTag && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-[11px]">
+              <span className={`px-1.5 py-0.5 rounded-full font-semibold ${closedTag.tone}`}>
+                {closedTag.text}
+              </span>
+              {deal.locked && <span className="text-navy/40">Read-only</span>}
+            </div>
+          )}
+        </div>
+        <span className="text-navy/30">›</span>
+      </Link>
+    </li>
+  )
+}
+
+function Pill({ children, tone = 'neutral' }) {
+  const cls =
+    tone === 'red'
+      ? 'bg-red-100 text-red-700'
+      : tone === 'amber'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-navy/10 text-navy/70'
+  return <span className={`px-1.5 py-0.5 rounded-full font-semibold ${cls}`}>{children}</span>
+}
+
+function prettyReason(r) {
+  return (
+    {
+      budget: 'Budget',
+      timing: 'Timing',
+      competitor: 'Competitor',
+      no_decision: 'No decision',
+      other: 'Other',
+      won: 'Won',
+    }[r] || r
   )
 }
