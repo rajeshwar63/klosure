@@ -14,7 +14,14 @@ import DealTimeline from './overview/DealTimeline.jsx'
 // the chat already exposes, for sellers who want a "deal command center"
 // view rather than scrolling chat. Read-mostly: every action still happens
 // in the Chat tab. Sections fill in across steps 4-8 of Phase 3.5.
-export default function OverviewView({ deal, dealContext, role, commitments, onSwitchToChat }) {
+export default function OverviewView({
+  deal,
+  dealContext,
+  role,
+  commitments,
+  onSwitchToChat,
+  onCommitmentClick,
+}) {
   const stats = useMemo(() => deriveStats(deal, commitments), [deal, commitments])
   const zones = useMemo(() => splitActionZones(commitments), [commitments])
   const timeline = useMemo(() => deriveTimeline(deal, commitments), [deal, commitments])
@@ -24,7 +31,7 @@ export default function OverviewView({ deal, dealContext, role, commitments, onS
       <div className="max-w-2xl mx-auto space-y-4">
         <DealStatStrip stats={stats} />
         <StageTracker deal={deal} />
-        <ActionZones deal={deal} zones={zones} />
+        <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
         <PeopleGrid stakeholders={dealContext?.stakeholders} onSwitchToChat={onSwitchToChat} />
         <DealTimeline events={timeline} />
       </div>

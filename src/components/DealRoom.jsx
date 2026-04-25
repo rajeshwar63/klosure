@@ -40,6 +40,9 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   const [kloThinking, setKloThinking] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [tab, setTab] = useState(() => loadLastTab(dealProp?.id))
+  // Set when the user clicks a commitment row in the Overview's action zones.
+  // ChatView watches this prop, scrolls to the matching card and pulses it.
+  const [highlightCommitmentId, setHighlightCommitmentId] = useState(null)
 
   const stakeholders = dealContext?.stakeholders ?? []
 
@@ -53,6 +56,12 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   function handleTabChange(next) {
     setTab(next)
     saveLastTab(deal?.id, next)
+  }
+
+  function handleCommitmentJump(commitmentId) {
+    setHighlightCommitmentId(commitmentId)
+    setTab('chat')
+    saveLastTab(deal?.id, 'chat')
   }
 
   // Keep local deal state in sync if the parent ever swaps the prop (e.g. buyer
@@ -225,6 +234,8 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
           commitments={commitments}
           kloThinking={kloThinking}
           setKloThinking={setKloThinking}
+          highlightCommitmentId={highlightCommitmentId}
+          onHighlightConsumed={() => setHighlightCommitmentId(null)}
         />
       ) : (
         <OverviewView
@@ -233,6 +244,7 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
           role={role}
           commitments={commitments}
           onSwitchToChat={() => handleTabChange('chat')}
+          onCommitmentClick={handleCommitmentJump}
         />
       )}
 

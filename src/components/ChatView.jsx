@@ -22,6 +22,8 @@ export default function ChatView({
   commitments,
   kloThinking,
   setKloThinking,
+  highlightCommitmentId,
+  onHighlightConsumed,
 }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -38,6 +40,33 @@ export default function ChatView({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, commitments, kloThinking])
+
+  // Jump-to-commitment from the Overview's action zones. We wait one frame so
+  // ChatView has actually rendered (it just got mounted by the tab swap),
+  // then scroll the anchor into view and pulse the card. After the animation
+  // we tell the shell to forget the highlight so the same id can re-trigger.
+  useEffect(() => {
+    if (!highlightCommitmentId) return
+    const id = highlightCommitmentId
+    const raf = requestAnimationFrame(() => {
+      const node = document.getElementById(`commitment-${id}`)
+      if (!node) return
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      node.classList.remove('commitment-jump')
+      // force reflow so the animation re-runs even if the class was just on it
+      void node.offsetWidth
+      node.classList.add('commitment-jump')
+    })
+    const t = setTimeout(() => {
+      const node = document.getElementById(`commitment-${id}`)
+      node?.classList.remove('commitment-jump')
+      onHighlightConsumed?.()
+    }, 1300)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [highlightCommitmentId, onHighlightConsumed])
 
   async function sendMessage(e) {
     e?.preventDefault()
@@ -324,7 +353,10 @@ function CommitmentCard({ commitment, viewerRole, onConfirm, onDecline, onDone }
 
   return (
     <div className="flex justify-center my-2">
-      <div className={`w-full max-w-[92%] rounded-xl border ${tone} px-4 py-3 shadow-sm`}>
+      <div
+        id={`commitment-${commitment.id}`}
+        className={`w-full max-w-[92%] rounded-xl border ${tone} px-4 py-3 shadow-sm`}
+      >
         <div className="flex items-start justify-between gap-3 mb-1.5">
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-navy/50">
             <LockIcon />
