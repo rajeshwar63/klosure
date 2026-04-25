@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import { getKloResponse, greetingForRole } from '../services/klo.js'
-import { formatCurrency, formatDeadline, formatRelativeDate, formatTime } from '../lib/format.js'
+import { greetingForRole, requestKloCoaching } from '../services/klo.js'
+import { formatCurrency, formatDeadline, formatTime } from '../lib/format.js'
 
 const STAGE_LABEL = {
   discovery: 'Discovery',
@@ -19,8 +19,9 @@ const HEALTH_DOT = {
 }
 
 // Shared deal room used by both seller and buyer views.
-export default function DealRoom({ deal, dealContext, role, currentUserName, onBack }) {
+export default function DealRoom({ deal: dealProp, dealContext, role, currentUserName, onBack }) {
   const navigate = useNavigate()
+  const [deal, setDeal] = useState(dealProp)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -30,7 +31,15 @@ export default function DealRoom({ deal, dealContext, role, currentUserName, onB
 
   const stakeholders = dealContext?.stakeholders ?? []
 
-  // Initial fetch + realtime subscription
+  // Keep local deal state in sync if the parent ever swaps the prop (e.g. buyer
+  // page promoting solo→shared). Realtime updates below override this with the
+  // live row from Postgres so summary/stage move on every Klo turn.
+  useEffect(() => {
+    setDeal(dealProp)
+  }, [dealProp])
+
+  // Initial fetch + realtime subscription on messages AND deals (Phase 2:
+  // Klo writes summary/stage back to deals.* so the room must listen).
   useEffect(() => {
     if (!deal?.id) return
     let mounted = true
@@ -47,6 +56,7 @@ export default function DealRoom({ deal, dealContext, role, currentUserName, onB
       }
       if (data.length === 0) {
         // First-time greeting from Klo, persisted so it survives reloads.
+        // visible_to is left null so both sides see the welcome line.
         const greeting = greetingForRole({ role, deal })
         const { data: inserted } = await supabase
           .from('messages')
@@ -64,19 +74,33 @@ export default function DealRoom({ deal, dealContext, role, currentUserName, onB
     }
     load()
 
-    const channel = supabase
+    let channel = supabase
       .channel(`deal-${deal.id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `deal_id=eq.${deal.id}` },
         (payload) => {
+          // Klo can stop "thinking" once any new Klo message lands.
+          if (payload.new.sender_type === 'klo') setKloThinking(false)
           setMessages((prev) => {
             if (prev.find((m) => m.id === payload.new.id)) return prev
             return [...prev, payload.new]
           })
         }
       )
-      .subscribe()
+    // Only the seller has RLS read access on `deals`, so only they get live
+    // summary + stage updates. The buyer sees a static snapshot at join time
+    // (Phase 4 will add a buyer_token-validating RPC that lifts this).
+    if (role === 'seller') {
+      channel = channel.on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'deals', filter: `id=eq.${deal.id}` },
+        (payload) => {
+          setDeal((d) => ({ ...d, ...payload.new }))
+        }
+      )
+    }
+    channel.subscribe()
 
     return () => {
       mounted = false
@@ -128,28 +152,34 @@ export default function DealRoom({ deal, dealContext, role, currentUserName, onB
     setMessages((m) => m.map((msg) => (msg.id === optimistic.id ? data : msg)))
     setSending(false)
 
-    // Klo responds — Phase 1 stub. Phase 2 swaps in Claude API.
+    // Klo responds — Phase 2: edge function calls Claude Sonnet 4.6 with
+    // prompt caching, picks up the speaker, writes a role-scoped Klo message,
+    // and updates deal summary + stage. Realtime delivers all of that.
+    // Falls back to the Phase 1 heuristic stub if the edge function isn't up.
     setKloThinking(true)
     try {
-      const reply = await getKloResponse({
+      await requestKloCoaching({
         deal,
         dealContext,
         messages: [...messages, data],
         role,
         mode: deal.mode
       })
-      await supabase.from('messages').insert({
-        deal_id: deal.id,
-        sender_type: 'klo',
-        sender_name: 'Klo',
-        content: reply
-      })
     } catch (err) {
       console.error('Klo failed', err)
     } finally {
+      // Realtime INSERT also clears this; keep this as belt-and-braces.
       setKloThinking(false)
     }
   }
+
+  // visible_to scopes Klo coaching to the speaker — see Phase 2 §8 "Views
+  // diverge". RLS already enforces this server-side; this filter is just
+  // belt-and-braces for any locally-cached state.
+  const visibleMessages = useMemo(
+    () => messages.filter((m) => !m.visible_to || m.visible_to === role),
+    [messages, role]
+  )
 
   const shareUrl = useMemo(() => {
     if (!deal?.buyer_token) return ''
@@ -202,13 +232,13 @@ export default function DealRoom({ deal, dealContext, role, currentUserName, onB
         </div>
       </header>
 
-      {/* Klo summary bar (Phase 2 will populate live; for Phase 1 we show context) */}
+      {/* Klo summary bar — populated live by the klo-respond edge function */}
       <KloSummaryBar deal={deal} dealContext={dealContext} />
 
       {/* Chat area */}
       <main ref={scrollRef} className="flex-1 overflow-y-auto chat-doodle px-3 py-3">
         <div className="max-w-2xl mx-auto space-y-2">
-          {messages.map((m) => (
+          {visibleMessages.map((m) => (
             <Bubble key={m.id} message={m} viewerRole={role} />
           ))}
           {kloThinking && <KloTyping />}
@@ -262,11 +292,16 @@ function Pill({ children }) {
 }
 
 function KloSummaryBar({ deal, dealContext }) {
-  // Phase 1: a static derived summary. Phase 2: Klo generates this live.
-  const next = dealContext?.what_needs_to_happen?.split('.').filter(Boolean)[0]?.trim()
-  const summary = next
-    ? `Next: ${next}.`
-    : `Solo room ready. Tell Klo where the deal stands and get a move.`
+  // Phase 2: deal.summary is written live by the klo-respond edge function on
+  // every Klo turn (see supabase/functions/klo-respond/index.ts). When summary
+  // is null (e.g. the very first message hasn't fired Klo yet, or the edge
+  // function isn't deployed) we fall back to the Phase 1 derived hint.
+  const fallback = (() => {
+    const next = dealContext?.what_needs_to_happen?.split('.').filter(Boolean)[0]?.trim()
+    if (next) return `Next: ${next}.`
+    return `Solo room ready. Tell Klo where the deal stands and get a move.`
+  })()
+  const summary = deal?.summary?.trim() || fallback
   return (
     <div className="bg-klo-bg border-y border-klo/20 shrink-0">
       <div className="max-w-2xl mx-auto px-3 py-2 text-[13px] text-navy flex items-center gap-2">

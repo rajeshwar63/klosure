@@ -1,23 +1,34 @@
 // =============================================================================
 // Klo — AI deal coach service abstraction
 // =============================================================================
-// In Phase 1 we ship a stub that returns canned coaching messages so the chat
-// UI works end-to-end without an Anthropic key. Phase 2 (Section 8) replaces
-// the body of `getKloResponse` with a real Claude Sonnet 4.6 call using prompt
-// caching, while keeping this exact public signature.
+// Phase 2: this module talks to the `klo-respond` Supabase Edge Function, which
+// calls Claude Sonnet 4.6 with prompt caching, JSON-schema output, and writes
+// back a role-aware Klo message + updated deal summary + detected stage.
+//
+// We keep a Phase 1 heuristic stub as a fallback so the app still works in
+// local dev when the edge function isn't deployed (or when ANTHROPIC_API_KEY
+// isn't set yet). Detection is best-effort: if the invoke errors, we fall back.
 //
 // Public API:
-//   getKloResponse({ deal, dealContext, messages, role, mode }) -> Promise<string>
-//   greetingForRole({ role, deal })                            -> string
+//   greetingForRole({ role, deal })                                -> string
+//   requestKloCoaching({ deal, dealContext, messages, role, mode }) -> Promise<{ ok, ...}>
 //
-// Phase 2 will add:
-//   - buildKloSystemPrompt(deal, role, mode)
-//   - real Anthropic API call with model from VITE_KLO_MODEL
+// `requestKloCoaching` is the Phase 2 entry point — it triggers Klo's reply.
+// In the edge-function path the function inserts the Klo message itself and
+// the client picks it up over Supabase realtime. In the stub path this module
+// inserts the message client-side so the UX is identical.
 // =============================================================================
 
-import { daysUntil } from '../lib/format'
+import { supabase } from '../lib/supabase.js'
+import { daysUntil } from '../lib/format.js'
 
 const MODEL = import.meta.env.VITE_KLO_MODEL ?? 'claude-sonnet-4-6'
+// Force-disable the edge call (keep using stub) by setting VITE_KLO_USE_STUB=true.
+const FORCE_STUB = String(import.meta.env.VITE_KLO_USE_STUB ?? '').toLowerCase() === 'true'
+
+export function getModelLabel() {
+  return MODEL
+}
 
 export function greetingForRole({ role, deal }) {
   if (role === 'buyer') {
@@ -29,11 +40,49 @@ export function greetingForRole({ role, deal }) {
   return `I'm Klo. Solo mode — I'm your private coach for ${deal?.title ?? 'this deal'}. Tell me where it stands and I'll tell you what to do next.`
 }
 
-// Phase 1 stub — heuristic coaching that feels like Klo without calling an LLM.
-// Replace the body of this function in Phase 2 with the Anthropic call.
-export async function getKloResponse({ deal, messages = [], role = 'seller', mode = 'solo' }) {
-  // Simulate a small think delay so the UI shows the "Klo is thinking" affordance.
-  await new Promise((r) => setTimeout(r, 600))
+// -----------------------------------------------------------------------------
+// Phase 2 entry point. Triggers Klo to coach the speaker (the role passed in).
+// -----------------------------------------------------------------------------
+export async function requestKloCoaching({ deal, dealContext, messages, role, mode }) {
+  if (!deal?.id) return { ok: false, error: 'no deal' }
+
+  if (!FORCE_STUB) {
+    try {
+      const { data, error } = await supabase.functions.invoke('klo-respond', {
+        body: { deal_id: deal.id },
+      })
+      if (error) throw error
+      if (data?.ok) {
+        return { ok: true, viaEdge: true, ...data }
+      }
+      // Edge function returned a non-ok body — fall through to stub.
+      console.warn('[Klo] edge function returned non-ok body, using stub', data)
+    } catch (err) {
+      console.warn('[Klo] edge function unavailable, using Phase 1 stub.', err?.message ?? err)
+    }
+  }
+
+  // ---- Phase 1 fallback: heuristic reply, visible only to the speaker. -----
+  const reply = await stubReply({ deal, messages, role, mode })
+  const { error } = await supabase.from('messages').insert({
+    deal_id: deal.id,
+    sender_type: 'klo',
+    sender_name: 'Klo',
+    content: reply,
+    visible_to: role,
+  })
+  if (error) {
+    console.error('[Klo] stub insert failed', error)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true, viaStub: true, reply, recipient: role }
+}
+
+// -----------------------------------------------------------------------------
+// Heuristic Phase 1 stub. Used when the edge function is unreachable.
+// -----------------------------------------------------------------------------
+async function stubReply({ deal, messages = [], role = 'seller', mode = 'solo' }) {
+  await new Promise((r) => setTimeout(r, 400))
 
   const days = daysUntil(deal?.deadline)
   const lastUserMessage = [...messages].reverse().find((m) => m.sender_type !== 'klo')
@@ -42,7 +91,6 @@ export async function getKloResponse({ deal, messages = [], role = 'seller', mod
   if (role === 'buyer') {
     return `Noted. The seller will see this. If procurement or legal is involved on your side, name them now — I'll help you keep them moving.`
   }
-
   if (text.includes('budget') || text.includes('approval')) {
     return `Budget approvals stall deals more than anything else. Don't wait — get the economic buyer on a 20-minute call this week. Ask for a specific date, not "soon".`
   }
@@ -61,13 +109,8 @@ export async function getKloResponse({ deal, messages = [], role = 'seller', mod
   if (days !== null && days < 0) {
     return `The deadline has passed. Don't pretend it hasn't. Reset it explicitly with the buyer today — a new date with a clear reason rebuilds momentum.`
   }
-
   if (mode === 'solo') {
     return `Tell me three things: who's the economic buyer, what's the next commitment on the table, and when it's due. I'll tell you the move.`
   }
   return `Got it. I'll watch the room. When either side commits to something with a date, I'll lock it.`
-}
-
-export function getModelLabel() {
-  return MODEL
 }
