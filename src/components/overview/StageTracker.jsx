@@ -12,7 +12,7 @@ export default function StageTracker({ deal }) {
   const closed = deal?.status === 'won' || deal?.status === 'lost'
 
   return (
-    <div className="bg-white border border-navy/10 rounded-xl px-4 py-4">
+    <div className="bg-white border border-navy/10 rounded-xl px-3 sm:px-4 py-4">
       <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-3">
         Where we are
       </div>
@@ -33,7 +33,7 @@ export default function StageTracker({ deal }) {
                 <Node state={state} />
                 <Connector visible={!isLast} state={i < idx || closed ? 'past' : 'future'} />
               </div>
-              <div className={`mt-1.5 text-[11px] font-medium text-center px-1 truncate w-full ${
+              <div className={`mt-1.5 text-[10px] sm:text-[11px] font-medium text-center px-0.5 truncate w-full ${
                 state === 'past' ? 'text-emerald-700'
                   : state === 'current' ? 'text-klo'
                   : 'text-navy/40'

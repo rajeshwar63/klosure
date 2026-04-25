@@ -121,9 +121,11 @@ function Item({ commitment, onClick, muted = false }) {
           {task}
         </span>
         <span className="flex items-center gap-1.5 mt-0.5 text-[11px] text-navy/50">
-          <span className="truncate">{ownerLabel}</span>
-          <span className="text-navy/20">·</span>
-          <DuePill dueDate={due_date} status={status} tone={tone} />
+          <span className="truncate min-w-0">{ownerLabel}</span>
+          <span className="text-navy/20 shrink-0">·</span>
+          <span className="shrink-0">
+            <DuePill dueDate={due_date} status={status} tone={tone} />
+          </span>
         </span>
       </span>
     </button>
