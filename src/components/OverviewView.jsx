@@ -6,6 +6,7 @@ import {
 } from '../services/overview.js'
 import DealStatStrip from './overview/DealStatStrip.jsx'
 import StageTracker from './overview/StageTracker.jsx'
+import ActionZones from './overview/ActionZones.jsx'
 
 // Overview half of the deal room — a structured rendering of the same data
 // the chat already exposes, for sellers who want a "deal command center"
@@ -21,15 +22,7 @@ export default function OverviewView({ deal, dealContext, role, commitments }) {
       <div className="max-w-2xl mx-auto space-y-4">
         <DealStatStrip stats={stats} />
         <StageTracker deal={deal} />
-        <DebugPanel
-          label="zones"
-          data={{
-            buyerOpen: zones.buyer.open.length,
-            buyerDone: zones.buyer.done.length,
-            sellerOpen: zones.seller.open.length,
-            sellerDone: zones.seller.done.length,
-          }}
-        />
+        <ActionZones deal={deal} zones={zones} />
         <DebugPanel
           label="timeline"
           data={timeline.map((e) => ({ date: e.date, label: e.label, tone: e.tone }))}
