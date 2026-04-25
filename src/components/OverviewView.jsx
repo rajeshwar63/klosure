@@ -5,6 +5,7 @@ import {
   deriveTimeline,
 } from '../services/overview.js'
 import DealStatStrip from './overview/DealStatStrip.jsx'
+import StageTracker from './overview/StageTracker.jsx'
 
 // Overview half of the deal room — a structured rendering of the same data
 // the chat already exposes, for sellers who want a "deal command center"
@@ -19,6 +20,7 @@ export default function OverviewView({ deal, dealContext, role, commitments }) {
     <main className="flex-1 overflow-y-auto bg-chat-bg/40 px-3 py-4">
       <div className="max-w-2xl mx-auto space-y-4">
         <DealStatStrip stats={stats} />
+        <StageTracker deal={deal} />
         <DebugPanel
           label="zones"
           data={{
