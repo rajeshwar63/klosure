@@ -232,6 +232,7 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
           dealContext={dealContext}
           role={role}
           commitments={commitments}
+          onSwitchToChat={() => handleTabChange('chat')}
         />
       )}
 

@@ -7,12 +7,13 @@ import {
 import DealStatStrip from './overview/DealStatStrip.jsx'
 import StageTracker from './overview/StageTracker.jsx'
 import ActionZones from './overview/ActionZones.jsx'
+import PeopleGrid from './overview/PeopleGrid.jsx'
 
 // Overview half of the deal room — a structured rendering of the same data
 // the chat already exposes, for sellers who want a "deal command center"
 // view rather than scrolling chat. Read-mostly: every action still happens
 // in the Chat tab. Sections fill in across steps 4-8 of Phase 3.5.
-export default function OverviewView({ deal, dealContext, role, commitments }) {
+export default function OverviewView({ deal, dealContext, role, commitments, onSwitchToChat }) {
   const stats = useMemo(() => deriveStats(deal, commitments), [deal, commitments])
   const zones = useMemo(() => splitActionZones(commitments), [commitments])
   const timeline = useMemo(() => deriveTimeline(deal, commitments), [deal, commitments])
@@ -23,6 +24,7 @@ export default function OverviewView({ deal, dealContext, role, commitments }) {
         <DealStatStrip stats={stats} />
         <StageTracker deal={deal} />
         <ActionZones deal={deal} zones={zones} />
+        <PeopleGrid stakeholders={dealContext?.stakeholders} onSwitchToChat={onSwitchToChat} />
         <DebugPanel
           label="timeline"
           data={timeline.map((e) => ({ date: e.date, label: e.label, tone: e.tone }))}
