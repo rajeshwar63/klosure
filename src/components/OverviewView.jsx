@@ -8,6 +8,7 @@ import DealStatStrip from './overview/DealStatStrip.jsx'
 import StageTracker from './overview/StageTracker.jsx'
 import ActionZones from './overview/ActionZones.jsx'
 import PeopleGrid from './overview/PeopleGrid.jsx'
+import DealTimeline from './overview/DealTimeline.jsx'
 
 // Overview half of the deal room — a structured rendering of the same data
 // the chat already exposes, for sellers who want a "deal command center"
@@ -25,26 +26,8 @@ export default function OverviewView({ deal, dealContext, role, commitments, onS
         <StageTracker deal={deal} />
         <ActionZones deal={deal} zones={zones} />
         <PeopleGrid stakeholders={dealContext?.stakeholders} onSwitchToChat={onSwitchToChat} />
-        <DebugPanel
-          label="timeline"
-          data={timeline.map((e) => ({ date: e.date, label: e.label, tone: e.tone }))}
-        />
+        <DealTimeline events={timeline} />
       </div>
     </main>
-  )
-}
-
-// Temporary scaffolding: shows the derived shapes so we can sanity-check
-// against real deals. Replaced section-by-section in steps 4-8.
-function DebugPanel({ label, data }) {
-  return (
-    <div className="bg-white border border-navy/10 rounded-xl p-3 text-xs">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-1">
-        {label}
-      </div>
-      <pre className="text-navy/80 whitespace-pre-wrap break-words">
-        {JSON.stringify(data, null, 2)}
-      </pre>
-    </div>
   )
 }
