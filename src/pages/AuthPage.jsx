@@ -25,7 +25,7 @@ export default function AuthPage({ mode = 'login' }) {
         const { data, error } = await signUp({ email, password, name })
         if (error) throw error
         if (data?.session) {
-          navigate('/deals', { replace: true })
+          navigate('/onboarding', { replace: true })
         } else {
           setInfo('Check your email to confirm your account, then log in.')
         }

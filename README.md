@@ -4,7 +4,7 @@
 
 Klosure is an AI-powered deal room that brings buyers and sellers into the same space. Klo — the AI deal coach — observes every conversation and coaches both sides to move the deal forward.
 
-This repo currently implements **Phase 1 — The Room** and **Phase 2 — Klo's Brain** (Section 8 of `Klosure_Project_Document_v2.md`).
+This repo currently implements **Phase 1 — The Room**, **Phase 2 — Klo's Brain**, **Phase 3 — Commitments and Accountability**, and **Phase 4 — Polish, Dashboard and Manager View** (Section 8 of `Klosure_Project_Document_v2.md`).
 
 ## What's in Phase 1
 
@@ -43,7 +43,10 @@ This repo currently implements **Phase 1 — The Room** and **Phase 2 — Klo's 
 
 1. Create a new Supabase project (region: EU or Singapore — see Section 11.1).
 2. Open the SQL editor and run [`supabase/schema.sql`](supabase/schema.sql) end-to-end. This creates all tables, RLS policies, the realtime publication, and the auth-trigger that mirrors `auth.users` into `public.users`.
-3. Then run [`supabase/phase2.sql`](supabase/phase2.sql) — the Phase 2 delta (adds `visible_to`, `summary`, `last_klo_at`, and tightens the message-read RLS policies).
+3. Then run, in order:
+   - [`supabase/phase2.sql`](supabase/phase2.sql) — adds `visible_to`, `summary`, `last_klo_at`, tightens RLS.
+   - [`supabase/phase3.sql`](supabase/phase3.sql) — commitments lifecycle, deal-health function, overdue marking.
+   - [`supabase/phase4.sql`](supabase/phase4.sql) — archive/lock, billing fields, team_members, team_invites, manager_threads.
 4. In **Authentication → Providers**, enable Email. For local dev you can disable email confirmations to speed up testing.
 
 ### 2. Environment
@@ -151,10 +154,21 @@ src/
 - Klo's writes happen through the Supabase **service role** inside the edge function, which bypasses RLS — this is the only safe way to write a message with `visible_to` set, since neither the anon nor authed JWT should be allowed to forge a Klo turn.
 - The buyer remains anonymous and reads `deals` via the Phase 1 `BuyerJoinPage` snapshot. They do **not** receive live `deals.summary` updates over realtime (Phase 4 will add a buyer_token-validating RPC). The buyer DOES see Klo's coaching live via the messages stream.
 
+## What's new in Phase 4
+
+- **PWA.** Manifest + service worker (`public/sw.js`) cache the app shell and the last successful fetch of `/rest/v1/*` (deals, messages, commitments) so a seller in a Gulf cell-coverage hole still sees their dashboard. Prompted "Add to home screen" via `InstallPrompt`.
+- **Seller dashboard.** All deals in one view, sorted by health then urgency, with a stats strip (pipeline value, value at risk, overdue commitments, won/lost counts) and inline overdue / open / Klo summary pills per row. See `src/services/dashboard.js` and `src/pages/DealsListPage.jsx`.
+- **Won / Lost archive.** Sellers can mark a deal Won or Lost (with a reason). The deal locks: a Postgres trigger flips `deals.locked = true` and refuses any future writes to messages, commitments, or context. Reopen is one click. Closed rooms stay forever — never deleted.
+- **Manager view.** Team plan owners get `/team` — pipeline rolled up by rep, stuck deals highlighted, member management, invite flow.
+- **Manager talks to Klo.** A separate Claude conversation (`klo-manager` edge function) where the manager asks pipeline-level questions ("which deals are at risk?", "where is my pipeline stuck?"). Persona is the same Klo voice, context is the whole team's pipeline.
+- **Stripe billing.** `stripe-checkout`, `stripe-portal`, `stripe-webhook` edge functions wire up Free / Pro / Team plans. Plan limits are enforced in `src/lib/plans.js` and surfaced as upsells where you'd expect (Share button, new-deal limit).
+- **Onboarding.** Two-path entry — "Use Klo solo" or "Invite my buyer" — at `/onboarding`. Solo opens new-deal directly; invite opens new-deal with `?share=1`, which auto-pops the share modal once the deal exists.
+- **Performance.** Vite manual chunking splits React, supabase-js, router, and the heavy deal-room flows so the dashboard ships in a small initial bundle. Web fonts are preloaded with `media="print"`-then-swap.
+
 ## What's next
 
-- **Phase 3 — Commitments and Accountability (Weeks 5–6):** the `commitments` table is already created. Next we extend the Klo prompt to detect commitments in conversation, render them as cards in chat, and emit Klo nudges when due dates pass. Email nudges via Resend.
-- **Phase 4 — Polish, Dashboard, Manager View (Weeks 7–10):** PWA, dashboard, archive flow, manager view, Stripe.
+- Voice mode (post-launch — Section 9.2).
+- Buyer-token validating RPC so buyers in shared mode get live `deals.summary` over realtime (currently the seller does, the buyer reads a snapshot at join).
 
 ## Brand
 

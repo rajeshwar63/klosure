@@ -24,6 +24,7 @@ export default function ChatView({
   setKloThinking,
   highlightCommitmentId,
   onHighlightConsumed,
+  locked = false,
 }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -70,6 +71,7 @@ export default function ChatView({
 
   async function sendMessage(e) {
     e?.preventDefault()
+    if (locked) return
     const content = input.trim()
     if (!content || sending) return
     setSending(true)
@@ -205,40 +207,48 @@ export default function ChatView({
         </div>
       </main>
 
-      <form onSubmit={sendMessage} className="bg-[#f0f0f0] border-t border-navy/10 safe-bottom shrink-0">
-        <div className="max-w-2xl mx-auto px-3 py-2 flex items-end gap-2">
-          <button
-            type="button"
-            onClick={() => setProposeOpen(true)}
-            className="bg-white border border-navy/10 hover:border-klo hover:text-klo text-navy/60 rounded-full w-11 h-11 flex items-center justify-center text-2xl leading-none shrink-0"
-            aria-label="Propose a commitment"
-            title="Propose a commitment"
-          >
-            +
-          </button>
-          <textarea
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage()
-              }
-            }}
-            placeholder={role === 'buyer' ? 'Reply to the seller…' : 'Message the room or ask Klo…'}
-            className="flex-1 bg-white rounded-2xl px-4 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-klo/30 max-h-32 resize-none"
-          />
-          <button
-            type="submit"
-            disabled={sending || !input.trim()}
-            className="bg-klo hover:bg-klo/90 disabled:opacity-40 text-white rounded-full w-11 h-11 flex items-center justify-center font-bold shrink-0"
-            aria-label="Send"
-          >
-            ›
-          </button>
+      {locked ? (
+        <div className="bg-[#f0f0f0] border-t border-navy/10 safe-bottom shrink-0">
+          <div className="max-w-2xl mx-auto px-3 py-3 text-center text-xs text-navy/60">
+            This room is read-only. Reopen the deal from the header to chat again.
+          </div>
         </div>
-      </form>
+      ) : (
+        <form onSubmit={sendMessage} className="bg-[#f0f0f0] border-t border-navy/10 safe-bottom shrink-0">
+          <div className="max-w-2xl mx-auto px-3 py-2 flex items-end gap-2">
+            <button
+              type="button"
+              onClick={() => setProposeOpen(true)}
+              className="bg-white border border-navy/10 hover:border-klo hover:text-klo text-navy/60 rounded-full w-11 h-11 flex items-center justify-center text-2xl leading-none shrink-0"
+              aria-label="Propose a commitment"
+              title="Propose a commitment"
+            >
+              +
+            </button>
+            <textarea
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage()
+                }
+              }}
+              placeholder={role === 'buyer' ? 'Reply to the seller…' : 'Message the room or ask Klo…'}
+              className="flex-1 bg-white rounded-2xl px-4 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-klo/30 max-h-32 resize-none"
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="bg-klo hover:bg-klo/90 disabled:opacity-40 text-white rounded-full w-11 h-11 flex items-center justify-center font-bold shrink-0"
+              aria-label="Send"
+            >
+              ›
+            </button>
+          </div>
+        </form>
+      )}
 
       {proposeOpen && (
         <ProposeCommitmentModal

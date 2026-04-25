@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import DealRoom from '../components/DealRoom.jsx'
@@ -7,6 +7,8 @@ import DealRoom from '../components/DealRoom.jsx'
 export default function DealRoomPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const autoShare = params.get('share') === '1'
   const { user } = useAuth()
   const [deal, setDeal] = useState(null)
   const [dealContext, setDealContext] = useState(null)
@@ -60,6 +62,7 @@ export default function DealRoomPage() {
       role="seller"
       currentUserName={sellerName}
       onBack={() => navigate('/deals')}
+      autoShare={autoShare}
     />
   )
 }

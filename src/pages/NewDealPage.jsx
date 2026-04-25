@@ -1,13 +1,40 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useProfile } from '../hooks/useProfile.jsx'
+import { canCreateDeal, planConfig, nextPlanFor } from '../lib/plans.js'
 
 const EMPTY_STAKEHOLDER = { name: '', role: '', company: '' }
 
 export default function NewDealPage() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const wantsShare = params.get('share') === '1'
   const { user } = useAuth()
+  const { plan } = useProfile()
+  const [activeCount, setActiveCount] = useState(null)
+
+  useEffect(() => {
+    if (!user) return
+    let mounted = true
+    async function load() {
+      const { count } = await supabase
+        .from('deals')
+        .select('id', { count: 'exact', head: true })
+        .eq('seller_id', user.id)
+        .eq('status', 'active')
+      if (mounted) setActiveCount(count ?? 0)
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [user])
+
+  const cfg = planConfig(plan)
+  const overLimit = activeCount !== null && !canCreateDeal({ plan, activeCount })
+  const upsell = nextPlanFor('unlimited_deals')
 
   const [form, setForm] = useState({
     title: '',
@@ -41,6 +68,10 @@ export default function NewDealPage() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    if (overLimit) {
+      setError(`The Free plan limits you to ${cfg.activeDealLimit} active deal. Upgrade to ${upsell.name} for unlimited.`)
+      return
+    }
     setSubmitting(true)
 
     const cleanStakeholders = stakeholders
@@ -74,7 +105,7 @@ export default function NewDealPage() {
       })
       if (contextError) throw contextError
 
-      navigate(`/deals/${deal.id}`, { replace: true })
+      navigate(`/deals/${deal.id}${wantsShare ? '?share=1' : ''}`, { replace: true })
     } catch (err) {
       setError(err?.message ?? 'Could not create the deal.')
       setSubmitting(false)
@@ -94,6 +125,24 @@ export default function NewDealPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-32">
+        {overLimit && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-lg">⚠</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">You've hit the Free plan limit.</p>
+              <p className="text-xs mt-0.5">
+                Free includes {cfg.activeDealLimit} active deal. Close or archive an existing deal,
+                or upgrade to {upsell.name} for unlimited.
+              </p>
+            </div>
+            <Link
+              to="/billing"
+              className="bg-klo hover:bg-klo/90 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0"
+            >
+              Upgrade
+            </Link>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-5">
           <Card>
             <Field label="Deal title" required value={form.title} onChange={(v) => update('title', v)} placeholder="DIB — Learning Experience Platform" />
@@ -179,7 +228,7 @@ export default function NewDealPage() {
             </Link>
             <button
               type="submit"
-              disabled={submitting || !form.title.trim()}
+              disabled={submitting || !form.title.trim() || overLimit}
               className="flex-1 bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold py-3 rounded-xl"
             >
               {submitting ? 'Creating…' : 'Create deal & open Klo'}
