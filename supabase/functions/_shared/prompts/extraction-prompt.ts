@@ -70,7 +70,7 @@ export function buildExtractionPrompt(args: {
 </deal_context>
 
 <current_klo_state>
-${JSON.stringify(args.currentState, null, 2)}
+${JSON.stringify(args.currentState)}
 </current_klo_state>
 
 Now call emit_klo_response with the updated klo_state and a chat_reply addressed to ${args.recipientRole}.`;
