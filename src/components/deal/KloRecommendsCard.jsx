@@ -154,7 +154,7 @@ function SellerRecommendsCard({ klo_state, onSwitchToChat }) {
       </h2>
 
       {body && (
-        <p className="text-sm text-navy/65 leading-relaxed mb-4 whitespace-pre-line">
+        <p className="text-[15px] text-navy/65 leading-relaxed mb-4 whitespace-pre-line">
           {body}
         </p>
       )}
@@ -182,7 +182,7 @@ function BuyerRecommendsCard({ klo_state }) {
       </h2>
 
       {body && (
-        <p className="text-sm text-navy/65 leading-relaxed whitespace-pre-line">
+        <p className="text-[15px] text-navy/65 leading-relaxed whitespace-pre-line">
           {body}
         </p>
       )}

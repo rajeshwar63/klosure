@@ -61,7 +61,7 @@ function Stat({ label, value, sub, valueColor, subColor }) {
       </div>
       {sub && (
         <div
-          className="text-[10px] mt-0.5"
+          className="text-[11px] mt-0.5"
           style={{ color: subColor || 'rgba(26,26,46,0.45)' }}
         >
           {sub}

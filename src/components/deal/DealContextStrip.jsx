@@ -25,7 +25,7 @@ export default function DealContextStrip({ klo_state }) {
         +
       </span>
       <div
-        className="flex-1 min-w-0 text-xs leading-relaxed"
+        className="flex-1 min-w-0 text-[13px] leading-relaxed"
         style={{ color: '#633806' }}
       >
         {display}
