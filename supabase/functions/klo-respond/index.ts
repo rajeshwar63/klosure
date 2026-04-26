@@ -306,12 +306,18 @@ async function updateDealState(deal_id: string, state: KloState): Promise<void> 
 }
 
 async function postKloMessage(
-  _deal_id: string,
-  _content: string,
-  _visible_to: "seller" | "buyer",
+  deal_id: string,
+  content: string,
+  visible_to: "seller" | "buyer",
 ): Promise<void> {
-  // TODO step 07: insert into messages with sender_type='klo', visible_to set
-  throw new Error("postKloMessage not implemented")
+  const { error } = await sb.from("messages").insert({
+    deal_id,
+    sender_type: "klo",
+    sender_name: "Klo",
+    content,
+    visible_to,
+  })
+  if (error) throw error
 }
 
 function json(body: unknown, status = 200) {
