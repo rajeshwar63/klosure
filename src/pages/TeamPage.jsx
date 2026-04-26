@@ -71,7 +71,10 @@ export default function TeamPage() {
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
       <header className="bg-navy text-white">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+        <div
+          className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-3"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <div className="min-w-0">
             <p className="text-white/50 text-[11px] uppercase tracking-wider font-semibold">Team</p>
             <h1 className="font-bold text-lg truncate">{team.name || 'My team'}</h1>
@@ -362,7 +365,10 @@ function CreateTeamCard({ user, profile, onCreated, onCancel }) {
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
       <header className="bg-navy text-white">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+        <div
+          className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <button onClick={onCancel} className="text-white/70 hover:text-white text-lg">‹</button>
           <h1 className="font-bold text-lg">Create your team</h1>
         </div>

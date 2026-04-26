@@ -56,7 +56,10 @@ export default function DealsListPage() {
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
       <header className="bg-navy text-white">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+        <div
+          className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <div className="min-w-0">
             <h1 className="font-bold text-lg truncate">
               {profile?.name ? `${profile.name.split(' ')[0]}'s deals` : 'Your deals'}
@@ -147,6 +150,7 @@ export default function DealsListPage() {
       <Link
         to="/deals/new"
         className="fixed bottom-6 right-6 sm:right-[calc(50%-22rem)] bg-klo hover:bg-klo/90 text-white shadow-lg rounded-full px-5 py-3 font-semibold flex items-center gap-2"
+        style={{ bottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
       >
         <span className="text-xl leading-none">+</span> New deal
       </Link>

@@ -185,7 +185,10 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   return (
     <div className="min-h-screen flex flex-col bg-chat-bg">
       <header className="bg-navy text-white shadow-sm shrink-0">
-        <div className="max-w-2xl mx-auto px-3 py-3 flex items-center gap-3">
+        <div
+          className="max-w-2xl mx-auto px-3 py-3 flex items-center gap-3"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+        >
           <button
             onClick={onBack ?? (() => navigate(-1))}
             className="text-white/70 hover:text-white text-2xl leading-none px-1"
