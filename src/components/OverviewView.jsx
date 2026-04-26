@@ -7,6 +7,7 @@ import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLo
 import ActionZones from './overview/ActionZones.jsx'
 import StageTracker from './overview/StageTracker.jsx'
 import Tooltip from './Tooltip.jsx'
+import RemoveButton from './RemoveButton.jsx'
 import { formatCurrency } from '../lib/format.js'
 
 // Phase 4.5: Overview renders from deals.klo_state — the living deal record
@@ -66,10 +67,17 @@ export default function OverviewView({
             <KloTake state={ks} viewerRole={role} />
             <DealStatStrip state={ks} health={health} />
             <StageTracker deal={{ ...deal, stage: ks.stage }} />
-            <PeopleGrid people={ks.people} viewerRole={role} onSwitchToChat={onSwitchToChat} />
+            <PeopleGrid
+              people={ks.people}
+              viewerRole={role}
+              dealId={deal.id}
+              onSwitchToChat={onSwitchToChat}
+            />
             <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
-            <BlockersList blockers={ks.blockers} />
-            {role === 'seller' && <OpenQuestionsList items={ks.open_questions} />}
+            <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
+            {role === 'seller' && (
+              <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
+            )}
             {role === 'seller' && <DecisionsList items={ks.decisions} />}
           </>
         ) : (
@@ -210,7 +218,7 @@ function Cell({ label, value, sub }) {
 // ---------------------------------------------------------------------------
 // People — pulled from klo_state.people.
 // ---------------------------------------------------------------------------
-function PeopleGrid({ people, viewerRole: _viewerRole, onSwitchToChat }) {
+function PeopleGrid({ people, viewerRole, dealId, onSwitchToChat }) {
   if (!people || people.length === 0) {
     return (
       <div className="bg-white border border-navy/10 border-dashed rounded-xl px-4 py-6 text-center">
@@ -240,36 +248,54 @@ function PeopleGrid({ people, viewerRole: _viewerRole, onSwitchToChat }) {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {people.map((p, i) => (
-          <PersonCard key={`${p.name || 'anon'}-${i}`} person={p} />
+          <PersonCard
+            key={`${p.name || 'anon'}-${i}`}
+            person={p}
+            dealId={dealId}
+            canRemove={viewerRole === 'seller'}
+          />
         ))}
       </div>
     </div>
   )
 }
 
-function PersonCard({ person }) {
+function PersonCard({ person, dealId, canRemove }) {
   const name = person?.name?.trim() || 'Unnamed'
   const role = person?.role?.trim() || ''
   const company = person?.company?.trim() || ''
   return (
-    <Tooltip content={renderProvenance(person?.first_seen_message_id)}>
-      <div className="border border-navy/10 rounded-lg px-2 py-2.5 flex flex-col items-center text-center w-full">
-        <Avatar name={name} />
-        <div className="text-[12px] font-semibold text-navy mt-1.5 truncate w-full" title={name}>
-          {name}
-        </div>
-        {role && (
-          <div className="text-[10px] text-navy/50 truncate w-full" title={role}>
-            {role}
-          </div>
-        )}
-        {company && (
-          <div className="text-[10px] text-navy/40 truncate w-full" title={company}>
-            {company}
-          </div>
-        )}
+    <div className="relative border border-navy/10 rounded-lg px-2 py-2.5 flex flex-col items-center text-center w-full">
+      {canRemove && (
+        <span className="absolute top-1 right-1">
+          <RemoveButton
+            dealId={dealId}
+            kind="people"
+            match={{ name: person.name }}
+            label={name}
+            addedAt={person.added_at}
+          />
+        </span>
+      )}
+      <Tooltip content={renderProvenance(person?.first_seen_message_id)}>
+        <span className="block">
+          <Avatar name={name} />
+        </span>
+      </Tooltip>
+      <div className="text-[12px] font-semibold text-navy mt-1.5 truncate w-full" title={name}>
+        {name}
       </div>
-    </Tooltip>
+      {role && (
+        <div className="text-[10px] text-navy/50 truncate w-full" title={role}>
+          {role}
+        </div>
+      )}
+      {company && (
+        <div className="text-[10px] text-navy/40 truncate w-full" title={company}>
+          {company}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -314,7 +340,7 @@ const SEVERITY_DOT = {
   red: 'bg-red-500',
 }
 
-function BlockersList({ blockers }) {
+function BlockersList({ blockers, viewerRole, dealId }) {
   if (!blockers || blockers.length === 0) {
     return (
       <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
@@ -325,6 +351,7 @@ function BlockersList({ blockers }) {
       </div>
     )
   }
+  const canRemove = viewerRole === 'seller'
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
       <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
@@ -342,6 +369,15 @@ function BlockersList({ blockers }) {
               <span className="block">{b.text}</span>
             </Tooltip>
             {b.since && <span className="text-[11px] text-navy/40 shrink-0">since {b.since}</span>}
+            {canRemove && (
+              <RemoveButton
+                dealId={dealId}
+                kind="blockers"
+                match={{ text: b.text }}
+                label={b.text}
+                addedAt={b.added_at}
+              />
+            )}
           </li>
         ))}
       </ul>
@@ -352,7 +388,7 @@ function BlockersList({ blockers }) {
 // ---------------------------------------------------------------------------
 // Open questions — seller-only.
 // ---------------------------------------------------------------------------
-function OpenQuestionsList({ items }) {
+function OpenQuestionsList({ items, dealId }) {
   if (!items || items.length === 0) return null
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
@@ -366,6 +402,13 @@ function OpenQuestionsList({ items }) {
             <Tooltip content={renderProvenance(q.source_message_id)} className="flex-1">
               <span className="block">{q.text}</span>
             </Tooltip>
+            <RemoveButton
+              dealId={dealId}
+              kind="open_questions"
+              match={{ text: q.text }}
+              label={q.text}
+              addedAt={q.added_at}
+            />
           </li>
         ))}
       </ul>
