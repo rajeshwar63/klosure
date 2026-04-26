@@ -1,10 +1,12 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   splitActionZones,
   deriveHealthFromState,
 } from '../services/overview.js'
+import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLookup.js'
 import ActionZones from './overview/ActionZones.jsx'
 import StageTracker from './overview/StageTracker.jsx'
+import Tooltip from './Tooltip.jsx'
 import { formatCurrency } from '../lib/format.js'
 
 // Phase 4.5: Overview renders from deals.klo_state — the living deal record
@@ -29,6 +31,32 @@ export default function OverviewView({
     () => deriveHealthFromState(ks, commitments),
     [ks, commitments],
   )
+
+  // Phase 4.5: prefetch every source_message_id used by the Overview so the
+  // tooltips on hover render synchronously from cache.
+  const [snippetVersion, setSnippetVersion] = useState(0)
+  useEffect(() => {
+    if (!ks) return
+    const ids = [
+      ks.deal_value?.source_message_id,
+      ks.deadline?.source_message_id,
+      ...(ks.people ?? []).map((p) => p.first_seen_message_id),
+      ...(ks.blockers ?? []).map((b) => b.source_message_id),
+      ...(ks.open_questions ?? []).map((q) => q.source_message_id),
+      ...(ks.decisions ?? []).map((d) => d.source_message_id),
+    ].filter(Boolean)
+    if (ids.length === 0) return
+    let alive = true
+    prefetchMessageSnippets(ids).then(() => {
+      if (alive) setSnippetVersion((v) => v + 1)
+    })
+    return () => {
+      alive = false
+    }
+  }, [ks])
+  // snippetVersion forces a re-render once the cache is warm so tooltips can
+  // pull from it synchronously.
+  void snippetVersion
 
   return (
     <main className="flex-1 overflow-y-auto bg-chat-bg/40 px-3 py-4">
@@ -90,6 +118,23 @@ function DealStatStrip({ state, health }) {
   const dateTentative = state.deadline?.confidence === 'tentative'
   const healthMeta = HEALTH[health] ?? HEALTH.green
 
+  const valueValue = (
+    <span className={valueTentative ? 'text-amber-700' : ''}>
+      {state.deal_value ? formatCurrency(state.deal_value.amount) : '—'}
+      {valueTentative && (
+        <span className="ml-1 text-[11px] italic font-normal opacity-70">(tentative)</span>
+      )}
+    </span>
+  )
+  const dateValue = (
+    <span className={dateTentative ? 'text-amber-700' : ''}>
+      {state.deadline?.date ?? '—'}
+      {dateTentative && (
+        <span className="ml-1 text-[11px] italic font-normal opacity-70">(tentative)</span>
+      )}
+    </span>
+  )
+
   return (
     <div className="rounded-xl overflow-hidden border border-navy/10 bg-navy/10">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-px">
@@ -97,26 +142,18 @@ function DealStatStrip({ state, health }) {
         <Cell
           label="Value"
           value={
-            <span className={valueTentative ? 'text-amber-700' : ''}>
-              {state.deal_value
-                ? formatCurrency(state.deal_value.amount)
-                : '—'}
-              {valueTentative && (
-                <span className="ml-1 text-[11px] italic font-normal opacity-70">(tentative)</span>
-              )}
-            </span>
+            <Tooltip content={renderProvenance(state.deal_value?.source_message_id)}>
+              {valueValue}
+            </Tooltip>
           }
           sub={state.deal_value ? `Per the deal record (${state.deal_value.currency})` : 'Not set'}
         />
         <Cell
           label="Deadline"
           value={
-            <span className={dateTentative ? 'text-amber-700' : ''}>
-              {state.deadline?.date ?? '—'}
-              {dateTentative && (
-                <span className="ml-1 text-[11px] italic font-normal opacity-70">(tentative)</span>
-              )}
-            </span>
+            <Tooltip content={renderProvenance(state.deadline?.source_message_id)}>
+              {dateValue}
+            </Tooltip>
           }
           sub={
             dateTentative && state.deadline?.previous
@@ -138,6 +175,23 @@ function DealStatStrip({ state, health }) {
         />
       </div>
     </div>
+  )
+}
+
+// Build the JSX shown inside a tooltip from the cached message snippet.
+// Returns null if there's no source id, or if the message hasn't been
+// prefetched yet — Tooltip handles null content by rendering nothing (no
+// empty bubble, no crash).
+function renderProvenance(messageId) {
+  const snippet = getCachedSnippet(messageId)
+  if (!snippet) return null
+  return (
+    <span className="block">
+      <span className="block text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-1">
+        Source · {snippet.sender || snippet.role} · {snippet.when}
+      </span>
+      <span className="block italic text-navy/80">"{snippet.text}"</span>
+    </span>
   )
 }
 
@@ -198,22 +252,24 @@ function PersonCard({ person }) {
   const role = person?.role?.trim() || ''
   const company = person?.company?.trim() || ''
   return (
-    <div className="border border-navy/10 rounded-lg px-2 py-2.5 flex flex-col items-center text-center">
-      <Avatar name={name} />
-      <div className="text-[12px] font-semibold text-navy mt-1.5 truncate w-full" title={name}>
-        {name}
+    <Tooltip content={renderProvenance(person?.first_seen_message_id)}>
+      <div className="border border-navy/10 rounded-lg px-2 py-2.5 flex flex-col items-center text-center w-full">
+        <Avatar name={name} />
+        <div className="text-[12px] font-semibold text-navy mt-1.5 truncate w-full" title={name}>
+          {name}
+        </div>
+        {role && (
+          <div className="text-[10px] text-navy/50 truncate w-full" title={role}>
+            {role}
+          </div>
+        )}
+        {company && (
+          <div className="text-[10px] text-navy/40 truncate w-full" title={company}>
+            {company}
+          </div>
+        )}
       </div>
-      {role && (
-        <div className="text-[10px] text-navy/50 truncate w-full" title={role}>
-          {role}
-        </div>
-      )}
-      {company && (
-        <div className="text-[10px] text-navy/40 truncate w-full" title={company}>
-          {company}
-        </div>
-      )}
-    </div>
+    </Tooltip>
   )
 }
 
@@ -282,7 +338,9 @@ function BlockersList({ blockers }) {
                 SEVERITY_DOT[b.severity] ?? 'bg-amber-500'
               }`}
             />
-            <span className="flex-1">{b.text}</span>
+            <Tooltip content={renderProvenance(b.source_message_id)} className="flex-1">
+              <span className="block">{b.text}</span>
+            </Tooltip>
             {b.since && <span className="text-[11px] text-navy/40 shrink-0">since {b.since}</span>}
           </li>
         ))}
@@ -305,7 +363,9 @@ function OpenQuestionsList({ items }) {
         {items.map((q, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
             <span className="text-klo font-bold leading-none mt-0.5">?</span>
-            <span className="flex-1">{q.text}</span>
+            <Tooltip content={renderProvenance(q.source_message_id)} className="flex-1">
+              <span className="block">{q.text}</span>
+            </Tooltip>
           </li>
         ))}
       </ul>
@@ -327,7 +387,9 @@ function DecisionsList({ items }) {
         {items.map((d, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
             <span className="text-emerald-600 leading-none mt-0.5">✓</span>
-            <span className="flex-1">{d.what}</span>
+            <Tooltip content={renderProvenance(d.source_message_id)} className="flex-1">
+              <span className="block">{d.what}</span>
+            </Tooltip>
             {d.when && <span className="text-[11px] text-navy/40 shrink-0">{d.when}</span>}
           </li>
         ))}
