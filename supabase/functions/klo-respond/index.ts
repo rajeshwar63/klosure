@@ -291,9 +291,18 @@ async function writeHistory(
   }
 }
 
-async function updateDealState(_deal_id: string, _state: KloState): Promise<void> {
-  // TODO step 07: update deals.klo_state, AND sync legacy columns (stage, value, deadline, summary)
-  throw new Error("updateDealState not implemented")
+async function updateDealState(deal_id: string, state: KloState): Promise<void> {
+  // Sync legacy columns so existing UI keeps working as a rollback target.
+  const update: Record<string, unknown> = {
+    klo_state: state,
+    summary: state.summary,
+    stage: state.stage,
+  }
+  if (state.deal_value) update.value = state.deal_value.amount
+  if (state.deadline) update.deadline = state.deadline.date
+
+  const { error } = await sb.from("deals").update(update).eq("id", deal_id)
+  if (error) throw error
 }
 
 async function postKloMessage(
