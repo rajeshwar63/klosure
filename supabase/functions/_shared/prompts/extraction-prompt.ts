@@ -80,18 +80,11 @@ When you detect one of these, your chat_reply should:
 
 If the user asks about something that has no history (e.g. "when did the budget change?" but the budget never changed), say so directly: "Budget hasn't changed — it's been $25k since the deal opened."
 
-# Output format
+# Output
 
-Respond with a single JSON object. No prose outside the JSON.
-
-{
-  "klo_state": { ... full updated state, same shape as current ... },
-  "chat_reply": "<your reply to ${args.recipientRole}, 1-3 sentences>"
-}
+Call the emit_klo_response tool with your updated deal state and a chat reply addressed to ${args.recipientRole}. The tool's schema enforces the structure — focus on the content quality.
 
 Set added_at on any new array items to the current ISO timestamp. Preserve added_at on items that already exist.
 
-If a renderable item came from a specific message in this turn, set source_message_id to that message's id (the messages array provides ids).
-
-CRITICAL: Your response MUST be valid JSON. Before sending: verify every array item is followed by a comma except the last; every object property is followed by a comma except the last; all braces and brackets are balanced. Do not include any text outside the JSON object.`;
+If a renderable item came from a specific message in this turn, set source_message_id to that message's id (the messages array provides ids).`;
 }
