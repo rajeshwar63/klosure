@@ -183,7 +183,7 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   }, [deal?.buyer_token])
 
   return (
-    <div className="min-h-screen flex flex-col bg-chat-bg">
+    <div className="h-dvh flex flex-col bg-chat-bg overflow-hidden">
       <header className="bg-navy text-white shadow-sm shrink-0">
         <div
           className="max-w-2xl mx-auto px-3 py-3 flex items-center gap-3"

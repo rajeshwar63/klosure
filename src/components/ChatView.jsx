@@ -30,16 +30,27 @@ export default function ChatView({
   const [sending, setSending] = useState(false)
   const [proposeOpen, setProposeOpen] = useState(false)
   const scrollRef = useRef(null)
+  // Phase 5.5 step 02: track whether the user is parked near the bottom of
+  // the timeline. New messages arriving while they're scrolled up to read
+  // history shouldn't yank the view away from what they're reading.
+  const isAtBottomRef = useRef(true)
 
   const otherRole = role === 'seller' ? 'buyer' : 'seller'
   const otherName = role === 'seller'
     ? (deal.buyer_company || 'Buyer')
     : (deal.seller_company || 'Seller')
 
+  function handleScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+    isAtBottomRef.current = distance < 100
+  }
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
+    if (!scrollRef.current) return
+    if (!isAtBottomRef.current) return
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, commitments, kloThinking])
 
   // Jump-to-commitment from the Overview's action zones. We wait one frame so
@@ -86,6 +97,9 @@ export default function ChatView({
     }
     setMessages((m) => [...m, optimistic])
     setInput('')
+    // Sending counts as engagement with the live conversation — snap back to
+    // the bottom even if they were reading history a moment ago.
+    isAtBottomRef.current = true
 
     const { data, error } = await supabase
       .from('messages')
@@ -187,7 +201,11 @@ export default function ChatView({
 
   return (
     <>
-      <main ref={scrollRef} className="flex-1 overflow-y-auto chat-doodle px-3 py-3">
+      <main
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto chat-doodle px-3 py-3"
+      >
         <div className="max-w-2xl mx-auto space-y-2">
           {timeline.map((item) =>
             item.kind === 'message' ? (
