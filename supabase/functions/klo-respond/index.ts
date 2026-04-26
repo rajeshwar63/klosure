@@ -228,15 +228,67 @@ async function callAnthropic(
   return parsed as KloRespondOutput
 }
 
+const NOISY_FIELDS = new Set([
+  "summary",
+  "klo_take_seller",
+  "klo_take_buyer",
+  "stage_reasoning",
+])
+
 async function writeHistory(
-  _deal_id: string,
-  _oldState: KloState | null,
-  _newState: KloState,
-  _triggering_message_id: string | null,
-  _triggered_by_role: "seller" | "buyer" | "system",
+  deal_id: string,
+  oldState: KloState | null,
+  newState: KloState,
+  triggering_message_id: string | null,
+  triggered_by_role: "seller" | "buyer" | "system",
 ): Promise<void> {
-  // TODO step 07: diff old vs new, insert one klo_state_history row per change
-  throw new Error("writeHistory not implemented")
+  // Bootstrap case: one row, kind='extracted', field_path='bootstrap'.
+  if (oldState == null) {
+    const { error } = await sb.from("klo_state_history").insert({
+      deal_id,
+      triggered_by_message_id: triggering_message_id,
+      triggered_by_role: "system",
+      change_kind: "extracted",
+      field_path: "bootstrap",
+      before_value: null,
+      after_value: newState,
+    })
+    if (error) throw error
+    return
+  }
+
+  const rows: Array<Record<string, unknown>> = []
+  const fields: Array<keyof KloState> = [
+    "stage",
+    "deal_value",
+    "deadline",
+    "people",
+    "decisions",
+    "blockers",
+    "open_questions",
+  ]
+
+  for (const f of fields) {
+    if (NOISY_FIELDS.has(f as string)) continue
+    const before = (oldState as unknown as Record<string, unknown>)[f as string]
+    const after = (newState as unknown as Record<string, unknown>)[f as string]
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      rows.push({
+        deal_id,
+        triggered_by_message_id: triggering_message_id,
+        triggered_by_role,
+        change_kind: "extracted",
+        field_path: String(f),
+        before_value: before ?? null,
+        after_value: after ?? null,
+      })
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error } = await sb.from("klo_state_history").insert(rows)
+    if (error) throw error
+  }
 }
 
 async function updateDealState(_deal_id: string, _state: KloState): Promise<void> {
