@@ -21,6 +21,7 @@ import DealStatStripWide from './DealStatStripWide.jsx'
 import BlockersPanel from './BlockersPanel.jsx'
 import CommitmentsPanel from './CommitmentsPanel.jsx'
 import StakeholdersPanel from './StakeholdersPanel.jsx'
+import RecencyStrip from './RecencyStrip.jsx'
 import { useStuckFor } from '../../hooks/useStuckFor.js'
 
 export default function OverviewTab({
@@ -36,6 +37,8 @@ export default function OverviewTab({
   return (
     <div className="p-4 md:p-6 max-w-[1200px] mx-auto">
       <DealContextStrip klo_state={ks} />
+
+      <RecencyStrip dealId={deal?.id} klo_state={ks} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4 mb-4">
         <KloRecommendsCard
