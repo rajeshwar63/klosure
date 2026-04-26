@@ -1,22 +1,40 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   splitActionZones,
   deriveHealthFromState,
+  summarizePeople,
+  summarizeBlockers,
+  compactDeadline,
+  healthLabel,
 } from '../services/overview.js'
 import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLookup.js'
+import { loadSectionState, setSectionExpanded } from '../services/overviewSections.js'
 import ActionZones from './overview/ActionZones.jsx'
-import ConfidencePanel from './overview/ConfidencePanel.jsx'
+import KloReadPanel from './overview/KloReadPanel.jsx'
 import StageTracker from './overview/StageTracker.jsx'
+import CollapsibleSection from './overview/CollapsibleSection.jsx'
 import Tooltip from './Tooltip.jsx'
 import RemoveButton from './RemoveButton.jsx'
 import { formatCurrency } from '../lib/format.js'
+
+// Phase 5.5 step 06 default expansion: Commitments is always action-oriented
+// so it leads expanded; everything else opens collapsed and remembers the
+// user's per-deal preference (step 07).
+const SECTION_DEFAULTS = {
+  deal_facts: false,
+  commitments: true,
+  people: false,
+  blockers: false,
+  decisions: false,
+  open_questions: false,
+}
 
 // Phase 4.5: Overview renders from deals.klo_state — the living deal record
 // Klo writes on every chat turn. Legacy fields (deal.value, deal.deadline,
 // deal.summary, deal.stage) are still mirrored so this view degrades to the
 // previous behavior if klo_state is null.
 //
-// Sections render the same factual data on both sides — only KloTake and
+// Sections render the same factual data on both sides — only KloReadPanel and
 // OpenQuestionsList diverge. Removing items lives in step 11; provenance
 // hover lives in step 10. This step is pure rendering.
 export default function OverviewView({
@@ -32,6 +50,26 @@ export default function OverviewView({
   const health = useMemo(
     () => deriveHealthFromState(ks, commitments),
     [ks, commitments],
+  )
+
+  // Phase 5.5 step 07: per-deal section expansion. Re-load whenever dealId
+  // changes so navigating between deals picks up that deal's stored state.
+  const [sectionState, setSectionState] = useState(() => loadSectionState(deal?.id))
+  useEffect(() => {
+    setSectionState(loadSectionState(deal?.id))
+  }, [deal?.id])
+
+  const isExpanded = useCallback(
+    (key) => (key in sectionState ? sectionState[key] : SECTION_DEFAULTS[key]),
+    [sectionState],
+  )
+
+  const handleToggle = useCallback(
+    (key) => (next) => {
+      setSectionExpanded(deal?.id, key, next)
+      setSectionState((prev) => ({ ...prev, [key]: next }))
+    },
+    [deal?.id],
   )
 
   // Phase 4.5: prefetch every source_message_id used by the Overview so the
@@ -65,23 +103,79 @@ export default function OverviewView({
       <div className="max-w-2xl mx-auto space-y-4">
         {ks ? (
           <>
-            <KloTake state={ks} viewerRole={role} />
-            {role === 'seller' && <ConfidencePanel confidence={ks.confidence} />}
-            <DealStatStrip state={ks} health={health} />
-            <StageTracker deal={{ ...deal, stage: ks.stage }} />
-            <PeopleGrid
-              people={ks.people}
-              viewerRole={role}
-              dealId={deal.id}
-              onSwitchToChat={onSwitchToChat}
-            />
-            <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
-            <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
+            <KloReadPanel state={ks} viewerRole={role} />
+
+            <CollapsibleSection
+              title="Deal facts"
+              headline={`${STAGE_LABEL[ks.stage] ?? '—'} · ${
+                ks.deal_value ? formatCurrency(ks.deal_value.amount) : '—'
+              } · ${compactDeadline(ks.deadline?.date)} · ${healthLabel(health)}`}
+              expanded={isExpanded('deal_facts')}
+              onToggle={handleToggle('deal_facts')}
+            >
+              <div className="space-y-3">
+                <DealStatStrip state={ks} health={health} />
+                <StageTracker deal={{ ...deal, stage: ks.stage }} />
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Commitments"
+              expanded={isExpanded('commitments')}
+              onToggle={handleToggle('commitments')}
+            >
+              <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="People"
+              count={(ks.people ?? []).length}
+              headline={summarizePeople(ks.people)}
+              emptyMessage="Klo will add people as they appear in the chat."
+              expanded={isExpanded('people')}
+              onToggle={handleToggle('people')}
+            >
+              <PeopleGrid
+                people={ks.people}
+                viewerRole={role}
+                dealId={deal.id}
+                onSwitchToChat={onSwitchToChat}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Blockers"
+              count={(ks.blockers ?? []).length}
+              headline={summarizeBlockers(ks.blockers)}
+              emptyMessage="No blockers right now — keep it that way."
+              expanded={isExpanded('blockers')}
+              onToggle={handleToggle('blockers')}
+            >
+              <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
+            </CollapsibleSection>
+
             {/* Decisions are factual — both sides see them. Open questions are
                 seller-side coaching prompts and stay hidden for buyers. */}
-            <DecisionsList items={ks.decisions} />
+            <CollapsibleSection
+              title="Decisions on record"
+              count={(ks.decisions ?? []).length}
+              headline={ks.decisions?.[0]?.what ?? null}
+              emptyMessage="No decisions on record yet."
+              expanded={isExpanded('decisions')}
+              onToggle={handleToggle('decisions')}
+            >
+              <DecisionsList items={ks.decisions} />
+            </CollapsibleSection>
+
             {role === 'seller' && (
-              <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
+              <CollapsibleSection
+                title="Open questions"
+                count={(ks.open_questions ?? []).length}
+                expanded={isExpanded('open_questions')}
+                onToggle={handleToggle('open_questions')}
+              >
+                <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
+              </CollapsibleSection>
             )}
           </>
         ) : (
@@ -89,20 +183,6 @@ export default function OverviewView({
         )}
       </div>
     </main>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Klo's take — top of the Overview, role-scoped coaching string from klo_state.
-// ---------------------------------------------------------------------------
-function KloTake({ state, viewerRole }) {
-  const text = viewerRole === 'buyer' ? state.klo_take_buyer : state.klo_take_seller
-  if (!text) return null
-  return (
-    <div className="bg-klo-bg border border-klo/20 rounded-xl px-4 py-3 flex gap-3">
-      <span className="text-klo text-base leading-none mt-0.5">◆</span>
-      <p className="text-[14px] leading-snug text-navy">{text}</p>
-    </div>
   )
 }
 
@@ -222,34 +302,9 @@ function Cell({ label, value, sub }) {
 // ---------------------------------------------------------------------------
 // People — pulled from klo_state.people.
 // ---------------------------------------------------------------------------
-function PeopleGrid({ people, viewerRole, dealId, onSwitchToChat }) {
-  if (!people || people.length === 0) {
-    return (
-      <div className="bg-white border border-navy/10 border-dashed rounded-xl px-4 py-6 text-center">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-          People in this deal
-        </div>
-        <p className="text-[13px] text-navy/60 mb-3">
-          Klo will add people as they appear in the chat.
-        </p>
-        {onSwitchToChat && (
-          <button
-            type="button"
-            onClick={onSwitchToChat}
-            className="text-[12px] font-semibold text-klo hover:underline"
-          >
-            Open chat →
-          </button>
-        )}
-      </div>
-    )
-  }
-
+function PeopleGrid({ people, viewerRole, dealId, onSwitchToChat: _onSwitchToChat }) {
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-4">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-3">
-        People in this deal
-      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {people.map((p, i) => (
           <PersonCard
@@ -345,22 +400,9 @@ const SEVERITY_DOT = {
 }
 
 function BlockersList({ blockers, viewerRole, dealId }) {
-  if (!blockers || blockers.length === 0) {
-    return (
-      <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-1">
-          Blockers
-        </div>
-        <p className="text-[13px] text-navy/60">None right now.</p>
-      </div>
-    )
-  }
   const canRemove = viewerRole === 'seller'
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-        Blockers
-      </div>
       <ul className="space-y-1.5">
         {blockers.map((b, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
@@ -396,9 +438,6 @@ function OpenQuestionsList({ items, dealId }) {
   if (!items || items.length === 0) return null
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-        Open questions
-      </div>
       <ul className="space-y-1.5">
         {items.map((q, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
@@ -427,9 +466,6 @@ function DecisionsList({ items }) {
   if (!items || items.length === 0) return null
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-        Decisions on record
-      </div>
       <ul className="space-y-1.5">
         {items.map((d, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">

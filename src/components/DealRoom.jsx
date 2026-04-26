@@ -6,7 +6,7 @@ import { listCommitments } from '../services/commitments.js'
 import { markDealWon, markDealLost, reopenDeal, LOSS_REASONS } from '../services/archive.js'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { canShareWithBuyer, nextPlanFor } from '../lib/plans.js'
-import { formatCurrency, formatDeadline } from '../lib/format.js'
+import { formatCurrency, formatDeadline, daysUntil } from '../lib/format.js'
 import ChatView from './ChatView.jsx'
 import OverviewView from './OverviewView.jsx'
 import DealRoomTabs, { loadLastTab, saveLastTab } from './DealRoomTabs.jsx'
@@ -45,6 +45,10 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   const [shareOpen, setShareOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
   const [tab, setTab] = useState(() => loadLastTab(dealProp?.id))
+  // Phase 5.5 step 04: pill strip is compact-by-default; tapping the chip
+  // expands to the full row. No persistence — chat is meant to feel like
+  // chat, so navigating away resets it.
+  const [showAllPills, setShowAllPills] = useState(false)
 
   // Onboarding "Invite my buyer" path lands here with ?share=1 — pop the
   // share modal automatically once the deal is loaded and the plan allows it.
@@ -183,7 +187,7 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
   }, [deal?.buyer_token])
 
   return (
-    <div className="min-h-screen flex flex-col bg-chat-bg">
+    <div className="h-dvh flex flex-col bg-chat-bg overflow-hidden">
       <header className="bg-navy text-white shadow-sm shrink-0">
         <div
           className="max-w-2xl mx-auto px-3 py-3 flex items-center gap-3"
@@ -252,19 +256,33 @@ export default function DealRoom({ deal: dealProp, dealContext, role, currentUse
           )}
         </div>
 
-        {/* Pill strip */}
-        <div className="max-w-2xl mx-auto px-3 pb-3 overflow-x-auto no-scrollbar">
-          <div className="flex gap-2 text-[11px]">
-            <Pill>{STAGE_LABEL[deal.stage]}</Pill>
-            <HealthPill health={deal.health} />
-            <Pill>{formatCurrency(deal.value)}</Pill>
-            <Pill>{formatDeadline(deal.deadline)}</Pill>
-            <Pill>{deal.mode === 'shared' ? 'Shared' : 'Solo'}</Pill>
-            {stakeholders.slice(0, 3).map((s, i) => (
-              <Pill key={i}>{s.name}{s.role ? ` · ${s.role}` : ''}</Pill>
-            ))}
+        {/* Pill strip — compact by default, tap to expand. */}
+        {showAllPills ? (
+          <div className="max-w-2xl mx-auto px-3 pb-3 overflow-x-auto no-scrollbar">
+            <div className="flex gap-2 text-[11px] items-center">
+              <Pill>{STAGE_LABEL[deal.stage]}</Pill>
+              <HealthPill health={deal.health} />
+              <Pill>{formatCurrency(deal.value)}</Pill>
+              <Pill>{formatDeadline(deal.deadline)}</Pill>
+              <Pill>{deal.mode === 'shared' ? 'Shared' : 'Solo'}</Pill>
+              {stakeholders.slice(0, 3).map((s, i) => (
+                <Pill key={i}>{s.name}{s.role ? ` · ${s.role}` : ''}</Pill>
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowAllPills(false)}
+                aria-label="Collapse pills"
+                className="ml-auto text-white/70 hover:text-white text-base leading-none px-1.5"
+              >
+                ⌃
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="max-w-2xl mx-auto px-3 pb-3">
+            <CompactDealChip deal={deal} onExpand={() => setShowAllPills(true)} />
+          </div>
+        )}
       </header>
 
       <KloSummaryBar deal={deal} dealContext={dealContext} />
@@ -476,6 +494,55 @@ function Pill({ children }) {
       {children}
     </span>
   )
+}
+
+// Phase 5.5 step 04: single tappable chip that stands in for the full pill
+// row. Shows just the three things a seller scans for at a glance — health,
+// time-to-deadline, and which buyer this is.
+function CompactDealChip({ deal, onExpand }) {
+  const tone = deal.health === 'red'
+    ? 'bg-red-500/20 text-red-100 border-red-400/40'
+    : deal.health === 'amber'
+      ? 'bg-amber-500/20 text-amber-100 border-amber-400/40'
+      : 'bg-emerald-500/20 text-emerald-100 border-emerald-400/40'
+  const icon = deal.health === 'red' ? '✕' : deal.health === 'amber' ? '⚠' : '✓'
+  const healthText = HEALTH_LABEL[deal.health] ?? 'On track'
+  const days = compactDays(daysUntil(deal.deadline))
+  const buyer = (deal.buyer_company || deal.title || '').trim()
+
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      aria-label="Show all deal details"
+      className={`flex items-center gap-1.5 text-[11px] rounded-full px-3 py-1 border whitespace-nowrap max-w-full ${tone}`}
+    >
+      <span aria-hidden="true">{icon}</span>
+      <span className="font-semibold">{healthText}</span>
+      {days && (
+        <>
+          <span className="opacity-50">·</span>
+          <span>{days}</span>
+        </>
+      )}
+      {buyer && (
+        <>
+          <span className="opacity-50">·</span>
+          <span className="truncate">{buyer}</span>
+        </>
+      )}
+      <span className="opacity-70">⌄</span>
+    </button>
+  )
+}
+
+function compactDays(days) {
+  if (days === null || days === undefined) return ''
+  if (days < 0) return `${Math.abs(days)}d overdue`
+  if (days === 0) return 'today'
+  if (days < 7) return `${days}d`
+  if (days < 60) return `${Math.round(days / 7)}w`
+  return `${Math.round(days / 30)}mo`
 }
 
 function HealthPill({ health }) {

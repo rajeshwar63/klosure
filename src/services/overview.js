@@ -137,6 +137,42 @@ export function splitActionZones(commitments) {
   }
 }
 
+// Phase 5.5 step 06: short summaries used by collapsed-section headers so
+// the user can glance at "People (3) · Nina, Ahmed, +1" without expanding.
+export function summarizePeople(people) {
+  if (!people || people.length === 0) return null
+  const names = people.map((p) =>
+    !p.name || p.name === 'Unknown' ? '+1 unknown' : p.name,
+  )
+  if (names.length <= 2) return names.join(', ')
+  return `${names.slice(0, 2).join(', ')}, +${names.length - 2}`
+}
+
+export function summarizeBlockers(blockers) {
+  if (!blockers || blockers.length === 0) return null
+  return blockers
+    .slice(0, 2)
+    .map((b) => (b.text?.length > 40 ? b.text.slice(0, 37) + '…' : b.text))
+    .filter(Boolean)
+    .join(', ')
+}
+
+export function compactDeadline(deadlineISO) {
+  if (!deadlineISO) return '—'
+  const d = daysUntil(deadlineISO)
+  if (d === null) return '—'
+  if (d < 0) return `${Math.abs(d)}d overdue`
+  if (d === 0) return 'today'
+  if (d < 60) return `${d}d`
+  return `${Math.round(d / 30)}mo`
+}
+
+export function healthLabel(health) {
+  if (health === 'red') return 'At risk'
+  if (health === 'amber') return 'Stuck'
+  return 'On track'
+}
+
 function cmpDate(a, b) {
   if (!a && !b) return 0
   if (!a) return 1

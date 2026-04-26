@@ -9,6 +9,18 @@ import {
 } from '../services/commitments.js'
 import { formatTime, daysUntil } from '../lib/format.js'
 
+// Phase 5.5 step 03: textarea grows from 1 line up to 4 lines, then scrolls.
+// 22px leading + 8px top/bottom padding = 38px single-line; +3 extra lines
+// caps at 38 + 22*3 = 104px.
+const TEXTAREA_LINE_HEIGHT = 22
+const TEXTAREA_MAX_HEIGHT = 38 + TEXTAREA_LINE_HEIGHT * 3
+
+function placeholderFor(role, mode) {
+  if (role === 'buyer') return 'Reply to the seller…'
+  if (mode !== 'shared') return 'Message Klo…'
+  return 'Message the room or ask Klo…'
+}
+
 // Chat half of the deal room. The shell (DealRoom.jsx) owns deal/messages/
 // commitments state + the realtime channel; this view consumes them and
 // handles the input box, propose modal, and timeline render.
@@ -30,16 +42,41 @@ export default function ChatView({
   const [sending, setSending] = useState(false)
   const [proposeOpen, setProposeOpen] = useState(false)
   const scrollRef = useRef(null)
+  const textareaRef = useRef(null)
+  // Phase 5.5 step 02: track whether the user is parked near the bottom of
+  // the timeline. New messages arriving while they're scrolled up to read
+  // history shouldn't yank the view away from what they're reading.
+  const isAtBottomRef = useRef(true)
+
+  // Phase 5.5 step 03: auto-grow the textarea from 1 up to 4 lines as the
+  // user types, then enable internal scrolling. Heights match the explicit
+  // leading-[22px] / py-2 below.
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    const max = TEXTAREA_MAX_HEIGHT
+    const next = Math.min(ta.scrollHeight, max)
+    ta.style.height = next + 'px'
+    ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden'
+  }, [input])
 
   const otherRole = role === 'seller' ? 'buyer' : 'seller'
   const otherName = role === 'seller'
     ? (deal.buyer_company || 'Buyer')
     : (deal.seller_company || 'Seller')
 
+  function handleScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+    isAtBottomRef.current = distance < 100
+  }
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
+    if (!scrollRef.current) return
+    if (!isAtBottomRef.current) return
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, commitments, kloThinking])
 
   // Jump-to-commitment from the Overview's action zones. We wait one frame so
@@ -86,6 +123,9 @@ export default function ChatView({
     }
     setMessages((m) => [...m, optimistic])
     setInput('')
+    // Sending counts as engagement with the live conversation — snap back to
+    // the bottom even if they were reading history a moment ago.
+    isAtBottomRef.current = true
 
     const { data, error } = await supabase
       .from('messages')
@@ -187,7 +227,11 @@ export default function ChatView({
 
   return (
     <>
-      <main ref={scrollRef} className="flex-1 overflow-y-auto chat-doodle px-3 py-3">
+      <main
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto chat-doodle px-3 py-3"
+      >
         <div className="max-w-2xl mx-auto space-y-2">
           {timeline.map((item) =>
             item.kind === 'message' ? (
@@ -226,6 +270,7 @@ export default function ChatView({
               +
             </button>
             <textarea
+              ref={textareaRef}
               rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -235,8 +280,9 @@ export default function ChatView({
                   sendMessage()
                 }
               }}
-              placeholder={role === 'buyer' ? 'Reply to the seller…' : 'Message the room or ask Klo…'}
-              className="flex-1 bg-white rounded-2xl px-4 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-klo/30 max-h-32 resize-none"
+              placeholder={placeholderFor(role, deal.mode)}
+              style={{ lineHeight: `${TEXTAREA_LINE_HEIGHT}px`, maxHeight: `${TEXTAREA_MAX_HEIGHT}px` }}
+              className="flex-1 bg-white rounded-2xl px-4 py-2 text-[15px] focus:outline-none focus:ring-2 focus:ring-klo/30 resize-none overflow-y-hidden"
             />
             <button
               type="submit"
