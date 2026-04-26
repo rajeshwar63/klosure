@@ -24,6 +24,125 @@ const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
 
+const KLO_OUTPUT_TOOL = {
+  name: "emit_klo_response",
+  description: "Emit Klo's structured response: updated deal state and a chat reply.",
+  input_schema: {
+    type: "object",
+    properties: {
+      klo_state: {
+        type: "object",
+        properties: {
+          version: { type: "number" },
+          summary: { type: "string" },
+          stage: { type: "string", enum: ["discovery", "proposal", "negotiation", "legal", "closed"] },
+          stage_reasoning: { type: "string" },
+          deal_value: {
+            type: ["object", "null"],
+            properties: {
+              amount: { type: "number" },
+              currency: { type: "string" },
+              confidence: { type: "string", enum: ["definite", "tentative"] },
+              source_message_id: { type: ["string", "null"] },
+            },
+          },
+          deadline: {
+            type: ["object", "null"],
+            properties: {
+              date: { type: "string" },
+              confidence: { type: "string", enum: ["definite", "tentative"] },
+              previous: { type: ["string", "null"] },
+              note: { type: ["string", "null"] },
+              source_message_id: { type: ["string", "null"] },
+            },
+          },
+          people: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                role: { type: "string" },
+                company: { type: "string" },
+                first_seen_message_id: { type: ["string", "null"] },
+                added_at: { type: "string" },
+              },
+              required: ["name", "role", "company", "added_at"],
+            },
+          },
+          decisions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                what: { type: "string" },
+                when: { type: "string" },
+                source_message_id: { type: ["string", "null"] },
+              },
+              required: ["what", "when"],
+            },
+          },
+          blockers: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                text: { type: "string" },
+                since: { type: "string" },
+                severity: { type: "string", enum: ["green", "amber", "red"] },
+                source_message_id: { type: ["string", "null"] },
+                added_at: { type: "string" },
+              },
+              required: ["text", "since", "severity", "added_at"],
+            },
+          },
+          open_questions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                text: { type: "string" },
+                source_message_id: { type: ["string", "null"] },
+                added_at: { type: "string" },
+              },
+              required: ["text", "added_at"],
+            },
+          },
+          removed_items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                kind: { type: "string", enum: ["people", "blockers", "open_questions", "decisions"] },
+                value: {},
+                reason: { type: "string" },
+                removed_at: { type: "string" },
+              },
+              required: ["kind", "value", "reason", "removed_at"],
+            },
+          },
+          klo_take_seller: { type: "string" },
+          klo_take_buyer: { type: "string" },
+        },
+        required: [
+          "version",
+          "summary",
+          "stage",
+          "people",
+          "decisions",
+          "blockers",
+          "open_questions",
+          "removed_items",
+          "klo_take_seller",
+          "klo_take_buyer",
+        ],
+      },
+      chat_reply: { type: "string" },
+    },
+    required: ["klo_state", "chat_reply"],
+  },
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS })
@@ -212,11 +331,13 @@ async function callAnthropicOnce(
 
   const body: Record<string, unknown> = {
     model: KLO_MODEL,
-    max_tokens: 1500,
+    max_tokens: 4096,
     system: useCache
       ? [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }]
       : systemPrompt,
     messages: apiMessages,
+    tools: [KLO_OUTPUT_TOOL],
+    tool_choice: { type: "tool", name: "emit_klo_response" },
   }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -231,18 +352,21 @@ async function callAnthropicOnce(
 
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`)
   const data = await res.json()
-  const text: string = data.content?.[0]?.text ?? ""
 
-  // Robust JSON extraction: Klo should return only JSON, but tolerate accidental wrapping.
-  const jsonStart = text.indexOf("{")
-  const jsonEnd = text.lastIndexOf("}")
-  if (jsonStart < 0 || jsonEnd < 0) throw new Error("Klo did not return JSON")
-  const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
-
-  if (!parsed.klo_state || !parsed.chat_reply) {
-    throw new Error("Klo response missing klo_state or chat_reply")
+  const toolUseBlock = data.content?.find(
+    (block: { type: string; name?: string }) =>
+      block.type === "tool_use" && block.name === "emit_klo_response",
+  )
+  if (!toolUseBlock) {
+    const types = data.content?.map((b: { type: string }) => b.type)
+    throw new Error(`No tool_use block in response. Got: ${JSON.stringify(types)}`)
   }
-  return parsed as KloRespondOutput
+
+  const parsed = toolUseBlock.input as KloRespondOutput
+  if (!parsed.klo_state || !parsed.chat_reply) {
+    throw new Error("Tool input missing klo_state or chat_reply")
+  }
+  return parsed
 }
 
 const NOISY_FIELDS = new Set([

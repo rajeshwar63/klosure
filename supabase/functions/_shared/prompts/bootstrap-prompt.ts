@@ -35,30 +35,13 @@ You are reading the entire chat history of an existing deal that has no structur
 
 ${extractionRulesText}
 
-# Output format
+# Output
 
-Respond with a single JSON object matching this shape exactly. Do not include any prose outside the JSON.
+Call the emit_klo_response tool with the bootstrapped deal state and a short opening chat reply ("I've caught up on the deal so far. Here's where I think we are…" style). The tool's schema enforces the structure — focus on the content quality.
 
-{
-  "klo_state": {
-    "version": 1,
-    "summary": "<one sentence, present tense>",
-    "stage": "<discovery | proposal | negotiation | legal | closed>",
-    "stage_reasoning": "<why this stage>",
-    "deal_value": { "amount": <number>, "currency": "<USD|AED|...>", "confidence": "<definite|tentative>", "source_message_id": "<msg_id or null>" } | null,
-    "deadline": { "date": "<YYYY-MM-DD>", "confidence": "<definite|tentative>", "previous": "<YYYY-MM-DD or null>", "note": "<short reason if tentative>", "source_message_id": "<msg_id or null>" } | null,
-    "people": [{ "name": "<>", "role": "<>", "company": "<>", "first_seen_message_id": "<msg_id or null>", "added_at": "<ISO timestamp>" }],
-    "decisions": [{ "what": "<>", "when": "<YYYY-MM-DD>", "source_message_id": "<msg_id or null>" }],
-    "blockers": [{ "text": "<>", "since": "<YYYY-MM-DD>", "severity": "<green|amber|red>", "source_message_id": "<msg_id or null>", "added_at": "<ISO timestamp>" }],
-    "open_questions": [{ "text": "<>", "source_message_id": "<msg_id or null>", "added_at": "<ISO timestamp>" }],
-    "removed_items": [],
-    "klo_take_seller": "<1-3 sentences, direct tactical coaching>",
-    "klo_take_buyer": "<1-3 sentences, buyer-side coaching, never recommends seller's product>"
-  },
-  "chat_reply": "<short opening message Klo posts in chat — 'I've caught up on the deal so far. Here's where I think we are…' style>"
-}
-
-Set added_at and removed_at timestamps to the current time when generating fresh entries during bootstrap.
-
-If a piece of information is not yet known from the chat or the initial context, omit the field (use null where the schema allows) — do not invent.`;
+- Set version to 1, removed_items to an empty array.
+- Set added_at timestamps to the current time when generating fresh entries during bootstrap.
+- If a piece of information is not yet known from the chat or the initial context, omit the field (use null where the schema allows) — do not invent.
+- klo_take_seller: 1-3 sentences, direct tactical coaching.
+- klo_take_buyer: 1-3 sentences, buyer-side coaching, never recommends seller's product.`;
 }
