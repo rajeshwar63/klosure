@@ -160,6 +160,7 @@ export default function OverviewView({
               title="Decisions on record"
               count={(ks.decisions ?? []).length}
               headline={ks.decisions?.[0]?.what ?? null}
+              emptyMessage="No decisions on record yet."
               expanded={isExpanded('decisions')}
               onToggle={handleToggle('decisions')}
             >
