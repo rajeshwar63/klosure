@@ -11,6 +11,7 @@ import {
 } from '../services/team.js'
 import { formatCurrency, formatDeadline } from '../lib/format.js'
 import ManagerKloPanel from '../components/ManagerKloPanel.jsx'
+import ForecastTab from '../components/team/ForecastTab.jsx'
 
 const HEALTH_DOT = {
   green: 'bg-emerald-500',
@@ -80,7 +81,7 @@ export default function TeamPage() {
           </Link>
         </div>
         <div className="max-w-4xl mx-auto px-4 pb-3 flex gap-1">
-          {['pipeline', 'people', 'klo'].map((t) => (
+          {['pipeline', 'forecast', 'people', 'klo'].map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -88,7 +89,13 @@ export default function TeamPage() {
                 tab === t ? 'bg-white text-navy' : 'text-white/60 hover:text-white'
               }`}
             >
-              {t === 'pipeline' ? 'Pipeline' : t === 'people' ? 'People' : 'Ask Klo'}
+              {t === 'pipeline'
+                ? 'Pipeline'
+                : t === 'forecast'
+                  ? 'Forecast'
+                  : t === 'people'
+                    ? 'People'
+                    : 'Ask Klo'}
             </button>
           ))}
         </div>
@@ -105,6 +112,8 @@ export default function TeamPage() {
           <div className="text-navy/50 text-sm py-10 text-center">Loading team data…</div>
         ) : tab === 'pipeline' ? (
           <PipelineTab data={data} totalActive={totalActive} stuck={stuck} />
+        ) : tab === 'forecast' ? (
+          <ForecastTab teamId={team.id} />
         ) : tab === 'people' ? (
           <PeopleTab data={data} team={team} user={user} onChanged={async () => {
             const res = await loadTeamPipeline({ teamId: team.id })
