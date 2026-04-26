@@ -5,7 +5,7 @@ import {
 } from '../services/overview.js'
 import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLookup.js'
 import ActionZones from './overview/ActionZones.jsx'
-import ConfidencePanel from './overview/ConfidencePanel.jsx'
+import KloReadPanel from './overview/KloReadPanel.jsx'
 import StageTracker from './overview/StageTracker.jsx'
 import Tooltip from './Tooltip.jsx'
 import RemoveButton from './RemoveButton.jsx'
@@ -16,7 +16,7 @@ import { formatCurrency } from '../lib/format.js'
 // deal.summary, deal.stage) are still mirrored so this view degrades to the
 // previous behavior if klo_state is null.
 //
-// Sections render the same factual data on both sides — only KloTake and
+// Sections render the same factual data on both sides — only KloReadPanel and
 // OpenQuestionsList diverge. Removing items lives in step 11; provenance
 // hover lives in step 10. This step is pure rendering.
 export default function OverviewView({
@@ -65,8 +65,7 @@ export default function OverviewView({
       <div className="max-w-2xl mx-auto space-y-4">
         {ks ? (
           <>
-            <KloTake state={ks} viewerRole={role} />
-            {role === 'seller' && <ConfidencePanel confidence={ks.confidence} />}
+            <KloReadPanel state={ks} viewerRole={role} />
             <DealStatStrip state={ks} health={health} />
             <StageTracker deal={{ ...deal, stage: ks.stage }} />
             <PeopleGrid
@@ -89,20 +88,6 @@ export default function OverviewView({
         )}
       </div>
     </main>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Klo's take — top of the Overview, role-scoped coaching string from klo_state.
-// ---------------------------------------------------------------------------
-function KloTake({ state, viewerRole }) {
-  const text = viewerRole === 'buyer' ? state.klo_take_buyer : state.klo_take_seller
-  if (!text) return null
-  return (
-    <div className="bg-klo-bg border border-klo/20 rounded-xl px-4 py-3 flex gap-3">
-      <span className="text-klo text-base leading-none mt-0.5">◆</span>
-      <p className="text-[14px] leading-snug text-navy">{text}</p>
-    </div>
   )
 }
 
