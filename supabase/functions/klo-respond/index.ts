@@ -417,6 +417,15 @@ async function runLlm(
     apiMessages.push({ role: "user", content: "(no user messages yet — produce a fresh state from the deal context above.)" })
   }
 
+  console.log(JSON.stringify({
+    event: "prompt_size_breakdown",
+    system_prompt_chars: systemPrompt.length,
+    messages_chars: JSON.stringify(apiMessages).length,
+    tool_schema_chars: JSON.stringify(KLO_OUTPUT_TOOL).length,
+    total_chars: systemPrompt.length + JSON.stringify(apiMessages).length + JSON.stringify(KLO_OUTPUT_TOOL).length,
+    deal_id: dealId,
+  }))
+
   let result = await callLlm<KloRespondOutput>({
     systemPrompt,
     messages: apiMessages,
