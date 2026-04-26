@@ -155,16 +155,18 @@ export default function DealsListPage() {
 function StatsStrip({ stats }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-      <Stat label="Pipeline" value={formatCurrency(stats.pipelineValue)} />
       <Stat
-        label="At risk"
-        value={formatCurrency(stats.valueAtRisk)}
-        tone={stats.valueAtRisk > 0 ? 'red' : 'neutral'}
+        label="Weighted pipeline"
+        value={formatCurrency(stats.weightedPipeline)}
       />
       <Stat
-        label="Overdue"
-        value={String(stats.overdueCount)}
-        tone={stats.overdueCount > 0 ? 'red' : 'neutral'}
+        label="Likely this quarter"
+        value={`${stats.highConfidenceCount} of ${stats.activeCount}`}
+      />
+      <Stat
+        label="Need attention"
+        value={String(stats.slippingCount)}
+        tone={stats.slippingCount > 0 ? 'amber' : 'neutral'}
       />
       <Stat
         label="Closed"
@@ -230,12 +232,15 @@ function DealRow({ deal, archived = false }) {
         : { text: STATUS_LABEL[deal.status] || 'Closed', tone: 'bg-navy/10 text-navy/70' }
     : null
 
+  const slippingBg = !archived && deal.slipping ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-navy/5 active:bg-navy/10'
+
   return (
     <li>
       <Link
         to={`/deals/${deal.id}`}
-        className="flex items-center gap-3 px-4 py-3 hover:bg-navy/5 active:bg-navy/10"
+        className={`flex items-center gap-3 px-4 py-3 ${slippingBg}`}
       >
+        {!archived && <ConfidenceCell confidence={deal.klo_state?.confidence} />}
         <span
           className={`w-2.5 h-2.5 rounded-full shrink-0 ${HEALTH_DOT[deal.health] ?? 'bg-emerald-500'}`}
           title={HEALTH_LABEL[deal.health] ?? 'On track'}
@@ -281,6 +286,33 @@ function DealRow({ deal, archived = false }) {
         <span className="text-navy/30">›</span>
       </Link>
     </li>
+  )
+}
+
+function ConfidenceCell({ confidence }) {
+  if (!confidence) {
+    return (
+      <div className="shrink-0 w-12 text-center">
+        <div className="text-[15px] font-medium leading-none text-navy/30">—</div>
+      </div>
+    )
+  }
+  const v = confidence.value
+  const tone =
+    v >= 60 ? 'text-emerald-700' : v >= 35 ? 'text-amber-700' : 'text-red-700'
+  let arrow = ''
+  if (confidence.trend === 'up' && confidence.delta) {
+    arrow = `↑ ${Math.abs(confidence.delta)}`
+  } else if (confidence.trend === 'down' && confidence.delta) {
+    arrow = `↓ ${Math.abs(confidence.delta)}`
+  } else if (confidence.trend === 'flat') {
+    arrow = '→'
+  }
+  return (
+    <div className="shrink-0 w-12 text-center" title="Klo's read">
+      <div className={`text-[15px] font-medium leading-none ${tone}`}>{v}%</div>
+      {arrow && <div className="text-[10px] text-navy/40 mt-0.5">{arrow}</div>}
+    </div>
   )
 }
 

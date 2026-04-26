@@ -15,7 +15,45 @@
 import { supabase } from '../lib/supabase.js'
 import { daysUntil } from '../lib/format.js'
 
-const HEALTH_RANK = { red: 0, amber: 1, green: 2 }
+// Phase 5: a deal "slips" when Klo's confidence dropped meaningfully on the
+// last turn — these get an amber row background so the seller sees them first
+// when scanning the list.
+export function isSlipping(deal) {
+  const c = deal?.klo_state?.confidence
+  if (!c) return false
+  return c.trend === 'down' && c.delta <= -10
+}
+
+// Sum of (deal_value * confidence/100) across active deals that have both.
+// "Weighted pipeline" — Klo's read of how much money is realistically in play.
+export function weightedPipeline(deals) {
+  return deals
+    .filter(
+      (d) =>
+        d.status === 'active' &&
+        d.klo_state?.confidence &&
+        d.klo_state?.deal_value,
+    )
+    .reduce(
+      (sum, d) =>
+        sum + (d.klo_state.deal_value.amount * d.klo_state.confidence.value) / 100,
+      0,
+    )
+}
+
+export function highConfidenceCount(deals) {
+  return deals.filter(
+    (d) => d.status === 'active' && (d.klo_state?.confidence?.value ?? 0) >= 60,
+  ).length
+}
+
+export function activeCount(deals) {
+  return deals.filter((d) => d.status === 'active').length
+}
+
+export function slippingCount(deals) {
+  return deals.filter((d) => d.status === 'active' && isSlipping(d)).length
+}
 
 export async function loadSellerDashboard(sellerId) {
   if (!sellerId) return { deals: [], stats: emptyStats() }
@@ -69,6 +107,7 @@ export function enrichDeal(deal, allCommitments) {
     doneCount: done.length,
     daysToDeadline: days,
     urgency,
+    slipping: isSlipping(deal),
   }
 }
 
@@ -80,14 +119,17 @@ export function sortDeals(deals) {
     else archived.push(d)
   }
 
-  // Active: red first, then amber, then green. Within each tier the most
-  // urgent (lowest urgency score) comes first; ties break on created_at desc
-  // so newer deals don't hide under stale ones.
+  // Phase 5: confidence is the primary order. Highest-confidence deals first;
+  // deals without a confidence yet (no Klo turn since Phase 5 deployed) sink
+  // to the bottom of the active list. Ties break on most-recent activity so
+  // freshly-touched deals stay near the top.
   active.sort((a, b) => {
-    const h = (HEALTH_RANK[a.health] ?? 3) - (HEALTH_RANK[b.health] ?? 3)
-    if (h !== 0) return h
-    if (a.urgency !== b.urgency) return a.urgency - b.urgency
-    return new Date(b.created_at) - new Date(a.created_at)
+    const ac = a.klo_state?.confidence?.value ?? -1
+    const bc = b.klo_state?.confidence?.value ?? -1
+    if (ac !== bc) return bc - ac
+    const at = new Date(a.updated_at || a.created_at)
+    const bt = new Date(b.updated_at || b.created_at)
+    return bt - at
   })
 
   // Archive: most-recently archived first (or created if archived_at is null).
@@ -112,6 +154,9 @@ function emptyStats() {
     valueAtRisk: 0,
     wonCount: 0,
     lostCount: 0,
+    weightedPipeline: 0,
+    highConfidenceCount: 0,
+    slippingCount: 0,
   }
 }
 
@@ -126,6 +171,14 @@ function rollUpStats({ active, archived }) {
     const v = Number(d.value) || 0
     stats.pipelineValue += v
     if (d.health === 'red') stats.valueAtRisk += v
+
+    const confidence = d.klo_state?.confidence?.value
+    const dealAmount = d.klo_state?.deal_value?.amount ?? v
+    if (confidence != null && dealAmount) {
+      stats.weightedPipeline += (dealAmount * confidence) / 100
+    }
+    if ((confidence ?? 0) >= 60) stats.highConfidenceCount += 1
+    if (d.slipping) stats.slippingCount += 1
   }
   for (const d of archived) {
     stats.archivedCount += 1
