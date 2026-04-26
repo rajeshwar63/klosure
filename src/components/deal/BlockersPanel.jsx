@@ -27,9 +27,9 @@ function BlockerRow({ blocker, viewerRole, dealId }) {
         aria-hidden
       />
       <div className="flex-1 min-w-0">
-        <div className="text-xs leading-snug text-navy/85">{blocker.text}</div>
+        <div className="text-sm leading-snug text-navy/85">{blocker.text}</div>
         {blocker.since && (
-          <div className="text-[10px] text-navy/45 mt-0.5">
+          <div className="text-[12px] text-navy/45 mt-0.5">
             since {formatSince(blocker.since)}
           </div>
         )}
@@ -60,7 +60,7 @@ export default function BlockersPanel({ klo_state, viewerRole, dealId }) {
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
-          className="text-[10px] font-semibold tracking-wider text-navy/55 flex items-center gap-1.5 hover:text-navy"
+          className="text-[12px] font-semibold tracking-wider text-navy/55 flex items-center gap-1.5 hover:text-navy"
         >
           <span aria-hidden>{expanded ? '⌃' : '⌄'}</span>
           BLOCKERS · {blockers.length}

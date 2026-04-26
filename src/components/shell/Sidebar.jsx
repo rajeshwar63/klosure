@@ -1,7 +1,7 @@
 // Phase 6 — app shell sidebar.
 //
 // Used identically by seller home, deal page, and manager home — same
-// component, different content. 220px wide on desktop; collapses to a thin
+// component, different content. 260px wide on desktop; collapses to a thin
 // ~52px strip showing only the deal-health dots.
 //
 // Sort order: confidence ASCENDING (worst first). Inverted from the dashboard
@@ -82,7 +82,7 @@ export default function Sidebar({
   const currentDealId = activeDealId(activeView)
   const handle = (view) => () => onNavigate?.(view)
 
-  const widthClass = collapsed ? 'w-[52px]' : 'w-[220px]'
+  const widthClass = collapsed ? 'w-[52px]' : 'w-[260px]'
 
   return (
     <aside

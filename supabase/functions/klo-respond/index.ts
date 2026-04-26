@@ -169,6 +169,30 @@ const KLO_OUTPUT_TOOL = {
           previous_confidence_value: {
             type: ["integer", "null"],
           },
+          next_meeting: {
+            type: ["object", "null"],
+            properties: {
+              date: { type: "string" },
+              title: { type: "string" },
+              with: {
+                type: "array",
+                items: { type: "string" },
+              },
+              confidence: { type: "string", enum: ["definite", "tentative"] },
+              source_message_id: { type: ["string", "null"] },
+            },
+            required: ["date", "title", "with", "confidence"],
+          },
+          last_meeting: {
+            type: ["object", "null"],
+            properties: {
+              date: { type: "string" },
+              title: { type: "string" },
+              outcome_note: { type: ["string", "null"] },
+              source_message_id: { type: ["string", "null"] },
+            },
+            required: ["date", "title"],
+          },
         },
         required: [
           "version",

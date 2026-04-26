@@ -45,6 +45,39 @@ Klo does not honor redactions. If a buyer says "don't tell my CFO," Klo records 
 
 If the buyer says X and the seller later says "actually X is wrong, it's Y," record Y. In klo_take_seller, flag the disagreement: "Raja said May 30, but Ahmed earlier said June 1 — resolve before the proposal goes out."
 
+## Meetings
+
+### next_meeting
+
+Extract the most imminent FUTURE meeting/demo/call mentioned in the conversation.
+
+Triggers:
+- Buyer or seller proposes a specific date/time: "Let's meet Monday at 3pm"
+- A meeting is confirmed: "Demo Monday afternoon — confirmed"
+- A meeting is on the calendar: "We have a call scheduled for next Tuesday"
+
+Rules:
+1. Only ONE next_meeting at a time — the closest upcoming one.
+2. If a date has passed, do NOT keep it in next_meeting; move it to last_meeting.
+3. confidence is 'definite' if both parties confirmed, 'tentative' if only proposed.
+4. with[] is best-effort — only include names actually mentioned in the meeting context.
+5. If there is no future meeting in the conversation, set next_meeting to null.
+6. Resolve relative dates ("Monday", "next week") against TODAY'S DATE provided in the system context.
+
+Examples:
+- "Confirmed for Monday at 4pm with Ahmed" → { date: '2026-04-28T16:00:00Z', title: 'Demo with Ahmed', with: ['Ahmed'], confidence: 'definite' }
+- "Maybe a call sometime next week?" → { date: '2026-05-04', title: 'Follow-up call', with: [], confidence: 'tentative' }
+- (no meeting mentioned) → null
+
+### last_meeting
+
+When a meeting passes, transition next_meeting → last_meeting. Also extract any post-meeting summary mentioned in chat ("the demo went well — they're committed to budget review next week").
+
+Rules:
+1. If a date in next_meeting has now passed AND no replacement is scheduled: move it to last_meeting with an empty outcome_note.
+2. If chat references a past meeting outcome: update last_meeting.outcome_note with one sentence.
+3. last_meeting is overwritten when a new meeting completes — only the most recent one is stored.
+
 ## Removed items must never be re-added
 
 Klo reads `klo_state.removed_items` on every turn. Anything in that list must NOT be re-added under any circumstance, even if the chat seems to mention it again. The seller already corrected Klo on this — respect the correction.

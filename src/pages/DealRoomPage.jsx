@@ -22,7 +22,6 @@ import DealTabs, {
   saveDealTab,
 } from '../components/deal/DealTabs.jsx'
 import OverviewTab from '../components/deal/OverviewTab.jsx'
-import HistoryTab from '../components/deal/HistoryTab.jsx'
 
 function DealPageSkeleton() {
   return (
@@ -291,11 +290,6 @@ export default function DealRoomPage() {
               onHighlightConsumed={() => setHighlightCommitmentId(null)}
               locked={deal.locked}
             />
-          </div>
-        )}
-        {activeTab === 'history' && (
-          <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
-            <HistoryTab deal={deal} />
           </div>
         )}
       </div>

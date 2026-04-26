@@ -31,13 +31,13 @@ function CommitmentRow({ commitment, onJump }) {
         isOverdue ? 'bg-red-50 hover:bg-red-100' : 'bg-navy/5 hover:bg-navy/10'
       } transition-colors`}
     >
-      <div className="text-xs text-navy/85 leading-snug mb-1">
+      <div className="text-sm text-navy/85 leading-snug mb-1">
         {commitment.task}
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
         {isOverdue ? (
           <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+            className="text-[11px] px-2 py-0.5 rounded-full font-medium"
             style={{ background: '#F09595', color: '#501313' }}
           >
             Overdue {daysOverdueOf(commitment.due_date)}d
@@ -50,7 +50,7 @@ function CommitmentRow({ commitment, onJump }) {
           )
         )}
         {commitment.owner_name && (
-          <span className="text-[10px] text-navy/50">{commitment.owner_name}</span>
+          <span className="text-[12px] text-navy/50">{commitment.owner_name}</span>
         )}
       </div>
     </button>
@@ -60,7 +60,7 @@ function CommitmentRow({ commitment, onJump }) {
 function CommitmentZone({ label, commitments, emptyMessage, onJump }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold tracking-wider text-navy/45 mb-1.5">
+      <div className="text-[12px] font-semibold tracking-wider text-navy/45 mb-1.5">
         {label}
       </div>
       {commitments.length === 0 ? (
@@ -102,7 +102,7 @@ export default function CommitmentsPanel({
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
-          className="text-[10px] font-semibold tracking-wider text-navy/55 flex items-center gap-1.5 hover:text-navy"
+          className="text-[12px] font-semibold tracking-wider text-navy/55 flex items-center gap-1.5 hover:text-navy"
         >
           <span aria-hidden>{expanded ? '⌃' : '⌄'}</span>
           COMMITMENTS · {total}

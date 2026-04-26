@@ -132,7 +132,7 @@ export default function ConfidenceSidePanel({ klo_state }) {
                   +{f.impact}%
                 </span>
                 <span
-                  className="text-[11px] leading-snug"
+                  className="text-[12px] leading-snug"
                   style={{ color: '#173404' }}
                 >
                   {f.label}
