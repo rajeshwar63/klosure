@@ -91,5 +91,7 @@ Respond with a single JSON object. No prose outside the JSON.
 
 Set added_at on any new array items to the current ISO timestamp. Preserve added_at on items that already exist.
 
-If a renderable item came from a specific message in this turn, set source_message_id to that message's id (the messages array provides ids).`;
+If a renderable item came from a specific message in this turn, set source_message_id to that message's id (the messages array provides ids).
+
+CRITICAL: Your response MUST be valid JSON. Before sending: verify every array item is followed by a comma except the last; every object property is followed by a comma except the last; all braces and brackets are balanced. Do not include any text outside the JSON object.`;
 }

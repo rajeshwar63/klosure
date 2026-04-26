@@ -174,6 +174,23 @@ async function runExtraction(
 async function callAnthropic(
   systemPrompt: string,
   messages: MessageRow[],
+  recipientRole: "seller" | "buyer",
+  useCache: boolean,
+): Promise<KloRespondOutput> {
+  try {
+    return await callAnthropicOnce(systemPrompt, messages, recipientRole, useCache)
+  } catch (err) {
+    if (err instanceof SyntaxError && err.message.includes("JSON")) {
+      console.warn("Klo returned invalid JSON, retrying once")
+      return await callAnthropicOnce(systemPrompt, messages, recipientRole, useCache)
+    }
+    throw err
+  }
+}
+
+async function callAnthropicOnce(
+  systemPrompt: string,
+  messages: MessageRow[],
   _recipientRole: "seller" | "buyer",
   useCache: boolean,
 ): Promise<KloRespondOutput> {
