@@ -261,18 +261,22 @@ export default function DealRoomPage() {
         chatCount={messageCount}
       />
 
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
+      <div className="flex-1 min-h-0 flex flex-col">
         {activeTab === 'overview' && (
-          <OverviewTab
-            deal={deal}
-            viewerRole="seller"
-            commitments={commitments}
-            onSwitchToChat={() => handleTabChange('chat')}
-            onCommitmentJump={handleCommitmentJump}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
+            <OverviewTab
+              deal={deal}
+              viewerRole="seller"
+              commitments={commitments}
+              onSwitchToChat={() => handleTabChange('chat')}
+              onCommitmentJump={handleCommitmentJump}
+            />
+          </div>
         )}
         {activeTab === 'chat' && (
-          <div className="flex flex-col h-full chat-doodle">
+          // ChatView renders its own scrollable timeline + docked input;
+          // the wrapper just provides the flex column shape it expects.
+          <div className="flex-1 min-h-0 flex flex-col chat-doodle">
             <ChatView
               deal={deal}
               dealContext={dealContext}
@@ -289,7 +293,11 @@ export default function DealRoomPage() {
             />
           </div>
         )}
-        {activeTab === 'history' && <HistoryTab deal={deal} />}
+        {activeTab === 'history' && (
+          <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
+            <HistoryTab deal={deal} />
+          </div>
+        )}
       </div>
     </div>
   )
