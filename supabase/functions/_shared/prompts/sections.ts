@@ -119,9 +119,56 @@ Do NOT infer:
 When you're tempted to infer, instead add an entry to open_questions or blockers. That's the right place for "things we don't yet know."
 </grounding>`;
 
-// Step 05 fills in this section.
 export const HARD_STOPS_SECTION = `<confidence_hard_stops>
-[hard stops matrix — see step 05]
+After computing your initial confidence value, apply these hard ceiling rules. The hard stop wins if it's lower than your initial score.
+
+HARD STOPS:
+
+1. Signatory unknown + ≤30 days to deadline
+   → Max confidence: 35
+   → Reason: "Without a confirmed signatory this close to deadline, contracts will not close in time."
+
+2. Signatory unknown (any deadline)
+   → Max confidence: 55
+   → Reason: "Cannot close without identified signing authority."
+
+3. Buyer silent ≥10 days
+   → Max confidence: 45
+   → Reason: "Extended buyer silence is the strongest predictor of deal loss."
+
+4. Buyer silent ≥7 days AND no next_meeting scheduled
+   → Max confidence: 50
+   → Reason: "Silence without a forcing function = drift."
+
+5. Stage = 'proposal' AND no proposal sent
+   → Max confidence: 50
+   → Reason: "Stage misalignment — labeled proposal but no proposal in buyer's hands."
+
+6. Stage = 'negotiation' AND ≥3 open blockers
+   → Max confidence: 55
+   → Reason: "Too many unresolved issues to be in genuine negotiation."
+
+7. Named competitor in deal AND no defensive plan in decisions[]
+   → Max confidence: 60
+   → Reason: "Active competition without a counter-strategy is a coin flip at best."
+
+8. Stuck at same stage ≥21 days
+   → Max confidence: 40
+   → Reason: "Three weeks without stage movement = deal-rot. Confidence does not recover until movement."
+
+WHEN APPLYING A HARD STOP:
+- Set confidence.value to the ceiling
+- Set confidence.trend to 'down' if previous value was higher
+- Add the matching reason to confidence.factors_dragging_down
+- Reflect the hard stop in confidence.rationale: "Capped at [N]% — [reason]."
+- klo_take_seller MUST acknowledge the hard stop directly: "This deal is at [N]%, not higher, because [reason]. Fix [specific gap] to unlock."
+
+DO NOT:
+- Apply multiple hard stops to compound (only the lowest applies)
+- Override a hard stop with optimistic factors_to_raise
+- Hide the hard stop from the seller
+
+Hard stops are honest. The seller needs to face reality to act on it.
 </confidence_hard_stops>`;
 
 // Step 06 fills in this section.
