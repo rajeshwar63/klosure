@@ -123,6 +123,52 @@ const KLO_OUTPUT_TOOL = {
           },
           klo_take_seller: { type: "string" },
           klo_take_buyer: { type: "string" },
+          confidence: {
+            type: ["object", "null"],
+            properties: {
+              value: { type: "integer", minimum: 0, maximum: 100 },
+              trend: { type: "string", enum: ["up", "down", "flat"] },
+              delta: { type: "integer" },
+              factors_dragging_down: {
+                type: "array",
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string" },
+                    impact: { type: "integer", maximum: 0 },
+                  },
+                  required: ["label", "impact"],
+                },
+              },
+              factors_to_raise: {
+                type: "array",
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string" },
+                    impact: { type: "integer", minimum: 0 },
+                  },
+                  required: ["label", "impact"],
+                },
+              },
+              rationale: { type: "string" },
+              computed_at: { type: "string" },
+            },
+            required: [
+              "value",
+              "trend",
+              "delta",
+              "factors_dragging_down",
+              "factors_to_raise",
+              "rationale",
+              "computed_at",
+            ],
+          },
+          previous_confidence_value: {
+            type: ["integer", "null"],
+          },
         },
         required: [
           "version",
@@ -162,6 +208,12 @@ Deno.serve(async (req) => {
     const output = ctx.deal.klo_state == null
       ? await runBootstrap(ctx)
       : await runExtraction(ctx, triggering_message_id ?? null)
+
+    // 2b. Preserve previous confidence value so the next turn can compute trend/delta.
+    if (output.klo_state.confidence) {
+      output.klo_state.previous_confidence_value =
+        ctx.deal.klo_state?.confidence?.value ?? undefined
+    }
 
     // 3. Diff old state vs new state, append history rows
     await writeHistory(
