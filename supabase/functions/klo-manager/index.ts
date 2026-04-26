@@ -15,7 +15,8 @@
 //
 // Deploy:
 //   supabase functions deploy klo-manager
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-…
+//   supabase secrets set GEMINI_API_KEY=AIza...
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   # rollback path
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"

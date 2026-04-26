@@ -9,7 +9,7 @@
 //      were just flipped (so we only nudge once per overdue event).
 //   2. For each newly-overdue commitment:
 //        a. Loads its deal + context + recent messages.
-//        b. Asks Claude Sonnet 4.6 for a role-scoped nudge per side
+//        b. Asks Klo (via the LLM abstraction) for a role-scoped nudge per side
 //           (one for the seller, one for the buyer in shared mode).
 //        c. Inserts those nudges as Klo messages with visible_to scoped
 //           accordingly — so each side sees coaching framed for them.
@@ -21,7 +21,8 @@
 //
 // Setup:
 //   supabase functions deploy klo-watcher --no-verify-jwt
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+//   supabase secrets set GEMINI_API_KEY=AIza...
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...      # rollback path
 //   supabase secrets set RESEND_API_KEY=re_...
 //   supabase secrets set RESEND_FROM='Klo <klo@klosure.ai>'
 //   supabase secrets set APP_URL=https://klosure.ai
