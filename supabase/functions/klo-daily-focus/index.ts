@@ -20,11 +20,13 @@
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+import { callLlm } from "../_shared/llm-client.ts"
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-const KLO_MODEL = Deno.env.get("KLO_MODEL") ?? "claude-sonnet-4-6"
+const USE_GEMINI = (Deno.env.get("USE_GEMINI") ?? "true").toLowerCase() === "true"
+const KLO_MODEL_GEMINI = Deno.env.get("KLO_MODEL_GEMINI") ?? "gemini-3.1-flash-lite-preview"
+const KLO_MODEL_ANTHROPIC = Deno.env.get("KLO_MODEL_ANTHROPIC") ?? "claude-sonnet-4-5"
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -38,15 +40,21 @@ You have a digest of their active deals — confidence scores, trends, top block
 
 Rules:
 - Name the 1-2 deals that matter most today, BY NAME (e.g. "DIB" or the deal title)
-- Be specific about why each one matters — reference the actual blocker or signal
+- Open with the recommended action, then explain why in 1-2 sentences
+- Be specific about why each deal matters — reference the actual blocker or signal
 - Tell them what to do, in order of priority
 - Don't summarize their whole pipeline. Pick the urgent stuff and ignore the rest. Sellers know they have other deals.
 - If a deal is slipping (trend down, delta -10 or worse), it usually deserves the top spot
 - If two deals are quiet for 5+ days, mention both as a pattern
 - If everything is on track, say so briefly and point them at the highest-leverage move (usually the biggest deal in proposal stage)
-- Tone: senior, direct, no filler. Same Klo voice.
 
-Output a single paragraph. No bullet lists. No headers.`
+VOICE — Klo speaks like a senior sales VP coaching a rep:
+- Direct, not corporate. "Send the LXP proposal to Nina before Monday" — not "It might be helpful to follow up with Nina."
+- Specific, not generic.
+- DO NOT say: "Good morning!", "I'd recommend...", "It might be helpful...", "Have you considered...".
+- DO say: "Send X to Y today.", "DIB needs your attention today.", "The next move is...".
+
+Output a single paragraph. No bullet lists. No headers. No greetings.`
 
 interface DealRow {
   id: string
@@ -66,7 +74,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set" }, 500)
     const auth = req.headers.get("Authorization")
     if (!auth) return json({ error: "not authorized" }, 401)
 
@@ -168,25 +175,24 @@ ${JSON.stringify(digest, null, 2)}
 
 Write today's coaching paragraph.`
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: KLO_MODEL,
-        max_tokens: 400,
-        system: [
-          { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-        ],
-        messages: [{ role: "user", content: userMessage }],
-      }),
+    const result = await callLlm({
+      systemPrompt: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
+      maxTokens: 600,
+      temperature: 0.7,
     })
-    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`)
-    const data = await res.json()
-    const text = (data.content?.[0]?.text ?? "").trim()
+    if (result.toolCalled) {
+      // Defensive: we didn't pass a tool, so this shouldn't happen.
+      throw new Error("Unexpected tool call in klo-daily-focus")
+    }
+    const text = result.text.trim()
+
+    console.log(JSON.stringify({
+      event: "klo_daily_focus_complete",
+      model: USE_GEMINI ? KLO_MODEL_GEMINI : KLO_MODEL_ANTHROPIC,
+      seller_id: sellerId,
+      deal_count: digest.length,
+    }))
 
     // Best-effort: deals whose title or buyer name appears in Klo's paragraph.
     const lower = text.toLowerCase()

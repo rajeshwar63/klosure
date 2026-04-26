@@ -9,7 +9,7 @@
 //      were just flipped (so we only nudge once per overdue event).
 //   2. For each newly-overdue commitment:
 //        a. Loads its deal + context + recent messages.
-//        b. Asks Claude Sonnet 4.6 for a role-scoped nudge per side
+//        b. Asks Klo (via the LLM abstraction) for a role-scoped nudge per side
 //           (one for the seller, one for the buyer in shared mode).
 //        c. Inserts those nudges as Klo messages with visible_to scoped
 //           accordingly — so each side sees coaching framed for them.
@@ -21,7 +21,8 @@
 //
 // Setup:
 //   supabase functions deploy klo-watcher --no-verify-jwt
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+//   supabase secrets set GEMINI_API_KEY=AIza...
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...      # rollback path
 //   supabase secrets set RESEND_API_KEY=re_...
 //   supabase secrets set RESEND_FROM='Klo <klo@klosure.ai>'
 //   supabase secrets set APP_URL=https://klosure.ai
@@ -38,11 +39,13 @@
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+import { callLlm } from "../_shared/llm-client.ts"
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-const MODEL = Deno.env.get("KLO_MODEL") ?? "claude-sonnet-4-6"
+const USE_GEMINI = (Deno.env.get("USE_GEMINI") ?? "true").toLowerCase() === "true"
+const KLO_MODEL_GEMINI = Deno.env.get("KLO_MODEL_GEMINI") ?? "gemini-3.1-flash-lite-preview"
+const KLO_MODEL_ANTHROPIC = Deno.env.get("KLO_MODEL_ANTHROPIC") ?? "claude-sonnet-4-5"
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? ""
 const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "Klo <klo@klosure.ai>"
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://klosure.ai").replace(/\/$/, "")
@@ -58,14 +61,16 @@ const CORS = {
 // commitment, framed for the recipient role. Cached on every call.
 const NUDGE_SYSTEM_PROMPT = `You are Klo, the AI deal coach inside Klosure.
 
-You speak like a senior B2B sales expert with 15+ years working in Gulf markets.
-Direct. Brief. 1-3 sentences. Imperative voice. Never preachy. Never generic.
-No emoji. No "I understand" / "you might want to consider" / "as an AI".
+Generate ONE short nudge for an overdue sales commitment.
 
-Right now you are writing ONE nudge about ONE overdue commitment in a deal
-room. The commitment was confirmed by both sides; the due date has passed.
+Voice — Klo speaks like a senior B2B sales expert with 15+ years working in Gulf markets:
+- Direct. "Your proposal to Nina is 3 days overdue."
+- Followed by ONE action. "Send it before EOD or call her to reset expectations."
+- 1-3 sentences. Max 280 characters. Imperative voice.
+- No emoji. No greetings. No filler.
+- DO NOT say: "Hi there!", "Just a friendly reminder", "I understand", "you might want to consider", "as an AI".
 
-Your job:
+Role-specific framing:
 - If you are talking to the SELLER: this is THEIR deal to close. Be direct
   about the consequence. Tell them the move — call, not email. Name the
   blocker if you can infer one. Reference the commitment by what it actually
@@ -79,20 +84,7 @@ Your job:
 - If the OWNER of the overdue commitment is the SPEAKER, name it plainly: it
   slipped, here is the move to recover.
 
-Output a JSON object with one field: "reply" — the nudge text, 1-3 sentences,
-max 280 characters. No prefixes, no preamble.`
-
-const NUDGE_SCHEMA = {
-  type: "object",
-  properties: {
-    reply: {
-      type: "string",
-      description: "The Klo nudge — 1-3 sentences, max 280 chars, imperative voice.",
-    },
-  },
-  required: ["reply"],
-  additionalProperties: false,
-}
+Output ONLY the nudge text. No JSON wrapper. No preamble. No prefixes.`
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -100,7 +92,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set" }, 500)
     if (!SERVICE_ROLE_KEY) return json({ error: "service role not configured" }, 500)
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -300,49 +291,30 @@ async function generateNudge(args: {
     `- You are writing this nudge to: ${role}${speakerName ? ` (${speakerName})` : ""}`,
     `- The owner of the overdue commitment is the ${owner === role ? "speaker themselves" : "OTHER party"}.`,
     ``,
-    `Write the nudge now as a JSON object with field "reply".`,
+    `Write the nudge now. Output only the nudge text.`,
   )
 
-  const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 400,
-      thinking: { type: "disabled" },
-      output_config: {
-        effort: "low",
-        format: { type: "json_schema", schema: NUDGE_SCHEMA },
-      },
-      system: [
-        {
-          type: "text",
-          text: NUDGE_SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{ role: "user", content: lines.join("\n") }],
-    }),
+  const result = await callLlm({
+    systemPrompt: NUDGE_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: lines.join("\n") }],
+    maxTokens: 200,
+    temperature: 0.5,
   })
 
-  if (!claudeRes.ok) {
-    const detail = await claudeRes.text()
-    throw new Error(`claude error ${claudeRes.status}: ${detail}`)
+  if (result.toolCalled) {
+    throw new Error("unexpected tool call in klo-watcher nudge")
   }
-  const claudeData = await claudeRes.json()
-  const textBlock = claudeData?.content?.find((b: { type: string }) => b.type === "text")
-  if (!textBlock?.text) throw new Error("no text from Klo")
-  let parsed: { reply: string }
-  try {
-    parsed = JSON.parse(textBlock.text)
-  } catch {
-    throw new Error(`invalid JSON from Klo: ${textBlock.text}`)
-  }
-  return parsed.reply
+  const text = result.text.trim()
+  if (!text) throw new Error("empty nudge from Klo")
+
+  console.log(JSON.stringify({
+    event: "klo_watcher_nudge_complete",
+    model: USE_GEMINI ? KLO_MODEL_GEMINI : KLO_MODEL_ANTHROPIC,
+    role,
+    deal_id: deal.id,
+  }))
+
+  return text
 }
 
 async function sendNudgeEmail(args: {
