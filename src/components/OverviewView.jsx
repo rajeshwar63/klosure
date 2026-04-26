@@ -5,6 +5,7 @@ import {
 } from '../services/overview.js'
 import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLookup.js'
 import ActionZones from './overview/ActionZones.jsx'
+import ConfidencePanel from './overview/ConfidencePanel.jsx'
 import StageTracker from './overview/StageTracker.jsx'
 import Tooltip from './Tooltip.jsx'
 import RemoveButton from './RemoveButton.jsx'
@@ -65,6 +66,7 @@ export default function OverviewView({
         {ks ? (
           <>
             <KloTake state={ks} viewerRole={role} />
+            {role === 'seller' && <ConfidencePanel confidence={ks.confidence} />}
             <DealStatStrip state={ks} health={health} />
             <StageTracker deal={{ ...deal, stage: ks.stage }} />
             <PeopleGrid
