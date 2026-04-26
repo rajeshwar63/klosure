@@ -102,9 +102,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const threadId = body?.thread_id
-    const question = body?.question
-    if (!threadId || !question) return json({ error: "thread_id + question required" }, 400)
+    const mode = body?.mode ?? "chat"
     if (!ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set" }, 500)
 
     const auth = req.headers.get("Authorization")
@@ -115,6 +113,17 @@ Deno.serve(async (req) => {
     const service = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     })
+
+    if (mode === "quarter_take") {
+      if (!body?.team_id) return json({ error: "team_id required" }, 400)
+      const { data: userData, error: userErr } = await userClient.auth.getUser()
+      if (userErr || !userData?.user) return json({ error: "not authorized" }, 401)
+      return await handleQuarterTake(service, body.team_id, userData.user.id)
+    }
+
+    const threadId = body?.thread_id
+    const question = body?.question
+    if (!threadId || !question) return json({ error: "thread_id + question required" }, 400)
 
     // Verify the caller actually owns the thread.
     const { data: thread, error: tErr } = await userClient
@@ -309,4 +318,138 @@ function renderTranscript(history: Array<{ sender: string; content: string }>) {
     lines.push(`- ${m.sender === "klo" ? "Klo" : "Manager"}: ${m.content}`)
   }
   return lines.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: Klo's narrated quarter take. The forecast tab on the manager's
+// Team page calls this once on mount; the result is a 3-5 sentence read of
+// the team's pipeline framed for the manager (not for the rep).
+// ---------------------------------------------------------------------------
+const QUARTER_TAKE_PROMPT = `You are Klo, the AI deal coach inside Klosure. You are advising a sales manager on their quarter forecast.
+
+You'll receive a digest of all active deals across the team. Output a short narrative (3-5 sentences) that:
+
+1. States a realistic Q-commit number (sum of weighted-dollar across confident deals — those scoring 65+)
+2. States a stretch number if there are in-play deals (30-65 confidence) that could come through
+3. Names the 1-2 specific deals or reps that need attention to hit the stretch
+4. If you spot a pattern across the team's struggling deals, mention it ("two deals stuck on signatory unknown")
+5. Keep it to 3-5 sentences. Specific over generic. Manager voice — not coaching the rep, briefing the boss.
+
+Don't list every deal. Don't make a forecast table. Synthesize.`
+
+async function handleQuarterTake(
+  // deno-lint-ignore no-explicit-any
+  service: any,
+  teamId: string,
+  userId: string,
+) {
+  // Confirm the caller is a manager (or owner) of this team.
+  const { data: membership } = await service
+    .from("team_members")
+    .select("role")
+    .eq("team_id", teamId)
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (!membership || (membership.role !== "manager" && membership.role !== "owner")) {
+    return json({ error: "not authorized" }, 403)
+  }
+
+  const { data: members } = await service
+    .from("team_members")
+    .select("user_id, role, users:users(id, name, email)")
+    .eq("team_id", teamId)
+  const memberIds = (members ?? []).map((m: { user_id: string }) => m.user_id)
+
+  if (memberIds.length === 0) {
+    return json({
+      take:
+        "No active deals in this team yet. Once your reps start creating deals and chatting in them, Klo will start forecasting here.",
+      generated_at: new Date().toISOString(),
+    })
+  }
+
+  const { data: deals } = await service
+    .from("deals")
+    .select("id, title, buyer_company, klo_state, value, deadline, stage, seller_id")
+    .in("seller_id", memberIds)
+    .eq("status", "active")
+
+  if (!deals || deals.length === 0) {
+    return json({
+      take:
+        "No active deals in this team yet. Once your reps start creating deals and chatting in them, Klo will start forecasting here.",
+      generated_at: new Date().toISOString(),
+    })
+  }
+
+  const sellerName = new Map(
+    (members ?? []).map((m: { user_id: string; users?: { name?: string; email?: string } }) => [
+      m.user_id,
+      m.users?.name || m.users?.email || "Member",
+    ]),
+  )
+
+  // deno-lint-ignore no-explicit-any
+  const digest = (deals as any[]).map((d) => {
+    const ks = (d.klo_state ?? {}) as Record<string, unknown>
+    const dealValue = ks.deal_value as { amount?: number } | undefined
+    const deadline = ks.deadline as { date?: string } | undefined
+    const confidence = ks.confidence as
+      | {
+          value?: number
+          trend?: string
+          delta?: number
+          factors_dragging_down?: Array<{ label?: string }>
+        }
+      | undefined
+    return {
+      title: d.title,
+      buyer: d.buyer_company,
+      rep: sellerName.get(d.seller_id) ?? "—",
+      stage: (ks.stage as string | undefined) ?? d.stage,
+      value: dealValue?.amount ?? d.value,
+      deadline: deadline?.date ?? d.deadline,
+      confidence: confidence?.value ?? null,
+      trend: confidence?.trend ?? null,
+      delta: confidence?.delta ?? null,
+      summary: (ks.summary as string | undefined) ?? null,
+      top_factor_dragging: confidence?.factors_dragging_down?.[0]?.label ?? null,
+    }
+  })
+
+  const userMessage = `Active pipeline:
+
+${JSON.stringify(digest, null, 2)}
+
+Give me your quarter take.`
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 400,
+      system: [
+        { type: "text", text: QUARTER_TAKE_PROMPT, cache_control: { type: "ephemeral" } },
+      ],
+      messages: [{ role: "user", content: userMessage }],
+    }),
+  })
+  if (!res.ok) {
+    const detail = await res.text()
+    return json({ error: "claude error", status: res.status, detail }, 502)
+  }
+
+  const data = await res.json()
+  const textBlock = data?.content?.find((b: { type: string }) => b.type === "text")
+  const text = (textBlock?.text ?? "").trim()
+
+  return json({
+    take: text,
+    generated_at: new Date().toISOString(),
+  })
 }
