@@ -27,21 +27,20 @@ alter table public.deals
   add column if not exists klo_state jsonb;
 
 -- ----- klo_state_history ----------------------------------------------------
--- One row per change. Never updated, never deleted in normal operation.
--- prev_state / next_state are the full snapshots before and after the change
--- so we can render "what changed" without recomputing diffs from messages.
+-- One row per CHANGED FIELD per turn. Never updated, never deleted.
+-- before_value / after_value are the per-field snapshots so the Overview can
+-- render "what changed" without recomputing diffs from messages.
 create table if not exists public.klo_state_history (
   id uuid primary key default gen_random_uuid(),
   deal_id uuid not null references public.deals(id) on delete cascade,
   changed_at timestamptz not null default now(),
-  changed_by text not null check (changed_by in ('seller', 'buyer', 'klo', 'system')),
-  source_message_id uuid references public.messages(id) on delete set null,
-  change_kind text not null check (change_kind in (
-    'bootstrap', 'extract', 'remove', 'edit', 'system'
-  )),
-  change_summary text,
-  prev_state jsonb,
-  next_state jsonb
+  triggered_by_message_id uuid references public.messages(id) on delete set null,
+  triggered_by_role text not null check (triggered_by_role in ('seller', 'buyer', 'system')),
+  change_kind text not null check (change_kind in ('extracted', 'removed', 'corrected')),
+  field_path text not null,
+  before_value jsonb,
+  after_value jsonb,
+  reason text
 );
 
 create index if not exists klo_state_history_deal_idx
