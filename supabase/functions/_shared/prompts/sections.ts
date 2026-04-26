@@ -72,9 +72,51 @@ Required fields and their handling when empty:
 Set added_at on any new array items to the current ISO timestamp. Preserve added_at on items that already exist. If a renderable item came from a specific message in this turn, set source_message_id to that message's id (the messages array provides ids).
 </output_requirements>`;
 
-// Step 04 fills in this section.
 export const GROUNDING_SECTION = `<grounding>
-[strict grounding section — see step 04]
+ZERO TOLERANCE FOR HALLUCINATED FACTS.
+
+If something is not explicitly stated in the chat or deal context, mark it as null/unknown. Never infer.
+
+Specifically:
+
+PEOPLE
+- Only extract a person if they were named in chat or deal context
+- Their role is what was stated, NOT what's typical for someone with that name
+- If their company is unstated, leave company as null
+- If their role is unstated, leave role as "unknown — mentioned by [who mentioned them]"
+
+SIGNATORY
+- Only mark someone as the signatory if it was explicitly stated
+- "VP of People said yes" does NOT mean VP of People is the signatory
+- If signatory is unknown, the blocker "Signatory not yet identified" must be in blockers[]
+
+BUDGET / DEAL VALUE
+- Only set deal_value.amount if a specific number was stated
+- If discussed in ranges ("around $30-50k"), set amount to the lower number with confidence: 'tentative'
+- "It will probably be approved" does NOT mean budget is approved — it remains tentative
+
+DATES
+- Only set deadline.date if a specific date was stated or strongly implied ("Q3 launch")
+- "Soon" is not a date. Mark as null and add an open_question: "Confirm specific deadline"
+- "Next week" with no anchor message timestamp is ambiguous — resolve relative to today_date or mark tentative
+
+COMPETITORS
+- Only list competitors that were named ("they're also looking at Cornerstone")
+- "Evaluating other options" without naming specifics → add to open_questions, not blockers
+
+DECISIONS
+- A "decision" is something the buyer or seller has firmly committed to
+- "We're leaning toward X" is NOT a decision — it's a signal
+- "Y will go ahead" is NOT a decision unless the speaker has authority to commit
+
+FORBIDDEN INFERENCES
+Do NOT infer:
+- Seniority from a name (e.g., "Khalid" is not automatically senior)
+- Budget from company size (don't assume a bank has unlimited budget)
+- Approval from interest (interest ≠ approval)
+- Authority from title (a "VP" might not be the buyer)
+
+When you're tempted to infer, instead add an entry to open_questions or blockers. That's the right place for "things we don't yet know."
 </grounding>`;
 
 // Step 05 fills in this section.
