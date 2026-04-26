@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   splitActionZones,
   deriveHealthFromState,
@@ -8,6 +8,7 @@ import {
   healthLabel,
 } from '../services/overview.js'
 import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLookup.js'
+import { loadSectionState, setSectionExpanded } from '../services/overviewSections.js'
 import ActionZones from './overview/ActionZones.jsx'
 import KloReadPanel from './overview/KloReadPanel.jsx'
 import StageTracker from './overview/StageTracker.jsx'
@@ -15,6 +16,18 @@ import CollapsibleSection from './overview/CollapsibleSection.jsx'
 import Tooltip from './Tooltip.jsx'
 import RemoveButton from './RemoveButton.jsx'
 import { formatCurrency } from '../lib/format.js'
+
+// Phase 5.5 step 06 default expansion: Commitments is always action-oriented
+// so it leads expanded; everything else opens collapsed and remembers the
+// user's per-deal preference (step 07).
+const SECTION_DEFAULTS = {
+  deal_facts: false,
+  commitments: true,
+  people: false,
+  blockers: false,
+  decisions: false,
+  open_questions: false,
+}
 
 // Phase 4.5: Overview renders from deals.klo_state — the living deal record
 // Klo writes on every chat turn. Legacy fields (deal.value, deal.deadline,
@@ -37,6 +50,26 @@ export default function OverviewView({
   const health = useMemo(
     () => deriveHealthFromState(ks, commitments),
     [ks, commitments],
+  )
+
+  // Phase 5.5 step 07: per-deal section expansion. Re-load whenever dealId
+  // changes so navigating between deals picks up that deal's stored state.
+  const [sectionState, setSectionState] = useState(() => loadSectionState(deal?.id))
+  useEffect(() => {
+    setSectionState(loadSectionState(deal?.id))
+  }, [deal?.id])
+
+  const isExpanded = useCallback(
+    (key) => (key in sectionState ? sectionState[key] : SECTION_DEFAULTS[key]),
+    [sectionState],
+  )
+
+  const handleToggle = useCallback(
+    (key) => (next) => {
+      setSectionExpanded(deal?.id, key, next)
+      setSectionState((prev) => ({ ...prev, [key]: next }))
+    },
+    [deal?.id],
   )
 
   // Phase 4.5: prefetch every source_message_id used by the Overview so the
@@ -77,6 +110,8 @@ export default function OverviewView({
               headline={`${STAGE_LABEL[ks.stage] ?? '—'} · ${
                 ks.deal_value ? formatCurrency(ks.deal_value.amount) : '—'
               } · ${compactDeadline(ks.deadline?.date)} · ${healthLabel(health)}`}
+              expanded={isExpanded('deal_facts')}
+              onToggle={handleToggle('deal_facts')}
             >
               <div className="space-y-3">
                 <DealStatStrip state={ks} health={health} />
@@ -84,7 +119,11 @@ export default function OverviewView({
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Commitments" defaultExpanded>
+            <CollapsibleSection
+              title="Commitments"
+              expanded={isExpanded('commitments')}
+              onToggle={handleToggle('commitments')}
+            >
               <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
             </CollapsibleSection>
 
@@ -93,6 +132,8 @@ export default function OverviewView({
               count={(ks.people ?? []).length}
               headline={summarizePeople(ks.people)}
               emptyMessage="Klo will add people as they appear in the chat."
+              expanded={isExpanded('people')}
+              onToggle={handleToggle('people')}
             >
               <PeopleGrid
                 people={ks.people}
@@ -107,6 +148,8 @@ export default function OverviewView({
               count={(ks.blockers ?? []).length}
               headline={summarizeBlockers(ks.blockers)}
               emptyMessage="No blockers right now — keep it that way."
+              expanded={isExpanded('blockers')}
+              onToggle={handleToggle('blockers')}
             >
               <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
             </CollapsibleSection>
@@ -117,6 +160,8 @@ export default function OverviewView({
               title="Decisions on record"
               count={(ks.decisions ?? []).length}
               headline={ks.decisions?.[0]?.what ?? null}
+              expanded={isExpanded('decisions')}
+              onToggle={handleToggle('decisions')}
             >
               <DecisionsList items={ks.decisions} />
             </CollapsibleSection>
@@ -125,6 +170,8 @@ export default function OverviewView({
               <CollapsibleSection
                 title="Open questions"
                 count={(ks.open_questions ?? []).length}
+                expanded={isExpanded('open_questions')}
+                onToggle={handleToggle('open_questions')}
               >
                 <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
               </CollapsibleSection>
