@@ -20,12 +20,6 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 }
 
-// Quiet "unused import" while step 07 is pending — these are wired up next.
-void buildBootstrapPrompt
-void buildExtractionPrompt
-void ANTHROPIC_API_KEY
-void KLO_MODEL
-
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
@@ -138,17 +132,100 @@ async function loadDealContext(deal_id: string): Promise<DealContext> {
   return { deal, context, messages, history, recipientRole }
 }
 
-async function runBootstrap(_ctx: DealContext): Promise<KloRespondOutput> {
-  // TODO step 07: build bootstrap prompt, call Anthropic, parse JSON
-  throw new Error("runBootstrap not implemented")
+async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
+  const system = buildBootstrapPrompt({
+    dealTitle: ctx.deal.title,
+    buyerCompany: ctx.deal.buyer_company ?? "",
+    sellerCompany: ctx.deal.seller_company ?? "",
+    dealValue: ctx.deal.value,
+    dealDeadline: ctx.deal.deadline,
+    stakeholders: (ctx.context?.stakeholders ?? []).map((s) => ({
+      name: s.name ?? "",
+      role: s.role ?? "",
+      company: s.company ?? "",
+    })),
+    whatNeedsToHappen: ctx.context?.what_needs_to_happen ?? null,
+    budgetNotes: ctx.context?.budget_notes ?? null,
+    notes: ctx.context?.notes ?? null,
+  })
+
+  return callAnthropic(system, ctx.messages, ctx.recipientRole, /* useCache */ false)
 }
 
 async function runExtraction(
-  _ctx: DealContext,
+  ctx: DealContext,
   _triggering_message_id: string | null,
 ): Promise<KloRespondOutput> {
-  // TODO step 07: build extraction prompt, call Anthropic with prompt caching, parse JSON
-  throw new Error("runExtraction not implemented")
+  // currentState is non-null on the extraction path (skeleton routes on null).
+  const currentState = ctx.deal.klo_state as KloState
+  const system = buildExtractionPrompt({
+    dealTitle: ctx.deal.title,
+    buyerCompany: ctx.deal.buyer_company ?? "",
+    sellerCompany: ctx.deal.seller_company ?? "",
+    mode: ctx.deal.mode,
+    recipientRole: ctx.recipientRole,
+    currentState,
+    recentHistory: ctx.history,
+  })
+
+  return callAnthropic(system, ctx.messages, ctx.recipientRole, /* useCache */ true)
+}
+
+async function callAnthropic(
+  systemPrompt: string,
+  messages: MessageRow[],
+  _recipientRole: "seller" | "buyer",
+  useCache: boolean,
+): Promise<KloRespondOutput> {
+  // Format messages for the API: tag each with id and sender so Klo can echo source_message_id.
+  const apiMessages = messages.map((m) => ({
+    role: m.sender_type === "klo" ? "assistant" : "user",
+    content: `[msg_id=${m.id} | ${m.sender_name ?? m.sender_type} (${m.sender_type}) | ${m.created_at}]\n${m.content}`,
+  }))
+
+  // Anthropic requires the conversation to start with a user turn. If somehow
+  // the first item is an assistant turn (e.g. only a Klo message exists), drop
+  // leading assistant turns rather than failing the call.
+  while (apiMessages.length > 0 && apiMessages[0].role === "assistant") {
+    apiMessages.shift()
+  }
+  if (apiMessages.length === 0) {
+    apiMessages.push({ role: "user", content: "(no user messages yet — produce a fresh state from the deal context above.)" })
+  }
+
+  const body: Record<string, unknown> = {
+    model: KLO_MODEL,
+    max_tokens: 1500,
+    system: useCache
+      ? [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }]
+      : systemPrompt,
+    messages: apiMessages,
+  }
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  const text: string = data.content?.[0]?.text ?? ""
+
+  // Robust JSON extraction: Klo should return only JSON, but tolerate accidental wrapping.
+  const jsonStart = text.indexOf("{")
+  const jsonEnd = text.lastIndexOf("}")
+  if (jsonStart < 0 || jsonEnd < 0) throw new Error("Klo did not return JSON")
+  const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
+
+  if (!parsed.klo_state || !parsed.chat_reply) {
+    throw new Error("Klo response missing klo_state or chat_reply")
+  }
+  return parsed as KloRespondOutput
 }
 
 async function writeHistory(
