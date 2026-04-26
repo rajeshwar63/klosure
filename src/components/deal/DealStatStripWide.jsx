@@ -39,14 +39,6 @@ function formatShortDate(iso) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-function weeksAt(deal) {
-  const ts = deal?.updated_at || deal?.created_at
-  if (!ts) return 0
-  const t = new Date(ts).getTime()
-  if (Number.isNaN(t)) return 0
-  return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24 * 7))
-}
-
 function Stat({ label, value, sub, valueColor, subColor }) {
   return (
     <div>
@@ -71,7 +63,13 @@ function Stat({ label, value, sub, valueColor, subColor }) {
   )
 }
 
-export default function DealStatStripWide({ deal, klo_state }) {
+function stuckValueLabel(stuckFor) {
+  if (stuckFor == null) return '—'
+  if (stuckFor.weeks <= 0) return 'Not stuck'
+  return `${stuckFor.weeks} week${stuckFor.weeks === 1 ? '' : 's'}`
+}
+
+export default function DealStatStripWide({ deal, klo_state, stuckFor }) {
   const stage = klo_state?.stage ?? deal?.stage
   const stageLabel = STAGE_LABEL[stage] ?? '—'
   const stageIdx = STAGE_INDEX[stage]
@@ -80,7 +78,9 @@ export default function DealStatStripWide({ deal, klo_state }) {
   const valueTentative = klo_state?.deal_value?.confidence === 'tentative'
   const deadline = klo_state?.deadline?.date ?? deal?.deadline
   const days = daysUntil(deadline)
-  const stuck = weeksAt(deal)
+  const stuckValue = stuckValueLabel(stuckFor)
+  const stuckIsRed = stuckFor != null && stuckFor.weeks >= 2
+  const stuckSub = stuckFor?.since ? `since ${formatShortDate(stuckFor.since)}` : null
 
   return (
     <div
@@ -127,8 +127,9 @@ export default function DealStatStripWide({ deal, klo_state }) {
       />
       <Stat
         label="STUCK FOR"
-        value={`${stuck} weeks`}
-        valueColor={stuck >= 2 ? '#A32D2D' : undefined}
+        value={stuckValue}
+        valueColor={stuckIsRed ? '#A32D2D' : undefined}
+        sub={stuckSub}
       />
     </div>
   )

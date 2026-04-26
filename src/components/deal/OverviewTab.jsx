@@ -17,6 +17,7 @@ import KloFullReadCollapsed from './KloFullReadCollapsed.jsx'
 import DealStatStripWide from './DealStatStripWide.jsx'
 import BlockersPanel from './BlockersPanel.jsx'
 import CommitmentsPanel from './CommitmentsPanel.jsx'
+import { useStuckFor } from '../../hooks/useStuckFor.js'
 
 export default function OverviewTab({
   deal,
@@ -26,6 +27,7 @@ export default function OverviewTab({
   onCommitmentJump,
 }) {
   const ks = deal?.klo_state ?? {}
+  const stuckFor = useStuckFor(deal?.id, ks?.confidence)
 
   return (
     <div className="p-4 md:p-6 max-w-[1200px] mx-auto">
@@ -44,7 +46,7 @@ export default function OverviewTab({
 
       <KloFullReadCollapsed klo_state={ks} viewerRole={viewerRole} />
 
-      <DealStatStripWide deal={deal} klo_state={ks} />
+      <DealStatStripWide deal={deal} klo_state={ks} stuckFor={stuckFor} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <BlockersPanel
