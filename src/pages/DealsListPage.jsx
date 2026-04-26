@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { loadSellerDashboard } from '../services/dashboard.js'
 import { formatCurrency, formatDeadline, formatRelativeDate } from '../lib/format.js'
+import DailyFocusBanner from '../components/DailyFocusBanner.jsx'
 import InstallPrompt from '../components/InstallPrompt.jsx'
 
 const HEALTH_DOT = {
@@ -103,6 +104,7 @@ export default function DealsListPage() {
           <EmptyState />
         ) : (
           <>
+            {stats && stats.activeCount > 0 && <DailyFocusBanner />}
             {stats && stats.activeCount > 0 && <StatsStrip stats={stats} />}
 
             {active.length > 0 && (
