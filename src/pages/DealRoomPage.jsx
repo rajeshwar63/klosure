@@ -1,68 +1,296 @@
-import { useEffect, useState } from 'react'
+// Phase 6 step 08 — new deal page shell. Three tabs (Overview / Chat /
+// History) and a dark deal header at the top. The page lives inside the
+// AppShell, so the sidebar is always visible on the left.
+//
+// Data layer is unchanged from Phase 5.5 — we still load the deal +
+// dealContext + messages + commitments, and subscribe to realtime changes
+// the same way DealRoom.jsx did. We just rehouse the UI in a new layout.
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
-import DealRoom from '../components/DealRoom.jsx'
+import { useProfile } from '../hooks/useProfile.jsx'
+import { useShellDeals } from '../hooks/useShellDeals.jsx'
+import { listCommitments } from '../services/commitments.js'
+import { greetingForRole } from '../services/klo.js'
+import { canShareWithBuyer } from '../lib/plans.js'
+import ChatView from '../components/ChatView.jsx'
+import DealHeader from '../components/deal/DealHeader.jsx'
+import DealTabs, {
+  loadDealTab,
+  saveDealTab,
+} from '../components/deal/DealTabs.jsx'
+import OverviewTab from '../components/deal/OverviewTab.jsx'
+import HistoryTab from '../components/deal/HistoryTab.jsx'
+
+function DealPageSkeleton() {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="h-16 animate-pulse" style={{ background: '#2C2C2A' }} />
+      <div className="border-b border-navy/10 bg-white h-10 animate-pulse" />
+      <div className="flex-1 p-4 md:p-6">
+        <div className="h-32 rounded-xl bg-navy/5 mb-4 animate-pulse" />
+        <div className="h-48 rounded-xl bg-navy/5 animate-pulse" />
+      </div>
+    </div>
+  )
+}
+
+function DealNotFound({ error }) {
+  const navigate = useNavigate()
+  return (
+    <div className="p-12 text-center">
+      <h2 className="text-xl font-medium text-navy mb-2">Deal not found</h2>
+      <p className="text-navy/55 text-sm mb-4">
+        {error || 'It may have been archived or deleted.'}
+      </p>
+      <button
+        type="button"
+        onClick={() => navigate('/deals')}
+        className="text-klo font-medium"
+      >
+        ← Back to deals
+      </button>
+    </div>
+  )
+}
 
 export default function DealRoomPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [params] = useSearchParams()
-  const autoShare = params.get('share') === '1'
+  const navigate = useNavigate()
   const { user } = useAuth()
+  const { profile, plan } = useProfile()
+  const { reload: reloadShellDeals } = useShellDeals()
+
   const [deal, setDeal] = useState(null)
   const [dealContext, setDealContext] = useState(null)
-  const [profile, setProfile] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [commitments, setCommitments] = useState([])
+  const [kloThinking, setKloThinking] = useState(false)
+  const [highlightCommitmentId, setHighlightCommitmentId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const [activeTab, setActiveTab] = useState(() => loadDealTab(id))
+
+  // Re-read the per-deal tab when the dealId in the URL changes.
+  useEffect(() => {
+    setActiveTab(loadDealTab(id))
+  }, [id])
+
+  function handleTabChange(next) {
+    setActiveTab(next)
+    saveDealTab(id, next)
+  }
+
+  function handleCommitmentJump(commitmentId) {
+    setHighlightCommitmentId(commitmentId)
+    handleTabChange('chat')
+  }
+
+  // Load the deal + context + profile.
   useEffect(() => {
     if (!user || !id) return
     let mounted = true
-    async function load() {
-      const [{ data: dealData, error: dealErr }, { data: ctx }, { data: prof }] = await Promise.all([
-        supabase.from('deals').select('*').eq('id', id).single(),
-        supabase.from('deal_context').select('*').eq('deal_id', id).maybeSingle(),
-        supabase.from('users').select('*').eq('id', user.id).maybeSingle()
-      ])
+    setLoading(true)
+    Promise.all([
+      supabase.from('deals').select('*').eq('id', id).single(),
+      supabase.from('deal_context').select('*').eq('deal_id', id).maybeSingle(),
+    ]).then(([dealRes, ctxRes]) => {
       if (!mounted) return
-      if (dealErr) {
-        setError(dealErr.message)
+      if (dealRes.error) {
+        setError(dealRes.error.message)
         setLoading(false)
         return
       }
-      setDeal(dealData)
-      setDealContext(ctx)
-      setProfile(prof)
+      setDeal(dealRes.data)
+      setDealContext(ctxRes.data ?? null)
       setLoading(false)
+    })
+    return () => {
+      mounted = false
     }
-    load()
   }, [user, id])
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-navy/50 text-sm">Loading deal…</div>
-  }
-  if (error || !deal) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <p className="text-navy font-semibold mb-2">Couldn't open this deal.</p>
-        <p className="text-navy/60 text-sm mb-4">{error || 'Deal not found.'}</p>
-        <button onClick={() => navigate('/deals')} className="text-klo font-medium">
-          Back to deals
-        </button>
-      </div>
-    )
-  }
+  // Load messages + commitments and subscribe to realtime updates.
+  useEffect(() => {
+    if (!deal?.id) return
+    let mounted = true
+    async function load() {
+      const [msgRes, commits] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('*')
+          .eq('deal_id', deal.id)
+          .order('created_at', { ascending: true }),
+        listCommitments(deal.id),
+      ])
+      if (!mounted) return
+      if (msgRes.error) {
+        console.error('Failed to load messages', msgRes.error)
+        return
+      }
+      setCommitments(commits)
+      const data = msgRes.data ?? []
+      if (data.length === 0) {
+        // Phase 1 first-message greeting from Klo.
+        const greeting = greetingForRole({ role: 'seller', deal })
+        const { data: inserted } = await supabase
+          .from('messages')
+          .insert({
+            deal_id: deal.id,
+            sender_type: 'klo',
+            sender_name: 'Klo',
+            content: greeting,
+          })
+          .select()
+        setMessages(inserted ?? [])
+      } else {
+        setMessages(data)
+      }
+    }
+    load()
 
-  const sellerName = profile?.name || user?.email || 'Seller'
+    const channel = supabase
+      .channel(`deal-${deal.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `deal_id=eq.${deal.id}`,
+        },
+        (payload) => {
+          if (payload.new.sender_type === 'klo') setKloThinking(false)
+          setMessages((prev) => {
+            if (prev.find((m) => m.id === payload.new.id)) return prev
+            return [...prev, payload.new]
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'commitments',
+          filter: `deal_id=eq.${deal.id}`,
+        },
+        (payload) => {
+          setCommitments((prev) => {
+            if (payload.eventType === 'DELETE') {
+              return prev.filter((c) => c.id !== payload.old.id)
+            }
+            const row = payload.new
+            const idx = prev.findIndex((c) => c.id === row.id)
+            if (idx === -1) return [...prev, row]
+            const next = [...prev]
+            next[idx] = row
+            return next
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'deals',
+          filter: `id=eq.${deal.id}`,
+        },
+        (payload) => {
+          setDeal((d) => ({ ...d, ...payload.new }))
+        },
+      )
+
+    channel.subscribe()
+    return () => {
+      mounted = false
+      supabase.removeChannel(channel)
+    }
+  }, [deal?.id])
+
+  // When the deal record updates (Klo writes back klo_state, summary, etc.)
+  // refresh the sidebar list so its confidence dot stays in sync.
+  useEffect(() => {
+    if (!deal?.id) return
+    reloadShellDeals()
+  }, [deal?.klo_state?.confidence?.value, deal?.health, reloadShellDeals, deal?.id])
+
+  const handleShare = useCallback(() => {
+    if (!deal?.buyer_token) return
+    const base = import.meta.env.VITE_APP_URL || window.location.origin
+    const url = `${base.replace(/\/$/, '')}/join/${deal.buyer_token}`
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url).catch(() => {})
+    }
+    window.alert(`Share link copied:\n${url}`)
+  }, [deal?.buyer_token])
+
+  const sellerName = useMemo(
+    () => profile?.name || user?.email || 'Seller',
+    [profile?.name, user?.email],
+  )
+
+  const messageCount = messages?.length ?? 0
+  // Honor onboarding's ?share=1 hint by prompting share immediately.
+  useEffect(() => {
+    if (params.get('share') === '1' && deal && canShareWithBuyer(plan)) {
+      handleShare()
+    }
+  }, [params, deal, plan, handleShare])
+
+  if (loading) return <DealPageSkeleton />
+  if (error || !deal) return <DealNotFound error={error} />
+
   return (
-    <DealRoom
-      deal={deal}
-      dealContext={dealContext}
-      role="seller"
-      currentUserName={sellerName}
-      onBack={() => navigate('/deals')}
-      autoShare={autoShare}
-    />
+    <div className="flex flex-col h-full min-h-0">
+      <DealHeader
+        deal={deal}
+        viewerRole="seller"
+        canShare={canShareWithBuyer(plan)}
+        onShare={handleShare}
+        onOpenChat={() => handleTabChange('chat')}
+      />
+      <DealTabs
+        activeTab={activeTab}
+        onChange={handleTabChange}
+        chatCount={messageCount}
+      />
+
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
+        {activeTab === 'overview' && (
+          <OverviewTab
+            deal={deal}
+            viewerRole="seller"
+            commitments={commitments}
+            onSwitchToChat={() => handleTabChange('chat')}
+            onCommitmentJump={handleCommitmentJump}
+          />
+        )}
+        {activeTab === 'chat' && (
+          <div className="flex flex-col h-full chat-doodle">
+            <ChatView
+              deal={deal}
+              dealContext={dealContext}
+              role="seller"
+              currentUserName={sellerName}
+              messages={messages}
+              setMessages={setMessages}
+              commitments={commitments}
+              kloThinking={kloThinking}
+              setKloThinking={setKloThinking}
+              highlightCommitmentId={highlightCommitmentId}
+              onHighlightConsumed={() => setHighlightCommitmentId(null)}
+              locked={deal.locked}
+            />
+          </div>
+        )}
+        {activeTab === 'history' && <HistoryTab deal={deal} />}
+      </div>
+    </div>
   )
 }
