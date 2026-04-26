@@ -1,40 +1,361 @@
 import { useMemo } from 'react'
 import {
-  deriveStats,
   splitActionZones,
-  deriveTimeline,
+  deriveHealthFromState,
 } from '../services/overview.js'
-import DealStatStrip from './overview/DealStatStrip.jsx'
-import StageTracker from './overview/StageTracker.jsx'
 import ActionZones from './overview/ActionZones.jsx'
-import PeopleGrid from './overview/PeopleGrid.jsx'
-import DealTimeline from './overview/DealTimeline.jsx'
+import StageTracker from './overview/StageTracker.jsx'
+import { formatCurrency } from '../lib/format.js'
 
-// Overview half of the deal room — a structured rendering of the same data
-// the chat already exposes, for sellers who want a "deal command center"
-// view rather than scrolling chat. Read-mostly: every action still happens
-// in the Chat tab. Sections fill in across steps 4-8 of Phase 3.5.
+// Phase 4.5: Overview renders from deals.klo_state — the living deal record
+// Klo writes on every chat turn. Legacy fields (deal.value, deal.deadline,
+// deal.summary, deal.stage) are still mirrored so this view degrades to the
+// previous behavior if klo_state is null.
+//
+// Sections render the same factual data on both sides — only KloTake and
+// OpenQuestionsList diverge. Removing items lives in step 11; provenance
+// hover lives in step 10. This step is pure rendering.
 export default function OverviewView({
   deal,
-  dealContext,
+  dealContext: _dealContext,
   role,
   commitments,
   onSwitchToChat,
   onCommitmentClick,
 }) {
-  const stats = useMemo(() => deriveStats(deal, commitments), [deal, commitments])
+  const ks = deal?.klo_state ?? null
   const zones = useMemo(() => splitActionZones(commitments), [commitments])
-  const timeline = useMemo(() => deriveTimeline(deal, commitments), [deal, commitments])
+  const health = useMemo(
+    () => deriveHealthFromState(ks, commitments),
+    [ks, commitments],
+  )
 
   return (
     <main className="flex-1 overflow-y-auto bg-chat-bg/40 px-3 py-4">
       <div className="max-w-2xl mx-auto space-y-4">
-        <DealStatStrip stats={stats} />
-        <StageTracker deal={deal} />
-        <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
-        <PeopleGrid stakeholders={dealContext?.stakeholders} onSwitchToChat={onSwitchToChat} />
-        <DealTimeline events={timeline} />
+        {ks ? (
+          <>
+            <KloTake state={ks} viewerRole={role} />
+            <DealStatStrip state={ks} health={health} />
+            <StageTracker deal={{ ...deal, stage: ks.stage }} />
+            <PeopleGrid people={ks.people} viewerRole={role} onSwitchToChat={onSwitchToChat} />
+            <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
+            <BlockersList blockers={ks.blockers} />
+            {role === 'seller' && <OpenQuestionsList items={ks.open_questions} />}
+            {role === 'seller' && <DecisionsList items={ks.decisions} />}
+          </>
+        ) : (
+          <EmptyKloState onSwitchToChat={onSwitchToChat} />
+        )}
       </div>
     </main>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Klo's take — top of the Overview, role-scoped coaching string from klo_state.
+// ---------------------------------------------------------------------------
+function KloTake({ state, viewerRole }) {
+  const text = viewerRole === 'buyer' ? state.klo_take_buyer : state.klo_take_seller
+  if (!text) return null
+  return (
+    <div className="bg-klo-bg border border-klo/20 rounded-xl px-4 py-3 flex gap-3">
+      <span className="text-klo text-base leading-none mt-0.5">◆</span>
+      <p className="text-[14px] leading-snug text-navy">{text}</p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Stat strip — stage / value / deadline / health derived from klo_state.
+// Tentative confidence renders in amber with an italic "(tentative)" tag.
+// ---------------------------------------------------------------------------
+const STAGE_LABEL = {
+  discovery: 'Discovery',
+  proposal: 'Proposal',
+  negotiation: 'Negotiation',
+  legal: 'Legal',
+  closed: 'Closed',
+}
+
+const HEALTH = {
+  green: { dot: 'bg-emerald-500', label: 'On track', tone: 'text-emerald-700' },
+  amber: { dot: 'bg-amber-500', label: 'At risk', tone: 'text-amber-700' },
+  red: { dot: 'bg-red-500', label: 'Stuck', tone: 'text-red-700' },
+}
+
+function DealStatStrip({ state, health }) {
+  const stage = STAGE_LABEL[state.stage] ?? '—'
+  const valueTentative = state.deal_value?.confidence === 'tentative'
+  const dateTentative = state.deadline?.confidence === 'tentative'
+  const healthMeta = HEALTH[health] ?? HEALTH.green
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-navy/10 bg-navy/10">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px">
+        <Cell label="Deal stage" value={stage} sub={state.stage_reasoning ?? null} />
+        <Cell
+          label="Value"
+          value={
+            <span className={valueTentative ? 'text-amber-700' : ''}>
+              {state.deal_value
+                ? formatCurrency(state.deal_value.amount)
+                : '—'}
+              {valueTentative && (
+                <span className="ml-1 text-[11px] italic font-normal opacity-70">(tentative)</span>
+              )}
+            </span>
+          }
+          sub={state.deal_value ? `Per the deal record (${state.deal_value.currency})` : 'Not set'}
+        />
+        <Cell
+          label="Deadline"
+          value={
+            <span className={dateTentative ? 'text-amber-700' : ''}>
+              {state.deadline?.date ?? '—'}
+              {dateTentative && (
+                <span className="ml-1 text-[11px] italic font-normal opacity-70">(tentative)</span>
+              )}
+            </span>
+          }
+          sub={
+            dateTentative && state.deadline?.previous
+              ? `was ${state.deadline.previous}${state.deadline.note ? ` — ${state.deadline.note}` : ''}`
+              : state.deadline?.date
+              ? 'Target go-live'
+              : 'Not set'
+          }
+        />
+        <Cell
+          label="Health"
+          value={
+            <span className={`inline-flex items-center gap-1.5 ${healthMeta.tone}`}>
+              <span className={`w-2 h-2 rounded-full ${healthMeta.dot}`} />
+              {healthMeta.label}
+            </span>
+          }
+          sub={health === 'green' ? 'No tentative items' : 'Resolve in chat'}
+        />
+      </div>
+    </div>
+  )
+}
+
+function Cell({ label, value, sub }) {
+  return (
+    <div className="bg-white px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-0.5">
+        {label}
+      </div>
+      <div className="text-[15px] font-semibold text-navy leading-tight">{value}</div>
+      {sub && <div className="text-[11px] text-navy/50 mt-0.5 truncate">{sub}</div>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// People — pulled from klo_state.people.
+// ---------------------------------------------------------------------------
+function PeopleGrid({ people, viewerRole: _viewerRole, onSwitchToChat }) {
+  if (!people || people.length === 0) {
+    return (
+      <div className="bg-white border border-navy/10 border-dashed rounded-xl px-4 py-6 text-center">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
+          People in this deal
+        </div>
+        <p className="text-[13px] text-navy/60 mb-3">
+          Klo will add people as they appear in the chat.
+        </p>
+        {onSwitchToChat && (
+          <button
+            type="button"
+            onClick={onSwitchToChat}
+            className="text-[12px] font-semibold text-klo hover:underline"
+          >
+            Open chat →
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white border border-navy/10 rounded-xl px-4 py-4">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-3">
+        People in this deal
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+        {people.map((p, i) => (
+          <PersonCard key={`${p.name || 'anon'}-${i}`} person={p} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PersonCard({ person }) {
+  const name = person?.name?.trim() || 'Unnamed'
+  const role = person?.role?.trim() || ''
+  const company = person?.company?.trim() || ''
+  return (
+    <div className="border border-navy/10 rounded-lg px-2 py-2.5 flex flex-col items-center text-center">
+      <Avatar name={name} />
+      <div className="text-[12px] font-semibold text-navy mt-1.5 truncate w-full" title={name}>
+        {name}
+      </div>
+      {role && (
+        <div className="text-[10px] text-navy/50 truncate w-full" title={role}>
+          {role}
+        </div>
+      )}
+      {company && (
+        <div className="text-[10px] text-navy/40 truncate w-full" title={company}>
+          {company}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const AVATAR_PALETTE = [
+  'bg-klo/20 text-klo',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-violet-100 text-violet-700',
+  'bg-sky-100 text-sky-700',
+]
+
+function Avatar({ name }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('') || '?'
+  const tone = AVATAR_PALETTE[hash(name) % AVATAR_PALETTE.length]
+  return (
+    <span className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold ${tone}`}>
+      {initials}
+    </span>
+  )
+}
+
+function hash(str) {
+  let h = 0
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
+}
+
+// ---------------------------------------------------------------------------
+// Blockers — vertical list with a severity dot.
+// ---------------------------------------------------------------------------
+const SEVERITY_DOT = {
+  green: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  red: 'bg-red-500',
+}
+
+function BlockersList({ blockers }) {
+  if (!blockers || blockers.length === 0) {
+    return (
+      <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-1">
+          Blockers
+        </div>
+        <p className="text-[13px] text-navy/60">None right now.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
+        Blockers
+      </div>
+      <ul className="space-y-1.5">
+        {blockers.map((b, i) => (
+          <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
+            <span
+              className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${
+                SEVERITY_DOT[b.severity] ?? 'bg-amber-500'
+              }`}
+            />
+            <span className="flex-1">{b.text}</span>
+            {b.since && <span className="text-[11px] text-navy/40 shrink-0">since {b.since}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Open questions — seller-only.
+// ---------------------------------------------------------------------------
+function OpenQuestionsList({ items }) {
+  if (!items || items.length === 0) return null
+  return (
+    <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
+        Open questions
+      </div>
+      <ul className="space-y-1.5">
+        {items.map((q, i) => (
+          <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
+            <span className="text-klo font-bold leading-none mt-0.5">?</span>
+            <span className="flex-1">{q.text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Decisions — short audit list of what's been agreed.
+// ---------------------------------------------------------------------------
+function DecisionsList({ items }) {
+  if (!items || items.length === 0) return null
+  return (
+    <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
+        Decisions on record
+      </div>
+      <ul className="space-y-1.5">
+        {items.map((d, i) => (
+          <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
+            <span className="text-emerald-600 leading-none mt-0.5">✓</span>
+            <span className="flex-1">{d.what}</span>
+            {d.when && <span className="text-[11px] text-navy/40 shrink-0">{d.when}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Empty state for legacy deals (klo_state is null until first chat turn).
+// ---------------------------------------------------------------------------
+function EmptyKloState({ onSwitchToChat }) {
+  return (
+    <div className="bg-white border border-navy/10 border-dashed rounded-xl px-4 py-8 text-center">
+      <div className="text-klo text-2xl mb-2">◆</div>
+      <p className="text-[14px] text-navy/70 mb-3 max-w-md mx-auto">
+        Klo hasn't read this deal yet. Send a message in chat — Klo will catch
+        up on the conversation and start tracking.
+      </p>
+      {onSwitchToChat && (
+        <button
+          type="button"
+          onClick={onSwitchToChat}
+          className="text-[13px] font-semibold text-klo hover:underline"
+        >
+          Open chat →
+        </button>
+      )}
+    </div>
   )
 }
