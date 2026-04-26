@@ -45,7 +45,7 @@ export default function RemoveButton({
   if (tooNew) {
     return (
       <span
-        className={`text-navy/20 text-sm leading-none cursor-not-allowed ${className}`}
+        className={`text-navy/20 text-base leading-none cursor-not-allowed inline-flex items-center justify-center min-w-[24px] min-h-[24px] ${className}`}
         title="Just added — wait a moment"
       >
         ×
@@ -59,7 +59,7 @@ export default function RemoveButton({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Remove ${label}`}
-        className={`text-navy/30 hover:text-red-600 text-sm leading-none px-1 ${className}`}
+        className={`text-navy/30 hover:text-red-600 text-base leading-none inline-flex items-center justify-center min-w-[24px] min-h-[24px] ${className}`}
       >
         ×
       </button>
@@ -69,7 +69,7 @@ export default function RemoveButton({
   return (
     <form
       onSubmit={submit}
-      className={`flex flex-col gap-1.5 bg-white border border-klo/40 rounded-lg p-2 shadow-sm ${className}`}
+      className={`flex flex-col gap-1.5 bg-white border border-klo/40 rounded-lg p-2 shadow-sm w-full ${className}`}
     >
       <input
         autoFocus

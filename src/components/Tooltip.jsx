@@ -38,7 +38,7 @@ export default function Tooltip({ children, content, className = '' }) {
       {open && (
         <span
           role="tooltip"
-          className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-[260px] max-w-[80vw] rounded-lg bg-white text-navy text-[12px] leading-snug shadow-lg border border-navy/10 px-3 py-2 text-left pointer-events-none"
+          className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-[min(260px,calc(100vw-32px))] rounded-lg bg-white text-navy text-[12px] leading-snug shadow-lg border border-navy/10 px-3 py-2 text-left pointer-events-none"
         >
           {content}
           <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-2 h-2 rotate-45 bg-white border-r border-b border-navy/10" />
