@@ -92,7 +92,7 @@ export default function AppShell({
 
   const sidebarColsClass = collapsed
     ? 'lg:grid-cols-[52px_1fr] md:grid-cols-[52px_1fr]'
-    : 'lg:grid-cols-[220px_1fr] md:grid-cols-[180px_1fr]'
+    : 'lg:grid-cols-[260px_1fr] md:grid-cols-[200px_1fr]'
 
   return (
     <div className={`grid h-dvh overflow-hidden grid-cols-1 ${sidebarColsClass}`}>
