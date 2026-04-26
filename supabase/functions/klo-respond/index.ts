@@ -139,7 +139,7 @@ The klo_state is the complete structured record of this deal AFTER incorporating
           },
           klo_take_buyer: {
             type: ["string", "null"],
-            description: "2 sentence coaching for the buyer. Max 180 chars. ONLY populate if mode is 'shared' (buyer has joined the deal). On solo seller deals, set to null to save tokens.",
+            description: "2 sentence coaching for the buyer. Max 180 chars. ONLY populate if buyer has joined this deal (mode: 'shared'). If solo seller deal, set to null to save tokens.",
           },
           confidence: {
             type: ["object", "null"],
@@ -237,7 +237,7 @@ The klo_state is the complete structured record of this deal AFTER incorporating
       },
       chat_reply: {
         type: "string",
-        description: "Klo's chat reply to the user. STRICT MAXIMUM: 4 sentences, ~60 words. Often 2-3 is enough.",
+        description: "Klo's chat reply. STRICT MAXIMUM: 4 sentences. Often 2-3 is enough.",
       },
     },
     required: ["klo_state", "chat_reply"],
