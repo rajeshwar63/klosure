@@ -20,6 +20,7 @@ import KloFullReadCollapsed from './KloFullReadCollapsed.jsx'
 import DealStatStripWide from './DealStatStripWide.jsx'
 import BlockersPanel from './BlockersPanel.jsx'
 import CommitmentsPanel from './CommitmentsPanel.jsx'
+import StakeholdersPanel from './StakeholdersPanel.jsx'
 import { useStuckFor } from '../../hooks/useStuckFor.js'
 
 export default function OverviewTab({
@@ -61,7 +62,12 @@ export default function OverviewTab({
           viewerRole={viewerRole}
           dealId={deal?.id}
         />
-        <div />
+        <StakeholdersPanel
+          klo_state={ks}
+          viewerRole={viewerRole}
+          dealId={deal?.id}
+          deal={deal}
+        />
       </div>
     </div>
   )
