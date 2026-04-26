@@ -1,16 +1,51 @@
 // =============================================================================
-// Overview derivations — Phase 3.5
+// Overview derivations — Phase 3.5 + Phase 4.5
 // =============================================================================
 // Pure functions that turn the deal + commitments state already held by the
-// DealRoom shell into the shapes the Overview sections need. We don't fetch
-// here — the shell owns the realtime subscription on messages/commitments/
-// deals and passes live values down — these helpers just slice that data.
+// DealRoom shell into the shapes the Overview sections need. The shell owns
+// the realtime subscription on messages/commitments/deals and passes live
+// values down — these helpers just slice that data.
 //
-// Keeping them as standalone functions (no React) makes them trivial to
-// memoize in the component and easy to reason about in isolation.
+// Phase 4.5 adds `getOverviewData(dealId)` for callers that want to load the
+// living deal record (klo_state + commitments) directly, plus
+// `deriveHealthFromState` which derives the green/amber/red dot from
+// klo_state confidence + commitments.
 // =============================================================================
 
 import { daysUntil } from '../lib/format.js'
+import { supabase } from '../lib/supabase.js'
+
+// Phase 4.5: load deal + klo_state + commitments in one call. The shell
+// (DealRoom) usually owns this state; this helper exists for components that
+// want to render the Overview standalone or for tests.
+export async function getOverviewData(dealId) {
+  const [dealRes, commitmentsRes] = await Promise.all([
+    supabase.from('deals').select('*').eq('id', dealId).single(),
+    supabase.from('commitments').select('*').eq('deal_id', dealId)
+  ])
+  if (dealRes.error) throw dealRes.error
+  return {
+    deal: dealRes.data,
+    kloState: dealRes.data?.klo_state ?? null,
+    commitments: commitmentsRes.data ?? []
+  }
+}
+
+// Phase 4.5: health is no longer a column read — it's derived from the
+// living state + commitments. Tentative confidence on date/value pushes
+// amber; overdue commitments + deadline within 14d pushes red.
+export function deriveHealthFromState(state, commitments) {
+  if (!state) return 'green'
+  const list = commitments ?? []
+  const overdue = list.filter((c) => c.status === 'overdue')
+  const days = state.deadline?.date ? daysUntil(state.deadline.date) : null
+
+  if (overdue.length > 0 && days !== null && days <= 14) return 'red'
+  if (overdue.length > 0) return 'amber'
+  if (state.deadline?.confidence === 'tentative') return 'amber'
+  if (state.deal_value?.confidence === 'tentative') return 'amber'
+  return 'green'
+}
 
 const STAGE_ORDER = ['discovery', 'proposal', 'negotiation', 'legal', 'closed']
 
