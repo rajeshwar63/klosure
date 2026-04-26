@@ -61,7 +61,12 @@ export default function ForecastTab({ teamId }) {
 
   return (
     <>
-      <KloQuarterTake commit={commit} stretch={stretch} dealCount={data.deals.length} />
+      <KloQuarterTake
+        teamId={teamId}
+        commit={commit}
+        stretch={stretch}
+        dealCount={data.deals.length}
+      />
       <ConfidenceBuckets buckets={buckets} />
       <ByRepRollup reps={reps} />
     </>
