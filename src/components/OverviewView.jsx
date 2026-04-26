@@ -2,11 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   splitActionZones,
   deriveHealthFromState,
+  summarizePeople,
+  summarizeBlockers,
+  compactDeadline,
+  healthLabel,
 } from '../services/overview.js'
 import { prefetchMessageSnippets, getCachedSnippet } from '../services/messageLookup.js'
 import ActionZones from './overview/ActionZones.jsx'
 import KloReadPanel from './overview/KloReadPanel.jsx'
 import StageTracker from './overview/StageTracker.jsx'
+import CollapsibleSection from './overview/CollapsibleSection.jsx'
 import Tooltip from './Tooltip.jsx'
 import RemoveButton from './RemoveButton.jsx'
 import { formatCurrency } from '../lib/format.js'
@@ -66,21 +71,63 @@ export default function OverviewView({
         {ks ? (
           <>
             <KloReadPanel state={ks} viewerRole={role} />
-            <DealStatStrip state={ks} health={health} />
-            <StageTracker deal={{ ...deal, stage: ks.stage }} />
-            <PeopleGrid
-              people={ks.people}
-              viewerRole={role}
-              dealId={deal.id}
-              onSwitchToChat={onSwitchToChat}
-            />
-            <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
-            <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
+
+            <CollapsibleSection
+              title="Deal facts"
+              headline={`${STAGE_LABEL[ks.stage] ?? '—'} · ${
+                ks.deal_value ? formatCurrency(ks.deal_value.amount) : '—'
+              } · ${compactDeadline(ks.deadline?.date)} · ${healthLabel(health)}`}
+            >
+              <div className="space-y-3">
+                <DealStatStrip state={ks} health={health} />
+                <StageTracker deal={{ ...deal, stage: ks.stage }} />
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Commitments" defaultExpanded>
+              <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="People"
+              count={(ks.people ?? []).length}
+              headline={summarizePeople(ks.people)}
+              emptyMessage="Klo will add people as they appear in the chat."
+            >
+              <PeopleGrid
+                people={ks.people}
+                viewerRole={role}
+                dealId={deal.id}
+                onSwitchToChat={onSwitchToChat}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Blockers"
+              count={(ks.blockers ?? []).length}
+              headline={summarizeBlockers(ks.blockers)}
+              emptyMessage="No blockers right now — keep it that way."
+            >
+              <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
+            </CollapsibleSection>
+
             {/* Decisions are factual — both sides see them. Open questions are
                 seller-side coaching prompts and stay hidden for buyers. */}
-            <DecisionsList items={ks.decisions} />
+            <CollapsibleSection
+              title="Decisions on record"
+              count={(ks.decisions ?? []).length}
+              headline={ks.decisions?.[0]?.what ?? null}
+            >
+              <DecisionsList items={ks.decisions} />
+            </CollapsibleSection>
+
             {role === 'seller' && (
-              <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
+              <CollapsibleSection
+                title="Open questions"
+                count={(ks.open_questions ?? []).length}
+              >
+                <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
+              </CollapsibleSection>
             )}
           </>
         ) : (
@@ -207,34 +254,9 @@ function Cell({ label, value, sub }) {
 // ---------------------------------------------------------------------------
 // People — pulled from klo_state.people.
 // ---------------------------------------------------------------------------
-function PeopleGrid({ people, viewerRole, dealId, onSwitchToChat }) {
-  if (!people || people.length === 0) {
-    return (
-      <div className="bg-white border border-navy/10 border-dashed rounded-xl px-4 py-6 text-center">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-          People in this deal
-        </div>
-        <p className="text-[13px] text-navy/60 mb-3">
-          Klo will add people as they appear in the chat.
-        </p>
-        {onSwitchToChat && (
-          <button
-            type="button"
-            onClick={onSwitchToChat}
-            className="text-[12px] font-semibold text-klo hover:underline"
-          >
-            Open chat →
-          </button>
-        )}
-      </div>
-    )
-  }
-
+function PeopleGrid({ people, viewerRole, dealId, onSwitchToChat: _onSwitchToChat }) {
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-4">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-3">
-        People in this deal
-      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {people.map((p, i) => (
           <PersonCard
@@ -330,22 +352,9 @@ const SEVERITY_DOT = {
 }
 
 function BlockersList({ blockers, viewerRole, dealId }) {
-  if (!blockers || blockers.length === 0) {
-    return (
-      <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-1">
-          Blockers
-        </div>
-        <p className="text-[13px] text-navy/60">None right now.</p>
-      </div>
-    )
-  }
   const canRemove = viewerRole === 'seller'
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-        Blockers
-      </div>
       <ul className="space-y-1.5">
         {blockers.map((b, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
@@ -381,9 +390,6 @@ function OpenQuestionsList({ items, dealId }) {
   if (!items || items.length === 0) return null
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-        Open questions
-      </div>
       <ul className="space-y-1.5">
         {items.map((q, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
@@ -412,9 +418,6 @@ function DecisionsList({ items }) {
   if (!items || items.length === 0) return null
   return (
     <div className="bg-white border border-navy/10 rounded-xl px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/40 mb-2">
-        Decisions on record
-      </div>
       <ul className="space-y-1.5">
         {items.map((d, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px] text-navy">
