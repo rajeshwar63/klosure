@@ -45,7 +45,10 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-[#f5f6f8]">
       <header className="bg-navy text-white">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
+        <div
+          className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <button onClick={() => navigate(-1)} className="text-white/70 hover:text-white text-lg">‹</button>
           <h1 className="font-bold text-lg">Billing & plans</h1>
         </div>
