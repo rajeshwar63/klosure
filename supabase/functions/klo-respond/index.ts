@@ -7,7 +7,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { buildBootstrapPrompt } from "../_shared/prompts/bootstrap-prompt.ts"
 import { buildExtractionPrompt } from "../_shared/prompts/extraction-prompt.ts"
-import type { KloState, KloRespondOutput, KloHistoryRow } from "../_shared/klo-state-types.ts"
+import type { KloState, KloRespondOutput } from "../_shared/klo-state-types.ts"
 import type { LlmMessage, LlmToolDefinition } from "../_shared/llm-types.ts"
 import { callLlm } from "../_shared/llm-client.ts"
 
@@ -322,12 +322,11 @@ interface DealContext {
     notes?: string | null
   } | null
   messages: MessageRow[]
-  history: KloHistoryRow[]
   recipientRole: "seller" | "buyer"
 }
 
 async function loadDealContext(deal_id: string): Promise<DealContext> {
-  const [dealRes, contextRes, messagesRes, historyRes] = await Promise.all([
+  const [dealRes, contextRes, messagesRes] = await Promise.all([
     sb.from("deals").select("*").eq("id", deal_id).single(),
     sb.from("deal_context").select("*").eq("deal_id", deal_id).maybeSingle(),
     sb
@@ -336,26 +335,19 @@ async function loadDealContext(deal_id: string): Promise<DealContext> {
       .eq("deal_id", deal_id)
       .order("created_at", { ascending: true })
       .limit(50),
-    sb
-      .from("klo_state_history")
-      .select("*")
-      .eq("deal_id", deal_id)
-      .order("changed_at", { ascending: false })
-      .limit(20),
   ])
 
   if (dealRes.error) throw dealRes.error
   const deal = dealRes.data as DealContext["deal"]
   const context = (contextRes.data ?? null) as DealContext["context"]
   const messages = (messagesRes.data ?? []) as MessageRow[]
-  const history = ((historyRes.data ?? []) as KloHistoryRow[]).slice().reverse() // oldest first for the prompt
 
   // recipientRole = role of the most recent non-Klo message sender
   const lastNonKlo = [...messages].reverse().find((m) => m.sender_type !== "klo")
   const recipientRole: "seller" | "buyer" =
     lastNonKlo?.sender_type === "buyer" ? "buyer" : "seller"
 
-  return { deal, context, messages, history, recipientRole }
+  return { deal, context, messages, recipientRole }
 }
 
 async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
@@ -391,7 +383,6 @@ async function runExtraction(
     mode: ctx.deal.mode,
     recipientRole: ctx.recipientRole,
     currentState,
-    recentHistory: ctx.history,
   })
 
   return runLlm(system, ctx.messages, ctx.deal.id)
