@@ -19,11 +19,14 @@
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+import { callLlm } from "../_shared/llm-client.ts"
+import type { LlmMessage } from "../_shared/llm-types.ts"
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-const MODEL = Deno.env.get("KLO_MODEL") ?? "claude-sonnet-4-6"
+const USE_GEMINI = (Deno.env.get("USE_GEMINI") ?? "true").toLowerCase() === "true"
+const KLO_MODEL_GEMINI = Deno.env.get("KLO_MODEL_GEMINI") ?? "gemini-3.1-flash-lite-preview"
+const KLO_MODEL_ANTHROPIC = Deno.env.get("KLO_MODEL_ANTHROPIC") ?? "claude-sonnet-4-5"
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +34,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 }
 
-const KLO_MANAGER_PROMPT = `You are Klo, the AI deal coach inside Klosure, now talking to a sales MANAGER about their pipeline.
+const KLO_MANAGER_PROMPT = `You are Klo, the AI deal coach inside Klosure, now talking to a sales MANAGER about their pipeline. Your audience is more strategic than tactical — surface patterns across reps, not the next-step move for one rep.
 
 # Who you are
 You are the same Klo your sellers know — direct, brief, confident, 15+ years
@@ -40,11 +43,23 @@ truth about what's happening across their team's pipeline, not a feel-good
 dashboard summary.
 
 # How you sound
-- 1-3 sentences. Never an essay. Never bullet lists.
-- Imperative. "Push Ahmed on the DIB deal today."
+- 1-3 sentences for tactical questions. Up to 4-6 sentences when the manager wants depth or asks a pattern question.
+- Patterns over individual tactics. "Two of three deals are slipping for the same reason: signatory unknown" — not "Send X to Y."
+- Imperative when there's a clear move. "Push Ahmed on the DIB deal today."
+- Honest about reps' weaknesses. "Raja is stuck because he's avoiding the proposal — coach him on that" — not "Raja could benefit from additional support."
 - Specific. Names, numbers, dates. Never generic.
 - Confident. You've seen this exact pipeline shape before.
 - No corporate speak. No "synergy". No "alignment".
+
+DO NOT say:
+- "Your team is doing great!" / "I notice some opportunities..."
+- "I understand…" / "Great question…" / "Let me help…"
+- "You might want to consider…" / "It could be worth…"
+
+DO say:
+- "Here's where to spend your 1:1 time this week..."
+- "Two reps need pricing-approval support..."
+- "DIB is the highest-leverage deal today — Raja's stuck on the proposal."
 
 # What you do
 You read the WHOLE pipeline — every active deal in this manager's team — plus
@@ -103,7 +118,6 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
     const mode = body?.mode ?? "chat"
-    if (!ANTHROPIC_API_KEY) return json({ error: "ANTHROPIC_API_KEY not set" }, 500)
 
     const auth = req.headers.get("Authorization")
     const userClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -182,42 +196,35 @@ Deno.serve(async (req) => {
     const digest = renderPipeline(deals ?? [], commits ?? [], members ?? [], stateHistoryByDeal)
     const transcript = renderTranscript(history ?? [])
 
-    // Call Claude
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+    const messages: LlmMessage[] = [
+      {
+        role: "user",
+        content: `${digest}\n\n${transcript}\n\nManager just asked: "${question}"\n\nAnswer in 1-3 sentences (up to 4-6 for pattern questions). Direct. Specific.`,
       },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 400,
-        thinking: { type: "disabled" },
-        system: [
-          {
-            type: "text",
-            text: KLO_MANAGER_PROMPT,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [
-          {
-            role: "user",
-            content: `${digest}\n\n${transcript}\n\nManager just asked: "${question}"\n\nAnswer in 1-3 sentences. Direct. Specific.`,
-          },
-        ],
-      }),
-    })
+    ]
 
-    if (!claudeRes.ok) {
-      const detail = await claudeRes.text()
-      return json({ error: "claude error", status: claudeRes.status, detail }, 502)
+    let result
+    try {
+      result = await callLlm({
+        systemPrompt: KLO_MANAGER_PROMPT,
+        messages,
+        maxTokens: 1200,
+        temperature: 0.7,
+      })
+    } catch (err) {
+      return json({ error: "llm error", detail: String(err) }, 502)
     }
 
-    const claudeData = await claudeRes.json()
-    const textBlock = claudeData?.content?.find((b: { type: string }) => b.type === "text")
-    const reply = textBlock?.text?.trim() || "I can't see your pipeline right now. Try again."
+    if (result.toolCalled) {
+      return json({ error: "unexpected tool call in klo-manager chat" }, 502)
+    }
+    const reply = result.text.trim() || "I can't see your pipeline right now. Try again."
+
+    console.log(JSON.stringify({
+      event: "klo_manager_chat_complete",
+      model: USE_GEMINI ? KLO_MODEL_GEMINI : KLO_MODEL_ANTHROPIC,
+      thread_id: threadId,
+    }))
 
     const { error: insertErr } = await service.from("manager_messages").insert({
       thread_id: threadId,
@@ -231,7 +238,7 @@ Deno.serve(async (req) => {
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", threadId)
 
-    return json({ ok: true, reply, usage: claudeData.usage })
+    return json({ ok: true, reply })
   } catch (err) {
     return json({ error: "klo-manager crashed", detail: String(err) }, 500)
   }
@@ -423,30 +430,29 @@ ${JSON.stringify(digest, null, 2)}
 
 Give me your quarter take.`
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 400,
-      system: [
-        { type: "text", text: QUARTER_TAKE_PROMPT, cache_control: { type: "ephemeral" } },
-      ],
+  let result
+  try {
+    result = await callLlm({
+      systemPrompt: QUARTER_TAKE_PROMPT,
       messages: [{ role: "user", content: userMessage }],
-    }),
-  })
-  if (!res.ok) {
-    const detail = await res.text()
-    return json({ error: "claude error", status: res.status, detail }, 502)
+      maxTokens: 800,
+      temperature: 0.7,
+    })
+  } catch (err) {
+    return json({ error: "llm error", detail: String(err) }, 502)
   }
 
-  const data = await res.json()
-  const textBlock = data?.content?.find((b: { type: string }) => b.type === "text")
-  const text = (textBlock?.text ?? "").trim()
+  if (result.toolCalled) {
+    return json({ error: "unexpected tool call in quarter_take" }, 502)
+  }
+  const text = result.text.trim()
+
+  console.log(JSON.stringify({
+    event: "klo_manager_quarter_take_complete",
+    model: USE_GEMINI ? KLO_MODEL_GEMINI : KLO_MODEL_ANTHROPIC,
+    team_id: teamId,
+    deal_count: deals.length,
+  }))
 
   return json({
     take: text,
