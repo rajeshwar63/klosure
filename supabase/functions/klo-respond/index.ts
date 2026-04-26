@@ -7,7 +7,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { buildBootstrapPrompt } from "../_shared/prompts/bootstrap-prompt.ts"
 import { buildExtractionPrompt } from "../_shared/prompts/extraction-prompt.ts"
-import type { KloState, KloRespondOutput } from "../_shared/klo-state-types.ts"
+import type { KloState, KloRespondOutput, KloHistoryRow } from "../_shared/klo-state-types.ts"
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? ""
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
@@ -74,17 +74,68 @@ Deno.serve(async (req) => {
 
 // --- Stubs (filled in step 07) ---
 
-interface DealContext {
-  deal: { id: string; klo_state: KloState | null; [k: string]: unknown }
-  recipientRole: "seller" | "buyer"
-  // Step 07 fills the rest: deal_context, messages, history, etc.
+interface MessageRow {
+  id: string
+  sender_type: "seller" | "buyer" | "klo"
+  sender_name: string | null
+  content: string
+  created_at: string
 }
 
-async function loadDealContext(_deal_id: string): Promise<DealContext> {
-  // TODO step 07: load deal, deal_context, last 20 messages, current klo_state, last 20 history rows
-  // also: figure out recipientRole = the role of the sender of the LAST non-Klo message
-  void sb
-  throw new Error("loadDealContext not implemented")
+interface DealContext {
+  deal: {
+    id: string
+    title: string
+    buyer_company: string | null
+    seller_company: string | null
+    value: number | null
+    deadline: string | null
+    mode: "solo" | "shared"
+    stage: string
+    klo_state: KloState | null
+    [k: string]: unknown
+  }
+  context: {
+    stakeholders?: Array<{ name?: string; role?: string; company?: string }>
+    what_needs_to_happen?: string | null
+    budget_notes?: string | null
+    notes?: string | null
+  } | null
+  messages: MessageRow[]
+  history: KloHistoryRow[]
+  recipientRole: "seller" | "buyer"
+}
+
+async function loadDealContext(deal_id: string): Promise<DealContext> {
+  const [dealRes, contextRes, messagesRes, historyRes] = await Promise.all([
+    sb.from("deals").select("*").eq("id", deal_id).single(),
+    sb.from("deal_context").select("*").eq("deal_id", deal_id).maybeSingle(),
+    sb
+      .from("messages")
+      .select("id, sender_type, sender_name, content, created_at")
+      .eq("deal_id", deal_id)
+      .order("created_at", { ascending: true })
+      .limit(50),
+    sb
+      .from("klo_state_history")
+      .select("*")
+      .eq("deal_id", deal_id)
+      .order("changed_at", { ascending: false })
+      .limit(20),
+  ])
+
+  if (dealRes.error) throw dealRes.error
+  const deal = dealRes.data as DealContext["deal"]
+  const context = (contextRes.data ?? null) as DealContext["context"]
+  const messages = (messagesRes.data ?? []) as MessageRow[]
+  const history = ((historyRes.data ?? []) as KloHistoryRow[]).slice().reverse() // oldest first for the prompt
+
+  // recipientRole = role of the most recent non-Klo message sender
+  const lastNonKlo = [...messages].reverse().find((m) => m.sender_type !== "klo")
+  const recipientRole: "seller" | "buyer" =
+    lastNonKlo?.sender_type === "buyer" ? "buyer" : "seller"
+
+  return { deal, context, messages, history, recipientRole }
 }
 
 async function runBootstrap(_ctx: DealContext): Promise<KloRespondOutput> {
