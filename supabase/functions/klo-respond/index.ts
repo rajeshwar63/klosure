@@ -33,7 +33,7 @@ const KLO_OUTPUT_TOOL: LlmToolDefinition = {
 
 You MUST call this tool exactly once. Do not return free-form text.
 
-The chat_reply is what the user sees in chat — Klo's conversational coaching reply (2-4 sentences in Klo's voice).
+The chat_reply is what the user sees in chat — Klo's conversational coaching reply. STRICT MAXIMUM: 4 sentences. Often 2-3 is enough.
 
 The klo_state is the complete structured record of this deal AFTER incorporating any new information from the user's latest message. Every field in klo_state must be present. Use null (or empty arrays) for fields that don't apply yet. Do not omit any fields.`,
   parameters: {
@@ -43,7 +43,10 @@ The klo_state is the complete structured record of this deal AFTER incorporating
         type: "object",
         properties: {
           version: { type: "number" },
-          summary: { type: ["string", "null"] },
+          summary: {
+            type: ["string", "null"],
+            description: "ONE sentence describing the current deal state. Max 30 words. Null if deal is brand new.",
+          },
           stage: { type: "string", enum: ["discovery", "proposal", "negotiation", "legal", "closed"] },
           stage_reasoning: { type: "string" },
           deal_value: {
@@ -130,8 +133,14 @@ The klo_state is the complete structured record of this deal AFTER incorporating
               required: ["kind", "value", "reason", "removed_at"],
             },
           },
-          klo_take_seller: { type: ["string", "null"] },
-          klo_take_buyer: { type: ["string", "null"] },
+          klo_take_seller: {
+            type: ["string", "null"],
+            description: "2-3 sentence coaching paragraph for the seller. Max 240 chars (~40 words). Direct and specific.",
+          },
+          klo_take_buyer: {
+            type: ["string", "null"],
+            description: "2 sentence coaching for the buyer. Max 180 chars. ONLY populate if mode is 'shared' (buyer has joined the deal). On solo seller deals, set to null to save tokens.",
+          },
           confidence: {
             type: ["object", "null"],
             properties: {
@@ -140,11 +149,12 @@ The klo_state is the complete structured record of this deal AFTER incorporating
               delta: { type: "integer" },
               factors_dragging_down: {
                 type: "array",
-                maxItems: 5,
+                maxItems: 3,
+                description: "Top 3 factors dragging confidence down. Most impactful first.",
                 items: {
                   type: "object",
                   properties: {
-                    label: { type: "string" },
+                    label: { type: "string", description: "Max 12 words." },
                     impact: { type: "integer", maximum: 0 },
                   },
                   required: ["label", "impact"],
@@ -152,17 +162,21 @@ The klo_state is the complete structured record of this deal AFTER incorporating
               },
               factors_to_raise: {
                 type: "array",
-                maxItems: 5,
+                maxItems: 3,
+                description: "Top 3 actions that would raise confidence. Highest impact first.",
                 items: {
                   type: "object",
                   properties: {
-                    label: { type: "string" },
+                    label: { type: "string", description: "Max 12 words." },
                     impact: { type: "integer", minimum: 0 },
                   },
                   required: ["label", "impact"],
                 },
               },
-              rationale: { type: "string" },
+              rationale: {
+                type: "string",
+                description: "ONE sentence explaining the score. Max 25 words.",
+              },
               computed_at: { type: "string" },
             },
             required: [
@@ -221,7 +235,10 @@ The klo_state is the complete structured record of this deal AFTER incorporating
           "last_meeting",
         ],
       },
-      chat_reply: { type: "string" },
+      chat_reply: {
+        type: "string",
+        description: "Klo's chat reply to the user. STRICT MAXIMUM: 4 sentences, ~60 words. Often 2-3 is enough.",
+      },
     },
     required: ["klo_state", "chat_reply"],
   },

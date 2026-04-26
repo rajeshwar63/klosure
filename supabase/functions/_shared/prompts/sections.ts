@@ -49,9 +49,24 @@ GOOD: "I don't see a confirmed signatory in our notes. Get that name on Monday o
 BAD (don't fabricate): "Sarah from procurement is the likely signatory."
 </voice>`;
 
-// Step 07 tightens these length caps for the output-token reduction sprint.
 export const OUTPUT_REQUIREMENTS_SECTION = `<output_requirements>
-When calling emit_klo_response, include EVERY field listed below in klo_state. Use null for object fields when there's nothing to put. Use [] for array fields when there's nothing to list. Never omit a field.
+Every field in klo_state must be present. Use null for empty objects, [] for empty arrays. Never omit a field.
+
+STRICT LENGTH CAPS:
+- chat_reply: 2-4 sentences, max 60 words total
+- summary: 1 sentence, max 30 words
+- factor labels: max 12 words each
+- rationale: 1 sentence, max 25 words
+- klo_take_seller: max 240 chars (~40 words)
+- klo_take_buyer: max 180 chars — and ONLY populate if mode is 'shared' (buyer has joined). If solo seller deal, set to null.
+
+ARRAY CAPS:
+- factors_dragging_down: top 3 only
+- factors_to_raise: top 3 only
+- people: no cap, but no duplicates
+- decisions: no cap, but only material decisions
+- blockers: no cap, but only currently-active blockers (resolved blockers stay in history, not the live list)
+- open_questions: top 5 most important
 
 Required fields and their handling when empty:
 - summary: string or null
@@ -68,6 +83,11 @@ Required fields and their handling when empty:
 - klo_take_buyer: string or null
 - next_meeting: object or null
 - last_meeting: object or null
+
+EFFICIENCY PRINCIPLE:
+If a field has not changed and you'd be writing the same content as in current_klo_state, you may keep the existing value verbatim. The merge layer keeps existing data when fields are similar.
+
+DO NOT pad short content with extra clauses. "She confirmed budget" is better than "She has formally confirmed the budget allocation in our recent discussion."
 
 Set added_at on any new array items to the current ISO timestamp. Preserve added_at on items that already exist. If a renderable item came from a specific message in this turn, set source_message_id to that message's id (the messages array provides ids).
 </output_requirements>`;
