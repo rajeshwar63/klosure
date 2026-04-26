@@ -75,10 +75,12 @@ export default function OverviewView({
             />
             <ActionZones deal={deal} zones={zones} onItemClick={onCommitmentClick} />
             <BlockersList blockers={ks.blockers} viewerRole={role} dealId={deal.id} />
+            {/* Decisions are factual — both sides see them. Open questions are
+                seller-side coaching prompts and stay hidden for buyers. */}
+            <DecisionsList items={ks.decisions} />
             {role === 'seller' && (
               <OpenQuestionsList items={ks.open_questions} dealId={deal.id} />
             )}
-            {role === 'seller' && <DecisionsList items={ks.decisions} />}
           </>
         ) : (
           <EmptyKloState onSwitchToChat={onSwitchToChat} />
