@@ -14,7 +14,9 @@ export function buildExtractionPrompt(args: {
   recipientRole: 'seller' | 'buyer';   // who Klo is replying TO in chat this turn
   currentState: KloState;
   recentHistory: KloHistoryRow[];      // last 20 rows, oldest first
+  todayISO?: string;                   // YYYY-MM-DD for resolving relative dates
 }): string {
+  const today = args.todayISO ?? new Date().toISOString().slice(0, 10);
   return `You are Klo, the AI deal coach inside Klosure.
 
 You are reading a chat between a seller and a buyer (or just a seller in solo mode). On every turn you do two things at once:
@@ -28,6 +30,8 @@ You are reading a chat between a seller and a buyer (or just a seller in solo mo
 - Buyer: ${args.buyerCompany}
 - Seller: ${args.sellerCompany}
 - Mode: ${args.mode}
+
+TODAY'S DATE: ${today}
 
 # Extraction rules
 
@@ -50,6 +54,8 @@ Read the recent chat messages (provided in the messages array) and:
 2. **Honor removed_items.** Anything in current klo_state.removed_items must NOT be re-added, even if the chat mentions it again.
 
 3. **Re-write klo_take_seller and klo_take_buyer every turn.** These are not history — they are your current coaching for each side. They reflect the latest state and the latest chat.
+
+   **Meetings.** Extract \`next_meeting\` if there is a scheduled future event mentioned in the conversation. When a scheduled date passes, move that meeting to \`last_meeting\`. If chat references a past meeting outcome, capture one sentence in \`last_meeting.outcome_note\`. If no meeting is mentioned, both fields are null. Don't invent meetings that weren't discussed. Resolve relative dates ("Monday", "next week") against the system context's TODAY'S DATE. See EXTRACTION RULES (above) for full guidance.
 
 4. **Compose chat_reply** addressed to ${args.recipientRole}.
    - If they asked a "what changed?" / "when did X" / "why is X different" question, answer from history specifically with dates and triggers.

@@ -64,6 +64,21 @@ export interface ConfidenceFactor {
   // The frontend renders negatives in the explanation, positives in "what would move this up"
 }
 
+export interface NextMeeting {
+  date: string;                 // ISO datetime when known, ISO date (YYYY-MM-DD) otherwise
+  title: string;                // "Demo with Ahmed", "Budget review call"
+  with: string[];               // names mentioned in the meeting context
+  confidence: Confidence;       // 'definite' once both sides confirmed, else 'tentative'
+  source_message_id?: string | null;
+}
+
+export interface LastMeeting {
+  date: string;                 // ISO date when the meeting happened
+  title: string;
+  outcome_note?: string | null; // 1 sentence post-meeting summary, if available
+  source_message_id?: string | null;
+}
+
 export interface ConfidenceScore {
   value: number;                // 0-100, integer
   trend: 'up' | 'down' | 'flat';   // since last computed
@@ -90,6 +105,8 @@ export interface KloState {
   klo_take_buyer: string;       // 1-3 sentences, buyer-side coaching
   confidence?: ConfidenceScore;             // optional — null on freshly-bootstrapped deals
   previous_confidence_value?: number;       // tracks the previous score so we can compute trend/delta
+  next_meeting?: NextMeeting | null;        // most imminent future meeting, if any
+  last_meeting?: LastMeeting | null;        // most recently completed meeting, if any
 }
 
 export interface KloRespondOutput {
