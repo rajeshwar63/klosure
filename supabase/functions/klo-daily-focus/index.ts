@@ -9,9 +9,11 @@
 // Auth model: requires a JWT for the seller themselves; we use the auth header
 // to identify the caller, then read deals via the service role.
 //
-// Caching is in step 06 (klo_daily_focus_cache table). This function purely
-// computes the synthesis; the wrapper that handles cache hits/misses lives on
-// the client (or a separate function) and persists the result.
+// Caching: klo_daily_focus (one row per seller). The function checks the cache
+// first; if the row is fresh (< 24h) and not flagged stale, it returns the
+// cached paragraph. Triggers in phase5_daily_focus.sql flip is_stale when the
+// pipeline shifts meaningfully (≥10pt confidence swing, status change, new
+// deal). Pass ?refresh=1 to bypass the cache.
 //
 // Deploy:
 //   supabase functions deploy klo-daily-focus
@@ -84,6 +86,30 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     })
 
+    const url = new URL(req.url)
+    const forceRefresh = url.searchParams.get("refresh") === "1"
+
+    // Cache hit path: < 24h old and not flagged stale.
+    if (!forceRefresh) {
+      const { data: cached } = await service
+        .from("klo_daily_focus")
+        .select("focus_text, deals_referenced, generated_at, is_stale")
+        .eq("seller_id", sellerId)
+        .maybeSingle()
+      if (cached && !cached.is_stale) {
+        const ageHours =
+          (Date.now() - new Date(cached.generated_at).getTime()) / 3.6e6
+        if (ageHours < 24) {
+          return json({
+            focus_text: cached.focus_text,
+            deals_referenced: cached.deals_referenced ?? [],
+            generated_at: cached.generated_at,
+            from_cache: true,
+          })
+        }
+      }
+    }
+
     const { data: deals, error: dealsErr } = await service
       .from("deals")
       .select("id, title, buyer_company, klo_state, value, deadline, stage, status")
@@ -94,11 +120,21 @@ Deno.serve(async (req) => {
     if (dealsErr) throw dealsErr
 
     if (!deals || deals.length === 0) {
-      return json({
-        focus_text:
-          "No active deals yet. When you start one, Klo will start coaching across your pipeline here.",
+      const emptyText =
+        "No active deals yet. When you start one, Klo will start coaching across your pipeline here."
+      const generatedAt = new Date().toISOString()
+      await service.from("klo_daily_focus").upsert({
+        seller_id: sellerId,
+        focus_text: emptyText,
         deals_referenced: [],
-        generated_at: new Date().toISOString(),
+        generated_at: generatedAt,
+        is_stale: false,
+      })
+      return json({
+        focus_text: emptyText,
+        deals_referenced: [],
+        generated_at: generatedAt,
+        from_cache: false,
       })
     }
 
@@ -162,10 +198,20 @@ Write today's coaching paragraph.`
       )
       .map((d) => d.id)
 
+    const generatedAt = new Date().toISOString()
+    await service.from("klo_daily_focus").upsert({
+      seller_id: sellerId,
+      focus_text: text,
+      deals_referenced: referenced,
+      generated_at: generatedAt,
+      is_stale: false,
+    })
+
     return json({
       focus_text: text,
       deals_referenced: referenced,
-      generated_at: new Date().toISOString(),
+      generated_at: generatedAt,
+      from_cache: false,
     })
   } catch (err) {
     console.error("klo-daily-focus error", err)
