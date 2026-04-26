@@ -6,9 +6,8 @@
 //   1. DealContextStrip             cream banner with klo_state.summary
 //   2. Two-column row               KloRecommendsCard | CommitmentsPanel
 //   3. ConfidenceCompactStrip       collapsible single-line confidence bar
-//   4. KloFullReadCollapsed         expandable rationale + all factors
-//   5. DealStatStripWide            5-column Stage / Value / Deadline / Health / Stuck
-//   6. Two-column row               BlockersPanel | (Stakeholders — step 06)
+//   4. DealStatStripWide            5-column Stage / Value / Deadline / Health / Stuck
+//   5. Two-column row               BlockersPanel | (Stakeholders — step 06)
 //
 // Two-column rows collapse to single-column below 1024px (lg:) so they
 // stack readably on phones and small laptops.
@@ -16,7 +15,6 @@
 import KloRecommendsCard from './KloRecommendsCard.jsx'
 import ConfidenceCompactStrip from './ConfidenceCompactStrip.jsx'
 import DealContextStrip from './DealContextStrip.jsx'
-import KloFullReadCollapsed from './KloFullReadCollapsed.jsx'
 import DealStatStripWide from './DealStatStripWide.jsx'
 import BlockersPanel from './BlockersPanel.jsx'
 import CommitmentsPanel from './CommitmentsPanel.jsx'
@@ -54,8 +52,6 @@ export default function OverviewTab({
       </div>
 
       <ConfidenceCompactStrip klo_state={ks} viewerRole={viewerRole} />
-
-      <KloFullReadCollapsed klo_state={ks} viewerRole={viewerRole} />
 
       <DealStatStripWide deal={deal} klo_state={ks} stuckFor={stuckFor} />
 

@@ -5,7 +5,7 @@
 // Differences vs KloReadPanel:
 //   - Smaller (it's secondary, not the hero)
 //   - Score and label only — no rationale paragraph (now in Klo recommends)
-//   - Top 3 factors only — the rest live in KloFullReadCollapsed below
+//   - Top 3 factors only — the rest expand from ConfidenceCompactStrip
 
 const TONE = {
   good: '#3B6D11',

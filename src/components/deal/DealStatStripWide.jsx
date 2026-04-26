@@ -1,4 +1,4 @@
-// Phase 6 step 11 — 5-column stat row beneath KloFullReadCollapsed.
+// Phase 6 step 11 — 5-column stat row beneath the confidence strip.
 // Stage / Value / Deadline / Health / Stuck for. Collapses to 2-3 columns
 // on narrow screens.
 
