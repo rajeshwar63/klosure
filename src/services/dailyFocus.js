@@ -28,3 +28,16 @@ export async function fetchDailyFocus(forceRefresh = false) {
   }
   return res.json()
 }
+
+// Phase 5.5 step 01: pulls a single headline sentence out of the full focus
+// paragraph for the collapsed banner state. Strips markdown bold, takes the
+// first sentence, and truncates at a word boundary if it's too long.
+export function extractHeadline(focusText) {
+  if (!focusText) return ''
+  const clean = focusText.replace(/\*\*/g, '').trim()
+  const firstSentence = clean.split(/(?<=[.!?])\s+/)[0] ?? clean
+  if (firstSentence.length <= 80) return firstSentence
+  const truncated = firstSentence.slice(0, 80)
+  const lastSpace = truncated.lastIndexOf(' ')
+  return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '…'
+}
