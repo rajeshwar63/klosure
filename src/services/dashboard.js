@@ -102,6 +102,9 @@ export function enrichDeal(deal, allCommitments) {
 
   return {
     ...deal,
+    // Phase 6: attach the full commitment list so home-page surfaces can
+    // show task text (`Send LXP proposal to Nina`) without re-fetching.
+    commitments: own,
     overdueCount: overdue.length,
     openCount: open.length,
     doneCount: done.length,

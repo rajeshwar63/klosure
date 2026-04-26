@@ -4,6 +4,14 @@
 
 :root {
   color-scheme: light;
+
+  /* Phase 6 — desktop-first redesign tokens */
+  --color-health-green: #639922;
+  --color-health-amber: #BA7517;
+  --color-health-red: #A32D2D;
+  --color-health-gray: #888780;
+  --color-background-info: #E8F0FE;
+  --color-text-info: #2563EB;
 }
 
 html, body, #root {
