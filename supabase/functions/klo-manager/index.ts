@@ -57,6 +57,32 @@ highest-risk thing you see and surface it. Don't summarise — direct.
 You can name reps by name. You can name deals by title. You should — that's
 what the manager came for.
 
+# Per-deal data you have
+
+For each deal in the manager's team, you have:
+
+- klo_state: your current understanding of the deal (the same Overview the
+  seller and buyer see). Use klo_state.summary and klo_state.klo_take_seller
+  for the current situation.
+- recent_history: the last 10 things you changed in this deal. Use it to
+  answer "what changed?" / "when did X happen?" questions specifically with
+  dates and triggers.
+- commitments: structured tasks both sides have committed to — who owes
+  what, what's overdue.
+
+When the manager asks about a deal, prefer:
+1. klo_state.summary and klo_state.klo_take_seller for the current state.
+2. recent_history for change/timeline questions, with concrete dates.
+3. commitments for accountability.
+
+# Reality-bending check
+
+If recent_history shows the seller removed something (change_kind='removed'),
+mention it when relevant. Example: "Raja removed Ahmed from the people list 3
+days ago, saying he was just CC'd. But Ahmed has sent 4 messages since —
+worth checking with Raja." This is not surveillance. It's helping the manager
+see deal reality, including any reality-bending the seller may have done.
+
 # What you NEVER say
 - "I understand…" / "Great question…" / "Let me help…"
 - "You might want to consider…" / "It could be worth…"
@@ -120,7 +146,31 @@ Deno.serve(async (req) => {
         .limit(20),
     ])
 
-    const digest = renderPipeline(deals ?? [], commits ?? [], members ?? [])
+    // Phase 4.5: per-deal recent klo_state_history (last 10 changes, oldest
+    // first for the prompt). Service-role read across the manager's team.
+    const dealIds = (deals ?? []).map((d: { id: string }) => d.id)
+    const stateHistoryByDeal = new Map<string, Array<Record<string, unknown>>>()
+    if (dealIds.length > 0) {
+      const { data: stateHistory } = await service
+        .from("klo_state_history")
+        .select("deal_id, changed_at, triggered_by_role, change_kind, field_path, before_value, after_value, reason")
+        .in("deal_id", dealIds)
+        .order("changed_at", { ascending: false })
+        .limit(10 * dealIds.length)
+      for (const h of stateHistory ?? []) {
+        const arr = stateHistoryByDeal.get(h.deal_id as string) ?? []
+        if (arr.length < 10) {
+          arr.push(h as Record<string, unknown>)
+          stateHistoryByDeal.set(h.deal_id as string, arr)
+        }
+      }
+      // Each per-deal slice ends up newest-first; flip to oldest-first for the prompt.
+      for (const [k, arr] of stateHistoryByDeal) {
+        stateHistoryByDeal.set(k, arr.reverse())
+      }
+    }
+
+    const digest = renderPipeline(deals ?? [], commits ?? [], members ?? [], stateHistoryByDeal)
     const transcript = renderTranscript(history ?? [])
 
     // Call Claude
@@ -188,7 +238,8 @@ function json(body: unknown, status = 200) {
 function renderPipeline(
   deals: Array<Record<string, unknown>>,
   commitments: Array<Record<string, unknown>>,
-  members: Array<{ user_id: string; users?: { name?: string; email?: string } }>
+  members: Array<{ user_id: string; users?: { name?: string; email?: string } }>,
+  historyByDeal: Map<string, Array<Record<string, unknown>>>,
 ) {
   const memberById = new Map(
     members.map((m) => [m.user_id, m.users?.name || m.users?.email || "Member"])
@@ -215,9 +266,29 @@ function renderPipeline(
     const own = commitments.filter((c) => c.deal_id === d.id)
     const overdue = own.filter((c) => c.status === "overdue").length
     const open = own.filter((c) => c.status === "confirmed" || c.status === "proposed").length
+    const ks = (d.klo_state as Record<string, unknown> | null) ?? null
+    const summary = (ks?.summary as string | undefined) || (d.summary as string | undefined) || ""
+    const stage = (ks?.stage as string | undefined) || (d.stage as string | undefined) || ""
+    const takeSeller = (ks?.klo_take_seller as string | undefined) || ""
+
     lines.push(
-      `- [${(d.health as string).toUpperCase()}] "${d.title}" — ${sellerName} · ${d.buyer_company || "buyer"} · ${formatUsd(Number(d.value) || 0)} · ${d.deadline ? `deadline ${d.deadline}` : "no deadline"} · ${overdue} overdue / ${open} open commitments${d.summary ? ` · summary: ${d.summary}` : ""}`,
+      `\n- [${(d.health as string).toUpperCase()}] "${d.title}" — ${sellerName} · ${d.buyer_company || "buyer"} · ${formatUsd(Number(d.value) || 0)} · ${d.deadline ? `deadline ${d.deadline}` : "no deadline"} · stage ${stage} · ${overdue} overdue / ${open} open commitments`,
     )
+    if (summary) lines.push(`    summary: ${summary}`)
+    if (takeSeller) lines.push(`    klo_take_seller: ${takeSeller}`)
+
+    const hist = historyByDeal.get(d.id as string) ?? []
+    if (hist.length > 0) {
+      lines.push(`    recent_history (oldest first):`)
+      for (const h of hist) {
+        const when = String(h.changed_at).slice(0, 10)
+        const kind = h.change_kind as string
+        const path = h.field_path as string
+        const role = h.triggered_by_role as string
+        const reason = h.reason ? ` — reason: "${h.reason}"` : ""
+        lines.push(`      • ${when} ${role} ${kind} ${path}${reason}`)
+      }
+    }
   }
   return lines.join("\n")
 }
