@@ -56,10 +56,21 @@ function activeDealId(activeView) {
   return activeView.slice('deal:'.length)
 }
 
+function DealRowSkeleton() {
+  return (
+    <div className="px-2 py-1.5 flex items-center gap-2 animate-pulse">
+      <span className="w-1.5 h-1.5 rounded-full bg-navy/15 shrink-0" />
+      <span className="flex-1 h-3 bg-navy/10 rounded" />
+      <span className="w-5 h-3 bg-navy/10 rounded" />
+    </div>
+  )
+}
+
 export default function Sidebar({
   role = 'seller',
   activeView = 'today',
   deals = [],
+  loading = false,
   user,
   onNavigate,
   onNewDeal,
@@ -128,7 +139,15 @@ export default function Sidebar({
           collapsed ? 'px-1.5 py-2' : 'px-2 pb-3'
         } flex flex-col gap-0.5`}
       >
-        {sorted.length === 0 ? (
+        {loading && sorted.length === 0 ? (
+          !collapsed && (
+            <>
+              <DealRowSkeleton />
+              <DealRowSkeleton />
+              <DealRowSkeleton />
+            </>
+          )
+        ) : sorted.length === 0 ? (
           !collapsed && (
             <div className="px-2 py-3 text-[12px] text-navy/50">
               <p>No active deals yet</p>

@@ -36,6 +36,7 @@ export default function AppShell({
   activeView,
   pageTitle,
   deals = [],
+  dealsLoading = false,
   user,
   children,
 }) {
@@ -100,6 +101,7 @@ export default function AppShell({
           role={role}
           activeView={activeView}
           deals={deals}
+          loading={dealsLoading}
           user={user}
           collapsed={collapsed}
           onCollapseToggle={handleCollapseToggle}
@@ -121,6 +123,7 @@ export default function AppShell({
           role={role}
           activeView={activeView}
           deals={deals}
+          loading={dealsLoading}
           user={user}
           onNavigate={handleNavigate}
           onNewDeal={handleNewDeal}

@@ -43,7 +43,7 @@ export default function ShellWrapper() {
   const location = useLocation()
   const { user } = useAuth()
   const { profile, isManager } = useProfile()
-  const { deals } = useShellDeals()
+  const { deals, loading: dealsLoading } = useShellDeals()
 
   const role = location.pathname.startsWith('/team') && isManager ? 'manager' : 'seller'
   const activeView = resolveActiveView(location.pathname)
@@ -60,6 +60,7 @@ export default function ShellWrapper() {
       activeView={activeView}
       pageTitle={pageTitle}
       deals={deals}
+      dealsLoading={dealsLoading}
       user={userForShell}
     >
       <Outlet />
