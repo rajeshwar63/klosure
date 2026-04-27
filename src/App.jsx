@@ -14,7 +14,7 @@ import ShellWrapper from './components/shell/ShellWrapper.jsx'
 // Lazy-load the heavier flows so the dashboard ships in a smaller initial
 // bundle — important on slow Gulf 4G (Phase 4 §10 deliverable).
 const NewDealPage = lazy(() => import('./pages/NewDealPage.jsx'))
-const DealroomPage = lazy(() => import('./components/deal/v2/DealroomPage.jsx'))
+const DealRoomPage = lazy(() => import('./pages/DealRoomPage.jsx'))
 const BillingPage = lazy(() => import('./pages/BillingPage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage.jsx'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
@@ -65,7 +65,7 @@ export default function App() {
           <Route path="/today" element={<SellerHomePage />} />
           <Route path="/deals" element={<DealsListPage />} />
           <Route path="/deals/new" element={<NewDealPage />} />
-          <Route path="/deals/:id" element={<DealroomPage />} />
+          <Route path="/deals/:id" element={<DealRoomPage />} />
           <Route path="/team" element={<ManagerHomePage />} />
           <Route path="/team/forecast" element={<ForecastPage />} />
           <Route path="/team/reps" element={<RepsPlaceholderPage />} />

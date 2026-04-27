@@ -1,48 +1,53 @@
-// Dealroom v2 — single-canvas deal page with persistent right-rail Klo chat.
-// Replaces the old DealRoomPage (Overview / Chat / History tabs) at /deals/:id.
+// Phase 6 step 08 — new deal page shell. Three tabs (Overview / Chat /
+// History) and a dark deal header at the top. The page lives inside the
+// AppShell, so the sidebar is always visible on the left.
 //
-// Data layer is unchanged from the old page: load deal + deal_context, then
-// load messages + commitments and subscribe to realtime updates on each.
-// We just rehouse the UI in the new dealroom shape and palette.
+// Data layer is unchanged from Phase 5.5 — we still load the deal +
+// dealContext + messages + commitments, and subscribe to realtime changes
+// the same way DealRoom.jsx did. We just rehouse the UI in a new layout.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../../lib/supabase.js'
-import { useAuth } from '../../../hooks/useAuth.jsx'
-import { useProfile } from '../../../hooks/useProfile.jsx'
-import { useShellDeals } from '../../../hooks/useShellDeals.jsx'
-import { listCommitments } from '../../../services/commitments.js'
-import { greetingForRole } from '../../../services/klo.js'
-import { canShareWithBuyer } from '../../../lib/plans.js'
-import DealroomLayout from './DealroomLayout.jsx'
-import BuyerChatDrawer from './BuyerChatDrawer.jsx'
-import './dealroomTheme.css'
+import { supabase } from '../lib/supabase.js'
+import { useAuth } from '../hooks/useAuth.jsx'
+import { useProfile } from '../hooks/useProfile.jsx'
+import { useShellDeals } from '../hooks/useShellDeals.jsx'
+import { listCommitments } from '../services/commitments.js'
+import { greetingForRole } from '../services/klo.js'
+import { canShareWithBuyer } from '../lib/plans.js'
+import ChatView from '../components/ChatView.jsx'
+import DealHeader from '../components/deal/DealHeader.jsx'
+import DealTabs, {
+  loadDealTab,
+  saveDealTab,
+} from '../components/deal/DealTabs.jsx'
+import OverviewTab from '../components/deal/OverviewTab.jsx'
 
-function DealroomSkeleton() {
+function DealPageSkeleton() {
   return (
-    <div className="dealroom h-full" style={{ background: 'var(--dr-bg)' }}>
-      <div className="h-12 border-b border-[color:var(--dr-line)] animate-pulse" />
-      <div className="p-8 max-w-[760px] mx-auto">
-        <div className="h-10 rounded-md bg-black/5 mb-4 animate-pulse" />
-        <div className="h-24 rounded-xl bg-black/5 mb-4 animate-pulse" />
-        <div className="h-40 rounded-xl bg-black/5 animate-pulse" />
+    <div className="flex flex-col h-full">
+      <div className="h-16 animate-pulse" style={{ background: '#2C2C2A' }} />
+      <div className="border-b border-navy/10 bg-white h-10 animate-pulse" />
+      <div className="flex-1 p-4 md:p-6">
+        <div className="h-32 rounded-xl bg-navy/5 mb-4 animate-pulse" />
+        <div className="h-48 rounded-xl bg-navy/5 animate-pulse" />
       </div>
     </div>
   )
 }
 
-function DealroomNotFound({ error }) {
+function DealNotFound({ error }) {
   const navigate = useNavigate()
   return (
-    <div className="dealroom h-full p-12 text-center">
-      <h2 className="text-xl font-medium mb-2">Deal not found</h2>
-      <p className="text-sm mb-4" style={{ color: 'var(--dr-ink-3)' }}>
+    <div className="p-12 text-center">
+      <h2 className="text-xl font-medium text-navy mb-2">Deal not found</h2>
+      <p className="text-navy/55 text-sm mb-4">
         {error || 'It may have been archived or deleted.'}
       </p>
       <button
         type="button"
         onClick={() => navigate('/deals')}
-        className="dr-btn"
+        className="text-klo font-medium"
       >
         ← Back to deals
       </button>
@@ -50,9 +55,10 @@ function DealroomNotFound({ error }) {
   )
 }
 
-export default function DealroomPage() {
+export default function DealRoomPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { profile, plan } = useProfile()
   const { reload: reloadShellDeals } = useShellDeals()
@@ -62,12 +68,28 @@ export default function DealroomPage() {
   const [messages, setMessages] = useState([])
   const [commitments, setCommitments] = useState([])
   const [kloThinking, setKloThinking] = useState(false)
+  const [highlightCommitmentId, setHighlightCommitmentId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [buyerChatOpen, setBuyerChatOpen] = useState(false)
-  const [buyerChatPrefill, setBuyerChatPrefill] = useState('')
 
-  // Load the deal + context.
+  const [activeTab, setActiveTab] = useState(() => loadDealTab(id))
+
+  // Re-read the per-deal tab when the dealId in the URL changes.
+  useEffect(() => {
+    setActiveTab(loadDealTab(id))
+  }, [id])
+
+  function handleTabChange(next) {
+    setActiveTab(next)
+    saveDealTab(id, next)
+  }
+
+  function handleCommitmentJump(commitmentId) {
+    setHighlightCommitmentId(commitmentId)
+    handleTabChange('chat')
+  }
+
+  // Load the deal + context + profile.
   useEffect(() => {
     if (!user || !id) return
     let mounted = true
@@ -112,6 +134,7 @@ export default function DealroomPage() {
       setCommitments(commits)
       const data = msgRes.data ?? []
       if (data.length === 0) {
+        // Phase 1 first-message greeting from Klo.
         const greeting = greetingForRole({ role: 'seller', deal })
         const { data: inserted } = await supabase
           .from('messages')
@@ -130,7 +153,7 @@ export default function DealroomPage() {
     load()
 
     const channel = supabase
-      .channel(`deal-v2-${deal.id}`)
+      .channel(`deal-${deal.id}`)
       .on(
         'postgres_changes',
         {
@@ -189,6 +212,8 @@ export default function DealroomPage() {
     }
   }, [deal?.id])
 
+  // When the deal record updates (Klo writes back klo_state, summary, etc.)
+  // refresh the sidebar list so its confidence dot stays in sync.
   useEffect(() => {
     if (!deal?.id) return
     reloadShellDeals()
@@ -209,11 +234,7 @@ export default function DealroomPage() {
     [profile?.name, user?.email],
   )
 
-  function handleOpenBuyerChat(prefill) {
-    setBuyerChatPrefill(typeof prefill === 'string' ? prefill : '')
-    setBuyerChatOpen(true)
-  }
-
+  const messageCount = messages?.length ?? 0
   // Honor onboarding's ?share=1 hint by prompting share immediately.
   useEffect(() => {
     if (params.get('share') === '1' && deal && canShareWithBuyer(plan)) {
@@ -221,37 +242,57 @@ export default function DealroomPage() {
     }
   }, [params, deal, plan, handleShare])
 
-  if (loading) return <DealroomSkeleton />
-  if (error || !deal) return <DealroomNotFound error={error} />
+  if (loading) return <DealPageSkeleton />
+  if (error || !deal) return <DealNotFound error={error} />
 
   return (
-    <>
-      <DealroomLayout
+    <div className="flex flex-col h-full min-h-0">
+      <DealHeader
         deal={deal}
-        dealContext={dealContext}
-        messages={messages}
-        setMessages={setMessages}
-        commitments={commitments}
-        kloThinking={kloThinking}
-        setKloThinking={setKloThinking}
-        sellerName={sellerName}
+        viewerRole="seller"
         canShare={canShareWithBuyer(plan)}
         onShare={handleShare}
-        onOpenBuyerChat={handleOpenBuyerChat}
+        onOpenChat={() => handleTabChange('chat')}
       />
-      <BuyerChatDrawer
-        open={buyerChatOpen}
-        onClose={() => setBuyerChatOpen(false)}
-        deal={deal}
-        dealContext={dealContext}
-        messages={messages}
-        setMessages={setMessages}
-        commitments={commitments}
-        kloThinking={kloThinking}
-        setKloThinking={setKloThinking}
-        sellerName={sellerName}
-        prefill={buyerChatPrefill}
+      <DealTabs
+        activeTab={activeTab}
+        onChange={handleTabChange}
+        chatCount={messageCount}
       />
-    </>
+
+      <div className="flex-1 min-h-0 flex flex-col">
+        {activeTab === 'overview' && (
+          <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
+            <OverviewTab
+              deal={deal}
+              viewerRole="seller"
+              commitments={commitments}
+              onSwitchToChat={() => handleTabChange('chat')}
+              onCommitmentJump={handleCommitmentJump}
+            />
+          </div>
+        )}
+        {activeTab === 'chat' && (
+          // ChatView renders its own scrollable timeline + docked input;
+          // the wrapper just provides the flex column shape it expects.
+          <div className="flex-1 min-h-0 flex flex-col chat-doodle">
+            <ChatView
+              deal={deal}
+              dealContext={dealContext}
+              role="seller"
+              currentUserName={sellerName}
+              messages={messages}
+              setMessages={setMessages}
+              commitments={commitments}
+              kloThinking={kloThinking}
+              setKloThinking={setKloThinking}
+              highlightCommitmentId={highlightCommitmentId}
+              onHighlightConsumed={() => setHighlightCommitmentId(null)}
+              locked={deal.locked}
+            />
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
