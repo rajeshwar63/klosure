@@ -170,7 +170,7 @@ function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
   const stageChipTone = stage === 'closed' ? 'bg-emerald-100 text-emerald-800' : 'bg-klo/10 text-klo'
 
   return (
-    <section className="md:sticky md:top-4 z-10 bg-white border border-navy/10 rounded-2xl p-4 md:p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="bg-white border border-navy/10 rounded-2xl p-4 md:p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-navy">Deal snapshot</h2>
         <div className="flex items-center gap-2">
