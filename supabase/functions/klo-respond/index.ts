@@ -7,10 +7,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { buildBootstrapPrompt } from "../_shared/prompts/bootstrap-prompt.ts"
 import { buildExtractionPrompt } from "../_shared/prompts/extraction-prompt.ts"
-import type { KloState, KloRespondOutput } from "../_shared/klo-state-types.ts"
+import type { KloState, KloRespondOutput, BuyerView } from "../_shared/klo-state-types.ts"
 import type { LlmMessage, LlmToolDefinition } from "../_shared/llm-types.ts"
 import { callLlm } from "../_shared/llm-client.ts"
 import { loadSellerProfile, type SellerProfile } from "../_shared/seller-profile-loader.ts"
+import { detectMaterialChange } from "../_shared/material-change-detector.ts"
+import { buildBuyerViewPrompt } from "../_shared/prompts/buyer-view-prompt.ts"
+import { BUYER_VIEW_TOOL } from "../_shared/buyer-view-tool.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -306,12 +309,120 @@ Deno.serve(async (req) => {
     // 5. Insert chat_reply as a Klo message scoped to recipientRole
     await postKloMessage(deal_id, output.chat_reply, ctx.recipientRole)
 
+    // 6. Phase 8 — buyer_view regeneration (gated by material change).
+    //    Best-effort: a failure here must NOT fail the chat turn.
+    try {
+      await maybeRegenerateBuyerView({
+        deal: ctx.deal,
+        beforeState: ctx.deal.klo_state,
+        newState: output.klo_state,
+        sellerProfile,
+      })
+    } catch (err) {
+      console.error("buyer_view generation failed", err)
+    }
+
     return json({ ok: true })
   } catch (err) {
     console.error("klo-respond error", err)
     return json({ ok: false, error: String(err) }, 500)
   }
 })
+
+async function maybeRegenerateBuyerView(args: {
+  deal: DealContext["deal"]
+  beforeState: KloState | null
+  newState: KloState
+  sellerProfile: SellerProfile | null
+}): Promise<void> {
+  const { deal, beforeState, newState, sellerProfile } = args
+
+  const sinceISO = beforeState?.buyer_view?.generated_at ?? null
+  const messagesSinceLastBuyerView = await countMessagesSince(deal.id, sinceISO)
+
+  const materialCheck = detectMaterialChange({
+    before: beforeState,
+    after: newState,
+    messagesSinceLastBuyerView,
+  })
+
+  console.log(JSON.stringify({
+    event: "buyer_view_gating_decision",
+    deal_id: deal.id,
+    is_material: materialCheck.isMaterial,
+    reasons: materialCheck.reasons,
+    messages_since_last: messagesSinceLastBuyerView,
+  }))
+
+  if (!materialCheck.isMaterial) return
+
+  const buyerViewPrompt = buildBuyerViewPrompt({
+    dealTitle: deal.title,
+    buyerCompany: deal.buyer_company ?? "the buyer",
+    sellerCompany: deal.seller_company ?? "the vendor",
+    recipientLabel: "the buyer",
+    currentState: newState,
+    sellerProfile,
+    previousMomentumScore: beforeState?.buyer_view?.momentum_score ?? null,
+  })
+
+  const buyerViewResult = await callLlm<{ buyer_view: BuyerView }>({
+    systemPrompt: buyerViewPrompt,
+    messages: [{ role: "user", content: "Emit the buyer dashboard." }],
+    tool: BUYER_VIEW_TOOL,
+    maxTokens: 1500,
+    temperature: 0.6,
+  })
+
+  if (!buyerViewResult.toolCalled) {
+    console.warn("buyer_view tool not called — skipping update")
+    return
+  }
+
+  const buyerView = buyerViewResult.input.buyer_view
+  if (!buyerView) {
+    console.warn("buyer_view missing in tool input — skipping update")
+    return
+  }
+  buyerView.generated_at = new Date().toISOString()
+  buyerView.generation_reason = beforeState?.buyer_view ? "material_change" : "initial"
+
+  // Read fresh state, merge, write — avoids stomping any other concurrent write.
+  const { data: fresh } = await sb
+    .from("deals")
+    .select("klo_state")
+    .eq("id", deal.id)
+    .maybeSingle()
+  const baseState = (fresh?.klo_state ?? newState) as KloState
+  const mergedState: KloState = { ...baseState, buyer_view: buyerView }
+
+  const { error: updateErr } = await sb
+    .from("deals")
+    .update({ klo_state: mergedState })
+    .eq("id", deal.id)
+  if (updateErr) {
+    console.error("buyer_view persist failed", updateErr)
+    return
+  }
+
+  console.log(JSON.stringify({
+    event: "buyer_view_generated",
+    deal_id: deal.id,
+    reason: buyerView.generation_reason,
+    momentum_score: buyerView.momentum_score,
+  }))
+}
+
+async function countMessagesSince(dealId: string, sinceISO: string | null): Promise<number> {
+  if (!sinceISO) return 999
+  const { count } = await sb
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("deal_id", dealId)
+    .gt("created_at", sinceISO)
+    .neq("sender_type", "klo")
+  return count ?? 0
+}
 
 // --- Stubs (filled in step 07) ---
 
