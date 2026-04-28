@@ -138,12 +138,11 @@ export default function BuyerJoinPage() {
         <main className="flex-1 flex items-center justify-center px-5 pb-10">
           <div className="w-full max-w-sm bg-white text-navy rounded-2xl p-6 shadow-xl">
             <p className="text-xs uppercase tracking-wider text-klo font-semibold mb-2">
-              You've been invited
+              Get this deal live faster
             </p>
             <h1 className="text-2xl font-bold leading-tight mb-1">{deal.title}</h1>
             <p className="text-sm text-navy/60 mb-4">
-              {deal.seller_company || 'The seller'} has shared this deal room with you. No signup —
-              just enter your name and start.
+              Track status in real time, see what's blocking progress, and get Klo guidance to keep this deal moving.
             </p>
             <form onSubmit={handleJoin} className="space-y-3">
               <label className="block">
@@ -162,11 +161,13 @@ export default function BuyerJoinPage() {
                 disabled={joining || !nameInput.trim()}
                 className="w-full bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold py-3 rounded-xl"
               >
-                {joining ? 'Opening…' : 'Open the room'}
+                {joining ? 'Opening…' : 'Open my deal workspace'}
               </button>
             </form>
             <p className="text-[11px] text-navy/40 mt-3 text-center">
-              Your deal data is never used to train any AI model.
+              Private and secure. No signup required — just your name to enter.
+              <br />
+              <span className="text-navy/50">Shared by {deal.seller_company || 'the seller'}.</span>
             </p>
           </div>
         </main>
