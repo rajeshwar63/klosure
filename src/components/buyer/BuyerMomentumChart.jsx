@@ -66,7 +66,7 @@ export default function BuyerMomentumChart({ buyerView }) {
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
-        <h3 className="text-sm font-semibold text-navy">Deal momentum</h3>
+        <h3 className="text-sm font-semibold text-navy">Closure confidence</h3>
       </div>
       <div className="p-5 flex flex-col gap-3">
         {enoughData ? (
@@ -79,7 +79,7 @@ export default function BuyerMomentumChart({ buyerView }) {
           </>
         ) : (
           <p className="text-sm text-navy/55">
-            Building your momentum chart — it'll fill in as your deal evolves.
+            Not enough trend data yet—confirm the next vendor checkpoint and log the outcome to establish confidence.
           </p>
         )}
         <div className="flex items-baseline gap-2">

@@ -9,8 +9,8 @@ function formatDate(iso) {
 
 export default function BuyerRecentMomentsFeed({
   moments,
-  title = 'Recent moments',
-  emptyCopy = 'No moments yet — Klo records the milestones that matter as the deal develops.',
+  title = 'What changed this week',
+  emptyCopy = 'No updates yet—prompt your vendor lead for this week’s movement and add the key milestone here.',
 }) {
   const items = (moments ?? []).slice().reverse()
   return (

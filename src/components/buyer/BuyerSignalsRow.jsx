@@ -2,9 +2,9 @@
 // alignment, vendor responsiveness. Always 3 cards, one per kind.
 
 const KIND_LABELS = {
-  timeline_health: 'Timeline health',
-  stakeholder_alignment: 'Stakeholder alignment',
-  vendor_responsiveness: 'Vendor responsiveness',
+  timeline_health: 'Timeline confidence',
+  stakeholder_alignment: 'Approver alignment',
+  vendor_responsiveness: 'Vendor follow-through',
 }
 
 const LEVEL_STYLES = {
@@ -41,7 +41,7 @@ function SignalCard({ kind, signal }) {
         {signal ? styles.label : '—'}
       </p>
       <p className="text-[12px] text-navy/65 leading-snug">
-        {signal?.one_line_why || 'Klo needs more chat history to assess this signal.'}
+        {signal?.one_line_why || 'Not enough activity yet—send a status check and log the response to calibrate this signal.'}
       </p>
     </div>
   )

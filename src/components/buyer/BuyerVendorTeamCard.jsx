@@ -100,9 +100,9 @@ function TeamMemberCard({ vendor, company, lastReplyAt }) {
 function VendorEmptyState({ company }) {
   return (
     <div className="rounded-xl border border-dashed border-klo/35 bg-klo/5 px-4 py-6 text-center">
-      <p className="text-sm font-medium text-navy">No vendor teammates are connected yet.</p>
+      <p className="text-sm font-medium text-navy">No vendor owner is connected yet.</p>
       <p className="text-[12px] text-navy/60 mt-1">
-        Invite collaborators from {company || 'the vendor team'} so actions and follow-ups stay visible.
+        Invite the decision owner from {company || 'the vendor team'} so you can assign open items and lock next steps.
       </p>
       <button
         type="button"
@@ -156,7 +156,7 @@ export default function BuyerVendorTeamCard({ deal }) {
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
-        <h3 className="text-sm font-semibold text-navy">Vendor team</h3>
+        <h3 className="text-sm font-semibold text-navy">Vendor accountability</h3>
       </div>
       <div className="p-5">
         {vendor ? (

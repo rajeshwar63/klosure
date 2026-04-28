@@ -38,7 +38,7 @@ export default function BuyerTimelineStrip({ stage, deadline, blockers }) {
 
   return (
     <div className="bg-white border border-navy/10 rounded-2xl px-5 py-5">
-      <h3 className="text-sm font-semibold text-navy mb-4">Timeline</h3>
+      <h3 className="text-sm font-semibold text-navy mb-4">Path to signature</h3>
       <div className="overflow-x-auto -mx-1 px-1">
         <ol className="flex items-center min-w-[640px] md:min-w-0 gap-1.5">
           {STAGES.map((s, idx) => {

@@ -7,11 +7,11 @@ export default function BuyerRisksList({ risks }) {
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
-        <h3 className="text-sm font-semibold text-navy">Risks Klo is watching</h3>
+        <h3 className="text-sm font-semibold text-navy">What could slow signature</h3>
       </div>
       {items.length === 0 ? (
         <div className="px-5 py-5 text-sm text-navy/55">
-          No risks identified — Klo will flag concerns here as the deal progresses.
+          No blockers right now—use this window to finalize approvals and confirm the signing date.
         </div>
       ) : (
         <ul className="divide-y divide-navy/5">
