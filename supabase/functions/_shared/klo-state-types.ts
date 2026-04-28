@@ -202,6 +202,10 @@ export interface KloState {
   // always present (possibly empty).
   pending_on_seller?: PendingTask[];
   pending_on_buyer?: PendingTask[];
+
+  // Phase 9 — seller-side this-week's-moves. Mirrors the buyer playbook
+  // structure with seller voice. Optional — falls back to factors_to_raise.
+  next_actions?: NextAction[];
 }
 
 // =============================================================================
@@ -217,6 +221,19 @@ export interface PendingTask {
   status: PendingTaskStatus;
   source_message_id: string | null;
   added_at: string;             // ISO timestamp — when Klo first detected this task
+}
+
+// =============================================================================
+// Phase 9 — Seller-side next actions (mirror of buyer playbook)
+// =============================================================================
+
+export interface NextAction {
+  id: string;
+  action: string;                                  // ≤ 12 words, imperative
+  why_it_matters: string;                          // 1 sentence, seller voice
+  who: string;                                     // "you", "your CFO", etc.
+  deadline: string | null;
+  status: 'not_started' | 'in_flight' | 'done';
 }
 
 export interface KloRespondOutput {

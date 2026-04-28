@@ -23,7 +23,7 @@ import DealTabs, {
   loadDealTab,
   saveDealTab,
 } from '../components/deal/DealTabs.jsx'
-import OverviewTab from '../components/deal/OverviewTab.jsx'
+import SellerOverview from '../components/seller/SellerOverview.jsx'
 import BuyerViewPreview from '../components/seller/BuyerViewPreview.jsx'
 
 function DealPageSkeleton() {
@@ -296,11 +296,7 @@ export default function DealRoomPage() {
       <div className="flex-1 min-h-0 flex flex-col">
         {activeTab === 'overview' && (
           <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
-            <OverviewTab
-              deal={deal}
-              viewerRole="seller"
-              onSwitchToChat={() => handleTabChange('chat')}
-            />
+            <SellerOverview deal={deal} />
           </div>
         )}
         {activeTab === 'chat' && (
