@@ -8,17 +8,18 @@ import { useProfile } from '../../hooks/useProfile.jsx'
 import { useShellDeals } from '../../hooks/useShellDeals.jsx'
 import AppShell from './AppShell.jsx'
 
-export function resolveActiveView(pathname) {
+export function resolveActiveView(pathname, role) {
   if (pathname === '/today') return 'today'
   if (pathname === '/deals') return 'deals'
   if (pathname.startsWith('/deals/')) {
     const id = pathname.split('/')[2]
     if (id && id !== 'new') return `deal:${id}`
   }
-  if (pathname === '/team') return 'today'
+  if (pathname === '/team') return role === 'manager' ? 'today' : 'team'
   if (pathname === '/team/forecast') return 'forecast'
   if (pathname === '/team/reps') return 'reps'
   if (pathname === '/team/askklo') return 'askklo'
+  if (pathname === '/settings/train-klo') return 'train-klo'
   return null
 }
 
@@ -46,7 +47,7 @@ export default function ShellWrapper() {
   const { deals, loading: dealsLoading } = useShellDeals()
 
   const role = location.pathname.startsWith('/team') && isManager ? 'manager' : 'seller'
-  const activeView = resolveActiveView(location.pathname)
+  const activeView = resolveActiveView(location.pathname, role)
   const pageTitle = resolvePageTitle(location.pathname, deals)
 
   const userForShell = {

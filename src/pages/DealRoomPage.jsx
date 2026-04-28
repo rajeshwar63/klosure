@@ -15,6 +15,13 @@ import { useShellDeals } from '../hooks/useShellDeals.jsx'
 import { listCommitments } from '../services/commitments.js'
 import { greetingForRole } from '../services/klo.js'
 import { canShareWithBuyer } from '../lib/plans.js'
+import {
+  markDealWon,
+  markDealLost,
+  archiveDeal,
+  deleteDeal,
+  reopenDeal,
+} from '../services/archive.js'
 import ChatView from '../components/ChatView.jsx'
 import DealHeader from '../components/deal/DealHeader.jsx'
 import DealTabs, {
@@ -230,6 +237,64 @@ export default function DealRoomPage() {
     window.alert(`Share link copied:\n${url}`)
   }, [deal?.buyer_token])
 
+  const handleWin = useCallback(async () => {
+    if (!deal?.id) return
+    const res = await markDealWon({ dealId: deal.id })
+    if (!res.ok) {
+      window.alert(res.error || 'Could not mark deal as won.')
+      return
+    }
+    setDeal((d) => ({ ...d, ...res.deal }))
+    reloadShellDeals()
+  }, [deal?.id, reloadShellDeals])
+
+  const handleLost = useCallback(
+    async (reason) => {
+      if (!deal?.id) return
+      const res = await markDealLost({ dealId: deal.id, reason })
+      if (!res.ok) {
+        window.alert(res.error || 'Could not mark deal as lost.')
+        return
+      }
+      setDeal((d) => ({ ...d, ...res.deal }))
+      reloadShellDeals()
+    },
+    [deal?.id, reloadShellDeals],
+  )
+
+  const handleArchive = useCallback(async () => {
+    if (!deal?.id) return
+    const res = await archiveDeal({ dealId: deal.id })
+    if (!res.ok) {
+      window.alert(res.error || 'Could not archive the deal.')
+      return
+    }
+    setDeal((d) => ({ ...d, ...res.deal }))
+    reloadShellDeals()
+  }, [deal?.id, reloadShellDeals])
+
+  const handleReopen = useCallback(async () => {
+    if (!deal?.id) return
+    const res = await reopenDeal({ dealId: deal.id })
+    if (!res.ok) {
+      window.alert(res.error || 'Could not reopen the deal.')
+      return
+    }
+    setDeal((d) => ({ ...d, ...res.deal }))
+    reloadShellDeals()
+  }, [deal?.id, reloadShellDeals])
+
+  const handleDelete = useCallback(async () => {
+    if (!deal?.id) return
+    const res = await deleteDeal({ dealId: deal.id, locked: !!deal.locked })
+    if (!res.ok) {
+      window.alert(res.error || 'Could not delete the deal.')
+      return
+    }
+    reloadShellDeals()
+    navigate('/deals', { replace: true })
+  }, [deal?.id, deal?.locked, navigate, reloadShellDeals])
+
   const sellerName = useMemo(
     () => profile?.name || user?.email || 'Seller',
     [profile?.name, user?.email],
@@ -254,6 +319,11 @@ export default function DealRoomPage() {
         canShare={canShareWithBuyer(plan)}
         onShare={handleShare}
         onOpenChat={() => handleTabChange('chat')}
+        onWin={handleWin}
+        onLost={handleLost}
+        onArchive={handleArchive}
+        onReopen={handleReopen}
+        onDelete={handleDelete}
       />
       <DealTabs
         activeTab={activeTab}
