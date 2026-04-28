@@ -23,6 +23,7 @@ export default function ManagerKloPanel({ team, pipeline }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
+  const [error, setError] = useState('')
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -79,12 +80,13 @@ export default function ManagerKloPanel({ team, pipeline }) {
   async function handleAsk(question) {
     const text = (question ?? input).trim()
     if (!text || !thread || thinking) return
+    setError('')
     setInput('')
     setThinking(true)
     const res = await askManagerKlo({ thread, question: text, pipeline })
     if (!res.ok) {
       setThinking(false)
-      alert(res.error)
+      setError(res.error || 'Could not send your question.')
       return
     }
     if (res.viaStub) {
@@ -101,6 +103,11 @@ export default function ManagerKloPanel({ team, pipeline }) {
         <p className="text-sm text-navy/70 mt-0.5">
           Pipeline-level coaching. Klo reads every active deal in your team.
         </p>
+        {error && (
+          <p className="mt-2 text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+            {error}
+          </p>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2.5 max-h-[55vh]">
