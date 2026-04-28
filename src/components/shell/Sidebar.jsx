@@ -189,19 +189,29 @@ export default function Sidebar({
             <p className="text-[12px] font-medium text-navy truncate">
               {user?.name || user?.email || 'You'}
             </p>
-            {role === 'manager' ? (
-              <span className="inline-block mt-0.5 text-[10px] uppercase tracking-wider font-semibold text-klo">
-                Mgr
-              </span>
-            ) : (
+            <div className="flex items-center gap-2 mt-0.5">
+              {role === 'manager' ? (
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-klo">
+                  Mgr
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handle('team')}
+                  className="text-[11px] text-navy/55 hover:text-klo"
+                >
+                  Team →
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handle('team')}
+                onClick={handle('train-klo')}
                 className="text-[11px] text-navy/55 hover:text-klo"
+                title="Train Klo on your role and ICP"
               >
-                Team →
+                Train Klo
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}

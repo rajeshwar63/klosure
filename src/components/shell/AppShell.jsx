@@ -75,6 +75,10 @@ export default function AppShell({
       navigate('/team')
       return
     }
+    if (view === 'train-klo') {
+      navigate('/settings/train-klo')
+      return
+    }
   }
 
   function handleNewDeal() {
