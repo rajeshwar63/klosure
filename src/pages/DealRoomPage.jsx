@@ -294,7 +294,7 @@ export default function DealRoomPage() {
       <div className="flex-1 min-h-0 flex flex-col">
         {activeTab === 'overview' && (
           <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
-            <SellerOverview deal={deal} />
+            <SellerOverview deal={deal} viewerRole="seller" onDealUpdate={(next) => setDeal((d) => ({ ...d, ...next }))} />
             <DangerZoneFooter
               onArchive={handleArchive}
               onDelete={handleDelete}
