@@ -10,6 +10,7 @@ import BuyerPlaybookCard from '../buyer/BuyerPlaybookCard.jsx'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
 import BuyerVendorTeamCard from '../buyer/BuyerVendorTeamCard.jsx'
 import BuyerTimelineStrip from '../buyer/BuyerTimelineStrip.jsx'
+import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
 import BuyerMomentumChart from '../buyer/BuyerMomentumChart.jsx'
 import BuyerRisksList from '../buyer/BuyerRisksList.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
@@ -163,6 +164,7 @@ export default function BuyerViewPreview({ deal }) {
               deadline={deal?.klo_state?.deadline}
               blockers={deal?.klo_state?.blockers}
             />
+            <PendingTasksTwoCol kloState={deal?.klo_state} perspective="buyer" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <BuyerMomentumChart buyerView={buyerView} />
               <BuyerRisksList risks={buyerView.risks_klo_is_watching} />

@@ -11,6 +11,7 @@ import BuyerPlaybookCard from '../components/buyer/BuyerPlaybookCard.jsx'
 import BuyerStakeholderMap from '../components/buyer/BuyerStakeholderMap.jsx'
 import BuyerVendorTeamCard from '../components/buyer/BuyerVendorTeamCard.jsx'
 import BuyerTimelineStrip from '../components/buyer/BuyerTimelineStrip.jsx'
+import PendingTasksTwoCol from '../components/shared/PendingTasksTwoCol.jsx'
 import BuyerMomentumChart from '../components/buyer/BuyerMomentumChart.jsx'
 import BuyerRisksList from '../components/buyer/BuyerRisksList.jsx'
 import BuyerRecentMomentsFeed from '../components/buyer/BuyerRecentMomentsFeed.jsx'
@@ -91,6 +92,7 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
               deadline={klo.deadline}
               blockers={klo.blockers}
             />
+            <PendingTasksTwoCol kloState={klo} perspective="buyer" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <BuyerMomentumChart buyerView={buyerView} />
               <BuyerRisksList risks={buyerView.risks_klo_is_watching} />

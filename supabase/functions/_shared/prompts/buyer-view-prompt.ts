@@ -31,6 +31,10 @@ ${BUYER_VIEW_HARD_STOPS_SECTION}
 Use ONLY the data in <current_klo_state> and <recent_messages>. Do not invent stakeholders, dates, deal values, or pending tasks. If a field is unclear, leave it null or use an empty array. Buyer-facing fabrication is worse than missing data — the buyer will lose trust the first time they spot something wrong.
 </grounding>
 
+<note>
+The pending tasks (pending_on_seller, pending_on_buyer) are inherited from the main extraction — do NOT regenerate them in your output. They are not part of the emit_buyer_view tool schema. Focus on klo_brief_for_buyer, signals, playbook, stakeholders, risks, momentum, recent_moments.
+</note>
+
 <turn_workflow>
 1. Read the current klo_state and the recent messages.
 2. Identify what the BUYER specifically needs to do this week to keep this deal moving on their side.

@@ -14,6 +14,7 @@ import DealStatStripWide from './DealStatStripWide.jsx'
 import BlockersPanel from './BlockersPanel.jsx'
 import StakeholdersPanel from './StakeholdersPanel.jsx'
 import RecencyStrip from './RecencyStrip.jsx'
+import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
 import { useStuckFor } from '../../hooks/useStuckFor.js'
 
 export default function OverviewTab({
@@ -35,6 +36,10 @@ export default function OverviewTab({
         viewerRole={viewerRole}
         onSwitchToChat={onSwitchToChat}
       />
+
+      <div className="my-4">
+        <PendingTasksTwoCol kloState={ks} perspective={viewerRole === 'buyer' ? 'buyer' : 'seller'} />
+      </div>
 
       <ConfidenceCompactStrip klo_state={ks} viewerRole={viewerRole} />
 
