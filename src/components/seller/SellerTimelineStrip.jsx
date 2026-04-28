@@ -6,93 +6,209 @@ function titleCase(text) {
     .join(' ')
 }
 
-function deriveMilestones(kloState) {
-  const fromActions = (kloState?.next_actions ?? [])
-    .map((a) => a?.action)
-    .filter(Boolean)
-  const fromDecisions = (kloState?.decisions ?? [])
-    .map((d) => d?.what)
-    .filter(Boolean)
-  const fromQuestions = (kloState?.open_questions ?? [])
-    .map((q) => q?.text)
-    .filter(Boolean)
-    .map((q) => `Clarify: ${q}`)
-  const fromBlockers = (kloState?.blockers ?? [])
-    .map((b) => b?.text)
-    .filter(Boolean)
-    .map((b) => `Resolve: ${b}`)
-
-  const stageLabel = kloState?.stage ? titleCase(kloState.stage) : null
-  const fromSignals = [stageLabel, ...fromActions, ...fromDecisions, ...fromQuestions, ...fromBlockers]
-  const unique = []
-  for (const signal of fromSignals) {
-    if (!signal) continue
-    const trimmed = signal.trim()
-    if (!trimmed) continue
-    if (unique.some((s) => s.toLowerCase() === trimmed.toLowerCase())) continue
-    unique.push(trimmed)
-  }
-
-  const slotCount = 4
-  const filled = Array.from({ length: slotCount }, () => null)
-  for (let i = 0; i < Math.min(slotCount, unique.length); i += 1) {
-    filled[i] = unique[i]
-  }
-  return filled
+function formatDueDate(dateIso) {
+  if (!dateIso) return 'No due date'
+  const d = new Date(dateIso)
+  if (Number.isNaN(d.getTime())) return 'No due date'
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function goLiveDate(deadline) {
-  if (!deadline?.date) return null
-  const d = new Date(deadline.date)
-  if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+function deriveMilestones(kloState) {
+  const stageLabel = kloState?.stage ? titleCase(kloState.stage) : null
+
+  const fromStage = stageLabel
+    ? [{ label: stageLabel, owner: 'Deal owner', dueDate: kloState?.deadline?.date ?? null, type: 'current-stage' }]
+    : []
+
+  const fromActions = (kloState?.next_actions ?? [])
+    .filter((a) => a?.action)
+    .map((a) => ({
+      label: a.action,
+      owner: a.owner || 'Deal owner',
+      dueDate: a.due_date || a.deadline || null,
+      type: 'action',
+    }))
+
+  const fromDecisions = (kloState?.decisions ?? [])
+    .filter((d) => d?.what)
+    .map((d) => ({
+      label: d.what,
+      owner: d.owner || d.who || 'Stakeholder',
+      dueDate: d.due_date || d.by || null,
+      type: 'decision',
+    }))
+
+  const fromQuestions = (kloState?.open_questions ?? [])
+    .filter((q) => q?.text)
+    .map((q) => ({
+      label: `Clarify: ${q.text}`,
+      owner: q.owner || 'Deal owner',
+      dueDate: q.due_date || null,
+      type: 'question',
+    }))
+
+  const fromBlockers = (kloState?.blockers ?? [])
+    .filter((b) => b?.text)
+    .map((b) => ({
+      label: `Resolve: ${b.text}`,
+      owner: b.owner || 'Deal owner',
+      dueDate: b.due_date || null,
+      type: 'blocked',
+    }))
+
+  const fromSignals = [...fromStage, ...fromActions, ...fromDecisions, ...fromQuestions, ...fromBlockers]
+
+  const unique = []
+  for (const signal of fromSignals) {
+    const trimmed = signal?.label?.trim()
+    if (!trimmed) continue
+    if (unique.some((s) => s.label.toLowerCase() === trimmed.toLowerCase())) continue
+    unique.push({ ...signal, label: trimmed })
+  }
+
+  return unique.slice(0, 5)
+}
+
+function stateForMilestone(milestone, idx, currentIdx) {
+  if (milestone?.type === 'blocked') return 'blocked'
+  if (idx < currentIdx) return 'completed'
+  if (idx === currentIdx) return 'current'
+  if (idx === currentIdx + 1) return 'next'
+  return 'upcoming'
+}
+
+const STATE_STYLES = {
+  completed: {
+    node: 'bg-slate-100 border-slate-300 text-slate-700',
+    title: 'text-navy/80',
+    badge: 'bg-slate-100 text-slate-600 border-slate-200',
+    connector: 'bg-slate-300',
+    icon: '✓',
+    legend: 'Completed',
+  },
+  current: {
+    node: 'bg-klo border-klo text-white shadow-sm shadow-klo/25',
+    title: 'text-klo font-semibold',
+    badge: 'bg-klo text-white border-klo/90',
+    connector: 'bg-klo/40',
+    icon: '●',
+    legend: 'Current',
+  },
+  next: {
+    node: 'bg-white border-klo/60 text-klo',
+    title: 'text-klo/90',
+    badge: 'bg-klo/10 text-klo border-klo/20',
+    connector: 'bg-klo/25',
+    icon: '○',
+    legend: 'Next',
+  },
+  blocked: {
+    node: 'bg-rose-50 border-rose-300 text-rose-700',
+    title: 'text-rose-700',
+    badge: 'bg-rose-100 text-rose-700 border-rose-200',
+    connector: 'bg-rose-300',
+    icon: '⚠',
+    legend: 'Blocked',
+  },
+  upcoming: {
+    node: 'bg-white border-navy/20 text-navy/50',
+    title: 'text-navy/65',
+    badge: 'bg-navy/[0.03] text-navy/55 border-navy/15',
+    connector: 'bg-navy/15',
+    icon: '·',
+    legend: 'Upcoming',
+  },
+}
+
+function MilestoneLegend() {
+  const order = ['completed', 'current', 'next', 'blocked']
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[10px] text-navy/55 mt-3" title="Milestone state legend: completed, current, next, blocked, and upcoming.">
+      {order.map((state) => {
+        const style = STATE_STYLES[state]
+        return (
+          <span key={state} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${style.badge}`}>
+            <span className="text-[11px] leading-none">{style.icon}</span>
+            <span>{style.legend}</span>
+          </span>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function SellerTimelineStrip({ kloState }) {
   const milestones = deriveMilestones(kloState)
-  const activeIdx = milestones.findIndex((m) => !m)
-  const currentIdx = activeIdx === -1 ? milestones.length - 1 : Math.max(0, activeIdx - 1)
-  const liveDate = goLiveDate(kloState?.deadline)
+
+  if (milestones.length === 0) {
+    return (
+      <div className="bg-white border border-navy/10 rounded-2xl px-5 py-5">
+        <h3 className="text-sm font-semibold text-navy mb-2">Deal milestones</h3>
+        <p className="text-xs text-navy/55">Milestones are unavailable right now. Add stage updates, actions, or blockers to generate a timeline.</p>
+      </div>
+    )
+  }
+
+  const blockedIdx = milestones.findIndex((m) => m.type === 'blocked')
+  const currentIdx = blockedIdx !== -1 ? Math.max(0, blockedIdx - 1) : 0
 
   return (
     <div className="bg-white border border-navy/10 rounded-2xl px-5 py-5">
       <h3 className="text-sm font-semibold text-navy mb-4">Deal milestones</h3>
-      <div className="overflow-x-auto -mx-1 px-1">
-        <ol className="flex items-center min-w-[640px] md:min-w-0 gap-1.5">
-          {milestones.map((label, idx) => {
-            const isPast = idx < currentIdx && Boolean(milestones[idx])
-            const isCurrent = idx === currentIdx && Boolean(label)
-            const isEmpty = !label
-            const segmentClass = isCurrent
-              ? 'bg-klo text-white border-klo'
-              : isPast
-                ? 'bg-klo/15 text-klo border-klo/20'
-                : isEmpty
-                  ? 'bg-navy/[0.02] text-navy/30 border-dashed border-navy/20'
-                  : 'bg-white text-navy/60 border-navy/15'
+
+      <div className="md:hidden">
+        <ol className="flex flex-col gap-3">
+          {milestones.map((milestone, idx) => {
+            const state = stateForMilestone(milestone, idx, currentIdx)
+            const style = STATE_STYLES[state]
+            const badge = state === 'current' ? 'Current' : state === 'next' ? 'Next' : null
+            const due = formatDueDate(milestone.dueDate)
             return (
-              <li key={`milestone-${idx}`} className="flex-1 min-w-0 flex flex-col gap-1">
-                <div
-                  className={`text-[11px] uppercase tracking-wider font-semibold border rounded-md px-2 py-1.5 truncate text-center ${segmentClass}`}
-                >
-                  {label || 'Open milestone'}
-                </div>
-                <div className="text-[10px] text-center text-navy/35">
-                  {label ? `Step ${idx + 1}` : ''}
+              <li key={`milestone-mobile-${idx}`} className="relative pl-8">
+                {idx < milestones.length - 1 && <span className={`absolute left-[14px] top-7 h-[calc(100%+6px)] w-px ${style.connector}`} />}
+                <span className={`absolute left-0 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${style.node}`}>{style.icon}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className={`text-xs truncate ${style.title}`} title={milestone.label}>{milestone.label}</p>
+                    {badge && <span className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${style.badge}`}>{badge}</span>}
+                  </div>
+                  <p className="text-[10px] text-navy/50 truncate" title={`${milestone.owner || 'Unassigned'} • ${due}`}>{milestone.owner || 'Unassigned'} • {due}</p>
                 </div>
               </li>
             )
           })}
-          <li className="flex-1 min-w-0 flex flex-col gap-1">
-            <div className="text-[11px] uppercase tracking-wider font-semibold border rounded-md px-2 py-1.5 truncate text-center bg-white text-navy/70 border-navy/20">
-              Go-live
-            </div>
-            <div className="text-[10px] text-center text-navy/40">
-              {liveDate ?? ''}
-            </div>
-          </li>
         </ol>
       </div>
+
+      <div className="hidden md:block overflow-x-auto -mx-1 px-1">
+        <ol className="flex items-start min-w-[760px] gap-0 snap-x snap-mandatory">
+          {milestones.map((milestone, idx) => {
+            const state = stateForMilestone(milestone, idx, currentIdx)
+            const style = STATE_STYLES[state]
+            const badge = state === 'current' ? 'Current' : state === 'next' ? 'Next' : null
+            const due = formatDueDate(milestone.dueDate)
+            const isLast = idx === milestones.length - 1
+
+            return (
+              <li key={`milestone-${idx}`} className="relative flex-1 min-w-[150px] snap-start pr-4">
+                {!isLast && <span className={`absolute left-[calc(50%+16px)] right-0 top-4 h-0.5 ${style.connector}`} />}
+                <div className="flex flex-col items-center text-center gap-2 min-w-0">
+                  <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold ${style.node}`}>{style.icon}</span>
+                  <div className="min-w-0 w-full">
+                    <div className="flex items-center justify-center gap-1 min-w-0">
+                      <p className={`text-[11px] uppercase tracking-wide truncate ${style.title}`} title={milestone.label}>{milestone.label}</p>
+                      {badge && <span className={`shrink-0 text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${style.badge}`}>{badge}</span>}
+                    </div>
+                    <p className="text-[10px] text-navy/50 truncate mt-0.5" title={`${milestone.owner || 'Unassigned'} • ${due}`}>{milestone.owner || 'Unassigned'} • {due}</p>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ol>
+      </div>
+
+      <MilestoneLegend />
     </div>
   )
 }
