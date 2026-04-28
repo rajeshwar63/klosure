@@ -11,6 +11,7 @@ import BuyerPlaybookCard from '../components/buyer/BuyerPlaybookCard.jsx'
 import BuyerStakeholderMap from '../components/buyer/BuyerStakeholderMap.jsx'
 import BuyerVendorTeamCard from '../components/buyer/BuyerVendorTeamCard.jsx'
 import BuyerTimelineStrip from '../components/buyer/BuyerTimelineStrip.jsx'
+import BuyerDealMilestones from '../components/buyer/BuyerDealMilestones.jsx'
 import PendingTasksTwoCol from '../components/shared/PendingTasksTwoCol.jsx'
 import BuyerMomentumChart from '../components/buyer/BuyerMomentumChart.jsx'
 import BuyerRisksList from '../components/buyer/BuyerRisksList.jsx'
@@ -89,7 +90,7 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
             <section className="space-y-4">
               <h2 className="text-sm font-semibold tracking-wide uppercase text-navy/65">Unblock this week</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-                <BuyerPlaybookCard playbook={buyerView.playbook} dealId={deal.id} />
+                <BuyerPlaybookCard playbook={buyerView.playbook} />
                 <PendingTasksTwoCol kloState={klo} perspective="buyer" />
               </div>
               <BuyerRisksList risks={buyerView.risks_klo_is_watching} />
@@ -98,6 +99,7 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
                 deadline={klo.deadline}
                 blockers={klo.blockers}
               />
+              <BuyerDealMilestones moments={buyerView.recent_moments} />
             </section>
 
             <section className="space-y-4">
