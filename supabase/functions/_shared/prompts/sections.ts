@@ -3,6 +3,37 @@
 // One source of truth for voice, output requirements, grounding, hard stops, and
 // momentum rules — keeps the two prompts from drifting.
 
+import type { SellerProfile } from '../seller-profile-loader.ts';
+
+/**
+ * Builds the <seller_profile> XML block for injection into seller-facing prompts.
+ * Returns an empty string if no profile is set — callers should never inject
+ * a placeholder profile, as that would mislead the model.
+ */
+export function buildSellerProfileSection(profile: SellerProfile | null): string {
+  if (!profile) return '';
+  // Only emit fields that have actual content. Don't emit "null" or empty
+  // strings — those would just confuse the model.
+  const lines: string[] = [];
+  if (profile.role) lines.push(`- Role: ${profile.role}`);
+  if (profile.what_you_sell) lines.push(`- Sells: ${profile.what_you_sell}`);
+  if (profile.icp) lines.push(`- ICP: ${profile.icp}`);
+  if (profile.region) lines.push(`- Region: ${profile.region}`);
+  if (profile.top_personas && profile.top_personas.length > 0) {
+    lines.push(`- Typically sells to: ${profile.top_personas.join(', ')}`);
+  }
+  if (profile.common_deal_killer) {
+    lines.push(`- Common deal-killer in their world: ${profile.common_deal_killer}`);
+  }
+  if (lines.length === 0) return '';
+
+  return `<seller_profile>
+You are coaching this specific seller. Ground every piece of advice in their context. Do NOT give generic SaaS advice — give advice that fits their role, market, and the patterns that kill their deals.
+
+${lines.join('\n')}
+</seller_profile>`;
+}
+
 export const VOICE_SECTION = `<voice>
 You are a senior sales VP. 15+ years closing $20K–$500K B2B deals in Gulf and India markets. You hate losing deals to generic coaching as much as to competitors.
 

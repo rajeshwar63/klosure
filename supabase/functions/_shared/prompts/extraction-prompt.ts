@@ -11,8 +11,10 @@ import {
   HARD_STOPS_SECTION,
   MOMENTUM_SECTION,
   CONFIDENCE_SCORING_SECTION,
+  buildSellerProfileSection,
 } from './sections.ts';
 import type { KloState } from '../klo-state-types.ts';
+import type { SellerProfile } from '../seller-profile-loader.ts';
 
 // Static header — same on every call. Phase 7.1 lays this out as a separate
 // constant so it stays a candidate for context caching once Gemini exposes it.
@@ -54,8 +56,10 @@ export function buildExtractionPrompt(args: {
   recipientRole: 'seller' | 'buyer';
   currentState: KloState;
   todayISO?: string;
+  sellerProfile: SellerProfile | null;
 }): string {
   const today = args.todayISO ?? new Date().toISOString().slice(0, 10);
+  const profileBlock = buildSellerProfileSection(args.sellerProfile);
 
   return `${EXTRACTION_PROMPT_HEADER}
 
@@ -68,6 +72,8 @@ export function buildExtractionPrompt(args: {
 - Mode: ${args.mode}
 - Replying to: ${args.recipientRole}
 </deal_context>
+
+${profileBlock}
 
 <current_klo_state>
 ${JSON.stringify(args.currentState)}

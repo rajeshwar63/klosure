@@ -10,6 +10,7 @@ import { buildExtractionPrompt } from "../_shared/prompts/extraction-prompt.ts"
 import type { KloState, KloRespondOutput } from "../_shared/klo-state-types.ts"
 import type { LlmMessage, LlmToolDefinition } from "../_shared/llm-types.ts"
 import { callLlm } from "../_shared/llm-client.ts"
+import { loadSellerProfile, type SellerProfile } from "../_shared/seller-profile-loader.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -259,10 +260,30 @@ Deno.serve(async (req) => {
     // 1. Load context
     const ctx = await loadDealContext(deal_id)
 
+    // 1b. Load the seller's profile (Phase 8) — null if no profile saved yet.
+    //     Failure to load must not block the turn; fall back to no injection.
+    let sellerProfile: SellerProfile | null = null
+    try {
+      sellerProfile = await loadSellerProfile(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+        ctx.deal.seller_id as string,
+      )
+    } catch (err) {
+      console.warn("seller_profile_load_failed", err)
+      sellerProfile = null
+    }
+    console.log(JSON.stringify({
+      event: "seller_profile_loaded",
+      user_id: ctx.deal.seller_id,
+      has_profile: !!sellerProfile,
+      fn: "klo-respond",
+    }))
+
     // 2. Decide path: bootstrap (state is null) vs normal turn
     const output = ctx.deal.klo_state == null
-      ? await runBootstrap(ctx)
-      : await runExtraction(ctx, triggering_message_id ?? null)
+      ? await runBootstrap(ctx, sellerProfile)
+      : await runExtraction(ctx, triggering_message_id ?? null, sellerProfile)
 
     // 2b. Preserve previous confidence value so the next turn can compute trend/delta.
     if (output.klo_state.confidence) {
@@ -308,6 +329,7 @@ interface DealContext {
     title: string
     buyer_company: string | null
     seller_company: string | null
+    seller_id: string
     value: number | null
     deadline: string | null
     mode: "solo" | "shared"
@@ -350,7 +372,10 @@ async function loadDealContext(deal_id: string): Promise<DealContext> {
   return { deal, context, messages, recipientRole }
 }
 
-async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
+async function runBootstrap(
+  ctx: DealContext,
+  sellerProfile: SellerProfile | null,
+): Promise<KloRespondOutput> {
   const system = buildBootstrapPrompt({
     dealTitle: ctx.deal.title,
     buyerCompany: ctx.deal.buyer_company ?? "",
@@ -365,6 +390,7 @@ async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
     whatNeedsToHappen: ctx.context?.what_needs_to_happen ?? null,
     budgetNotes: ctx.context?.budget_notes ?? null,
     notes: ctx.context?.notes ?? null,
+    sellerProfile,
   })
 
   return runLlm(system, ctx.messages, ctx.deal.id)
@@ -373,6 +399,7 @@ async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
 async function runExtraction(
   ctx: DealContext,
   _triggering_message_id: string | null,
+  sellerProfile: SellerProfile | null,
 ): Promise<KloRespondOutput> {
   // currentState is non-null on the extraction path (skeleton routes on null).
   const currentState = ctx.deal.klo_state as KloState
@@ -383,6 +410,7 @@ async function runExtraction(
     mode: ctx.deal.mode,
     recipientRole: ctx.recipientRole,
     currentState,
+    sellerProfile,
   })
 
   return runLlm(system, ctx.messages, ctx.deal.id)

@@ -22,6 +22,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { callLlm } from "../_shared/llm-client.ts"
 import type { LlmMessage } from "../_shared/llm-types.ts"
+import { loadSellerProfile } from "../_shared/seller-profile-loader.ts"
+import { buildSellerProfileSection } from "../_shared/prompts/sections.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -140,6 +142,10 @@ Deno.serve(async (req) => {
     const question = body?.question
     if (!threadId || !question) return json({ error: "thread_id + question required" }, 400)
 
+    // Identify the manager — used for profile injection (Phase 8).
+    const { data: managerUserData } = await userClient.auth.getUser()
+    const managerUserId = managerUserData?.user?.id ?? null
+
     // Verify the caller actually owns the thread.
     const { data: thread, error: tErr } = await userClient
       .from("manager_threads")
@@ -204,10 +210,30 @@ Deno.serve(async (req) => {
       },
     ]
 
+    // Phase 8 — inject the manager's own profile so coaching is grounded.
+    let managerProfile = null
+    if (managerUserId) {
+      try {
+        managerProfile = await loadSellerProfile(SUPABASE_URL, SERVICE_ROLE_KEY, managerUserId)
+      } catch (err) {
+        console.warn("seller_profile_load_failed", err)
+      }
+    }
+    console.log(JSON.stringify({
+      event: "seller_profile_loaded",
+      user_id: managerUserId,
+      has_profile: !!managerProfile,
+      fn: "klo-manager",
+    }))
+    const profileSection = buildSellerProfileSection(managerProfile)
+    const systemPrompt = profileSection
+      ? `${KLO_MANAGER_PROMPT}\n\n${profileSection}`
+      : KLO_MANAGER_PROMPT
+
     let result
     try {
       result = await callLlm({
-        systemPrompt: KLO_MANAGER_PROMPT,
+        systemPrompt,
         messages,
         maxTokens: 1200,
         temperature: 0.7,
@@ -431,10 +457,32 @@ ${JSON.stringify(digest, null, 2)}
 
 Give me your quarter take.`
 
+  // Phase 8 — inject the manager's own profile.
+  let managerProfile = null
+  try {
+    managerProfile = await loadSellerProfile(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      userId,
+    )
+  } catch (err) {
+    console.warn("seller_profile_load_failed", err)
+  }
+  console.log(JSON.stringify({
+    event: "seller_profile_loaded",
+    user_id: userId,
+    has_profile: !!managerProfile,
+    fn: "klo-manager:quarter_take",
+  }))
+  const profileSection = buildSellerProfileSection(managerProfile)
+  const systemPrompt = profileSection
+    ? `${QUARTER_TAKE_PROMPT}\n\n${profileSection}`
+    : QUARTER_TAKE_PROMPT
+
   let result
   try {
     result = await callLlm({
-      systemPrompt: QUARTER_TAKE_PROMPT,
+      systemPrompt,
       messages: [{ role: "user", content: userMessage }],
       maxTokens: 800,
       temperature: 0.7,
