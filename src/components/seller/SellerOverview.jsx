@@ -315,53 +315,111 @@ function ConfidenceCard({ confidence }) {
 
   const trendArrow = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'
   const trendTone = trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-red-600' : 'text-navy/55'
+  const trendLabel = trend === 'flat' ? 'stable' : `${delta > 0 ? '+' : ''}${delta} pts`
 
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
         <h3 className="text-sm font-semibold text-navy">Confidence</h3>
       </div>
-      <div className="p-5 space-y-4">
-        <div className="flex items-baseline gap-3">
-          <span className="text-3xl font-semibold text-navy">{value ?? '—'}<span className="text-base text-navy/45">%</span></span>
-          <span className={`text-sm font-medium ${trendTone}`}>
-            {trendArrow} {trend === 'flat' ? 'stable' : `${delta > 0 ? '+' : ''}${delta} pts`}
-          </span>
-        </div>
+      <div className="p-5 space-y-5">
+        <section
+          className="rounded-xl border px-4 py-3.5"
+          style={{
+            backgroundColor: 'var(--confidence-neutral-bg)',
+            borderColor: 'var(--confidence-neutral-border)',
+          }}
+        >
+          <p className="text-[11px] uppercase tracking-wider font-semibold text-navy/70 mb-2">Score</p>
+          <div className="flex items-baseline gap-3">
+            <span className="text-3xl font-semibold text-navy tabular-nums">
+              {value ?? '—'}
+              <span className="text-base text-navy/60">%</span>
+            </span>
+            <span className={`text-sm font-medium ${trendTone}`}>
+              {trendArrow} {trendLabel}
+            </span>
+          </div>
+        </section>
         {factorsDown.length > 0 && (
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold text-navy/45 mb-1">
-              Factors dragging it down
+          <section
+            className="rounded-xl border px-4 py-3.5"
+            style={{
+              backgroundColor: 'var(--confidence-negative-bg)',
+              borderColor: 'var(--confidence-negative-border)',
+            }}
+          >
+            <p className="text-[11px] uppercase tracking-wider font-semibold mb-2.5 text-navy/80">
+              Dragging it down
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-2.5">
               {factorsDown.map((f, i) => (
-                <li key={i} className="text-[13px] text-navy flex items-baseline gap-2">
-                  <span className="text-red-500 font-mono text-[11px] shrink-0 w-12">{f.impact}%</span>
-                  <span>{f.label}</span>
+                <li key={i} className="text-[13px] text-navy flex items-start gap-2.5">
+                  <span
+                    className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-semibold shrink-0 mt-0.5"
+                    style={{ color: 'var(--confidence-negative-text)', backgroundColor: 'rgba(178, 64, 32, 0.15)' }}
+                    aria-hidden
+                  >
+                    −
+                  </span>
+                  <span
+                    className="font-mono text-[11px] shrink-0 w-14 text-right tabular-nums"
+                    style={{ color: 'var(--confidence-negative-text)' }}
+                  >
+                    -{Math.abs(f.impact)}%
+                  </span>
+                  <span className="leading-snug">{f.label}</span>
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
         {factorsUp.length > 0 && (
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold text-navy/45 mb-1">
+          <section
+            className="rounded-xl border px-4 py-3.5"
+            style={{
+              backgroundColor: 'var(--confidence-positive-bg)',
+              borderColor: 'var(--confidence-positive-border)',
+            }}
+          >
+            <p className="text-[11px] uppercase tracking-wider font-semibold mb-2.5 text-navy/80">
               Would raise it
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-2.5">
               {factorsUp.map((f, i) => (
-                <li key={i} className="text-[13px] text-navy flex items-baseline gap-2">
-                  <span className="text-emerald-600 font-mono text-[11px] shrink-0 w-12">+{f.impact}%</span>
-                  <span>{f.label}</span>
+                <li key={i} className="text-[13px] text-navy flex items-start gap-2.5">
+                  <span
+                    className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-semibold shrink-0 mt-0.5"
+                    style={{ color: 'var(--confidence-positive-text)', backgroundColor: 'rgba(34, 122, 59, 0.16)' }}
+                    aria-hidden
+                  >
+                    +
+                  </span>
+                  <span
+                    className="font-mono text-[11px] shrink-0 w-14 text-right tabular-nums"
+                    style={{ color: 'var(--confidence-positive-text)' }}
+                  >
+                    +{Math.abs(f.impact)}%
+                  </span>
+                  <span className="leading-snug">{f.label}</span>
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
         {confidence.rationale && (
-          <p className="text-[12px] text-navy/65 italic leading-snug border-t border-navy/5 pt-3">
-            {confidence.rationale}
-          </p>
+          <section
+            className="rounded-xl border px-4 py-3.5"
+            style={{
+              backgroundColor: 'var(--confidence-neutral-bg)',
+              borderColor: 'var(--confidence-neutral-border)',
+            }}
+          >
+            <p className="text-[11px] uppercase tracking-wider font-semibold text-navy/70 mb-2">
+              Insight summary
+            </p>
+            <p className="text-[13px] text-navy/85 leading-relaxed">{confidence.rationale}</p>
+          </section>
         )}
       </div>
     </div>

@@ -12,6 +12,17 @@
   --color-health-gray: #888780;
   --color-background-info: #E8F0FE;
   --color-text-info: #2563EB;
+
+  /* Confidence semantic tokens (shared across confidence cards). */
+  --confidence-positive-bg: rgba(34, 122, 59, 0.08);
+  --confidence-positive-border: rgba(34, 122, 59, 0.22);
+  --confidence-positive-text: #1f6e39;
+  --confidence-negative-bg: rgba(178, 64, 32, 0.08);
+  --confidence-negative-border: rgba(178, 64, 32, 0.22);
+  --confidence-negative-text: #8b2f14;
+  --confidence-neutral-bg: rgba(60, 93, 134, 0.08);
+  --confidence-neutral-border: rgba(60, 93, 134, 0.22);
+  --confidence-neutral-text: #29486b;
 }
 
 html, body, #root {
@@ -49,4 +60,3 @@ body {
 }
 .klo-typing span:nth-child(2) { animation-delay: 0.2s; }
 .klo-typing span:nth-child(3) { animation-delay: 0.4s; }
-
