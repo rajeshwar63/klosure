@@ -4,7 +4,7 @@
 
 import { supabase } from './supabase'
 
-const FIELDS = 'user_id, role, what_you_sell, icp, region, top_personas, common_deal_killer, updated_at'
+const FIELDS = 'user_id, role, what_you_sell, icp, region, top_personas, common_deal_killer, seller_company, updated_at'
 
 export async function getSellerProfile(userId) {
   const { data, error } = await supabase

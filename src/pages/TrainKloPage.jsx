@@ -39,6 +39,7 @@ export default function TrainKloPage() {
   const [savedFlash, setSavedFlash] = useState(false)
   const [serverError, setServerError] = useState('')
 
+  const [sellerCompany, setSellerCompany] = useState('')
   const [role, setRole] = useState('')
   const [whatYouSell, setWhatYouSell] = useState('')
   const [icp, setIcp] = useState('')
@@ -49,6 +50,7 @@ export default function TrainKloPage() {
   const [errors, setErrors] = useState({})
 
   const refs = {
+    sellerCompany: useRef(null),
     role: useRef(null),
     whatYouSell: useRef(null),
     icp: useRef(null),
@@ -66,6 +68,7 @@ export default function TrainKloPage() {
         if (!mounted) return
         if (row) {
           setHadProfile(true)
+          setSellerCompany(row.seller_company || '')
           setRole(row.role || '')
           setWhatYouSell(row.what_you_sell || '')
           setIcp(row.icp || '')
@@ -101,6 +104,7 @@ export default function TrainKloPage() {
       else if (v.length < FIELD_MIN) next[key] = `Too short (min ${FIELD_MIN})`
       else if (v.length > FIELD_MAX) next[key] = `Too long (max ${FIELD_MAX})`
     }
+    checkText('sellerCompany', sellerCompany)
     checkText('role', role)
     checkText('whatYouSell', whatYouSell)
     checkText('icp', icp)
@@ -131,6 +135,7 @@ export default function TrainKloPage() {
     setSaving(true)
     try {
       const row = await upsertSellerProfile(user.id, {
+        seller_company: sellerCompany.trim(),
         role: role.trim(),
         what_you_sell: whatYouSell.trim(),
         icp: icp.trim(),
@@ -173,7 +178,7 @@ export default function TrainKloPage() {
         <h1 className="text-2xl font-semibold text-navy mb-2">Train Klo</h1>
         <p className="text-sm text-navy/65 leading-relaxed">
           The more Klo knows about <em>you</em>, the less generic its coaching gets.
-          Five questions. Two minutes. You can change these anytime.
+          Six questions. Two minutes. You can change these anytime.
         </p>
       </header>
 
@@ -192,6 +197,22 @@ export default function TrainKloPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-7">
+        <Field
+          label="What's your company called?"
+          helper="This is the vendor name your buyers see in deal headers and the buyer dashboard."
+          error={errors.sellerCompany}
+        >
+          <input
+            ref={refs.sellerCompany}
+            type="text"
+            value={sellerCompany}
+            onChange={(e) => setSellerCompany(e.target.value)}
+            placeholder="Klosure"
+            maxLength={FIELD_MAX}
+            className={inputClass(errors.sellerCompany)}
+          />
+        </Field>
+
         <Field
           label="What's your role?"
           helper="Examples: Founder & CEO · Account Executive · VP Sales · Head of Growth"

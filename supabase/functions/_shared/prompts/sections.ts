@@ -15,6 +15,7 @@ export function buildSellerProfileSection(profile: SellerProfile | null): string
   // Only emit fields that have actual content. Don't emit "null" or empty
   // strings — those would just confuse the model.
   const lines: string[] = [];
+  if (profile.seller_company) lines.push(`- Company: ${profile.seller_company}`);
   if (profile.role) lines.push(`- Role: ${profile.role}`);
   if (profile.what_you_sell) lines.push(`- Sells: ${profile.what_you_sell}`);
   if (profile.icp) lines.push(`- ICP: ${profile.icp}`);
