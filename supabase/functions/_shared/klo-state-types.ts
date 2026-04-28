@@ -196,6 +196,27 @@ export interface KloState {
   // gated LLM call (see klo-respond → buyer-view extraction). Optional
   // because existing rows do not have it; the UI must handle the missing case.
   buyer_view?: BuyerView | null;
+
+  // Phase 9 — pending tasks extracted from chat. Single source of truth for
+  // who owes what, with seller-side and buyer-side splits. Both arrays are
+  // always present (possibly empty).
+  pending_on_seller?: PendingTask[];
+  pending_on_buyer?: PendingTask[];
+}
+
+// =============================================================================
+// Phase 9 — Pending tasks (replaces commitments table)
+// =============================================================================
+
+export type PendingTaskStatus = 'pending' | 'overdue' | 'done';
+
+export interface PendingTask {
+  id: string;                   // stable id derived from task hash — for client-side localStorage status overrides
+  task: string;                 // ≤ 12 words, imperative if possible. "Send SOC 2 report"
+  due_date: string | null;      // ISO date or null
+  status: PendingTaskStatus;
+  source_message_id: string | null;
+  added_at: string;             // ISO timestamp — when Klo first detected this task
 }
 
 export interface KloRespondOutput {

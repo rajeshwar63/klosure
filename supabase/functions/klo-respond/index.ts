@@ -220,6 +220,40 @@ The klo_state is the complete structured record of this deal AFTER incorporating
             },
             required: ["date", "title"],
           },
+          pending_on_seller: {
+            type: "array",
+            description: "Tasks the seller (vendor) owes — extracted from chat. Max 10 active items. See extraction rules for what qualifies. Always emit (empty array if none).",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Stable hash-derived ID. Same task across turns gets same ID." },
+                task: { type: "string", description: "≤ 12 words." },
+                due_date: { type: ["string", "null"], description: "ISO date or null." },
+                status: { type: "string", enum: ["pending", "overdue", "done"] },
+                source_message_id: { type: ["string", "null"] },
+                added_at: { type: "string", description: "ISO timestamp when first detected." },
+              },
+              required: ["id", "task", "due_date", "status", "source_message_id", "added_at"],
+            },
+          },
+          pending_on_buyer: {
+            type: "array",
+            description: "Tasks the buyer (client) owes — extracted from chat. Max 10 active items. See extraction rules for what qualifies. Always emit (empty array if none).",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Stable hash-derived ID. Same task across turns gets same ID." },
+                task: { type: "string", description: "≤ 12 words." },
+                due_date: { type: ["string", "null"], description: "ISO date or null." },
+                status: { type: "string", enum: ["pending", "overdue", "done"] },
+                source_message_id: { type: ["string", "null"] },
+                added_at: { type: "string", description: "ISO timestamp when first detected." },
+              },
+              required: ["id", "task", "due_date", "status", "source_message_id", "added_at"],
+            },
+          },
         },
         required: [
           "version",
@@ -237,6 +271,8 @@ The klo_state is the complete structured record of this deal AFTER incorporating
           "confidence",
           "next_meeting",
           "last_meeting",
+          "pending_on_seller",
+          "pending_on_buyer",
         ],
       },
       chat_reply: {

@@ -41,6 +41,7 @@ ${MOMENTUM_SECTION}
 <bootstrap_specifics>
 - Set version to 1.
 - Set removed_items to [] (always empty on bootstrap — there's nothing to have removed yet).
+- Set pending_on_seller and pending_on_buyer to [] unless the supplied bootstrap context explicitly mentions a task either side already owes.
 - Set added_at timestamps to the current time when generating fresh entries.
 - This is a bootstrap — no previous score exists. Set confidence.trend to "flat" and confidence.delta to 0.
 - If a piece of information is not yet known from the chat or the initial context, use null where the schema allows — do not invent.
