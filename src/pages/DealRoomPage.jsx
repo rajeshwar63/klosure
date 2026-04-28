@@ -25,6 +25,7 @@ import DealTabs, {
 } from '../components/deal/DealTabs.jsx'
 import SellerOverview from '../components/seller/SellerOverview.jsx'
 import BuyerViewPreview from '../components/seller/BuyerViewPreview.jsx'
+import DangerZoneFooter from '../components/deal/DangerZoneFooter.jsx'
 
 function DealPageSkeleton() {
   return (
@@ -280,12 +281,9 @@ export default function DealRoomPage() {
         viewerRole="seller"
         canShare={canShareWithBuyer(plan)}
         onShare={handleShare}
-        onOpenChat={() => handleTabChange('chat')}
         onWin={handleWin}
         onLost={handleLost}
-        onArchive={handleArchive}
         onReopen={handleReopen}
-        onDelete={handleDelete}
       />
       <DealTabs
         activeTab={activeTab}
@@ -297,6 +295,11 @@ export default function DealRoomPage() {
         {activeTab === 'overview' && (
           <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
             <SellerOverview deal={deal} />
+            <DangerZoneFooter
+              onArchive={handleArchive}
+              onDelete={handleDelete}
+              locked={!!deal?.locked}
+            />
           </div>
         )}
         {activeTab === 'chat' && (

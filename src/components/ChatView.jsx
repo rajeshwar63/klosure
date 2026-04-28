@@ -134,24 +134,24 @@ export default function ChatView({
       <main
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto chat-doodle px-3 py-3"
+        className="flex-1 overflow-y-auto chat-doodle"
       >
-        <div className="max-w-2xl mx-auto space-y-2">
+        <div className="max-w-2xl mx-auto">
           {visibleMessages.map((m) => (
-            <Bubble key={m.id} message={m} viewerRole={role} />
+            <MessageRow key={m.id} message={m} viewerRole={role} />
           ))}
           {kloThinking && <KloTyping />}
         </div>
       </main>
 
       {locked ? (
-        <div className="bg-[#f0f0f0] border-t border-navy/10 safe-bottom shrink-0">
+        <div className="bg-white border-t border-navy/10 safe-bottom shrink-0">
           <div className="max-w-2xl mx-auto px-3 py-3 text-center text-xs text-navy/60">
             This room is read-only. Reopen the deal from the header to chat again.
           </div>
         </div>
       ) : (
-        <form onSubmit={sendMessage} className="bg-[#f0f0f0] border-t border-navy/10 safe-bottom shrink-0">
+        <form onSubmit={sendMessage} className="bg-white border-t border-navy/10 safe-bottom shrink-0">
           <div className="max-w-2xl mx-auto px-3 py-2 flex items-end gap-2">
             <textarea
               ref={textareaRef}
@@ -183,50 +183,30 @@ export default function ChatView({
   )
 }
 
-function Bubble({ message, viewerRole }) {
+function MessageRow({ message }) {
   const { sender_type, sender_name, content, created_at } = message
-  if (sender_type === 'klo') {
-    return (
-      <div className="flex justify-center my-1">
-        <div className="max-w-[85%] bg-klo-bg border border-klo/30 text-navy px-3 py-2 rounded-xl text-[14px] leading-snug">
-          <div className="flex items-center gap-1.5 text-klo text-[11px] font-semibold mb-0.5">
-            <span>◆</span> Klo
-          </div>
-          <div>{content}</div>
-          <div className="text-[10px] text-navy/40 text-right mt-0.5">{formatTime(created_at)}</div>
-        </div>
-      </div>
-    )
-  }
-  const isMine = sender_type === viewerRole
+  const isKlo = sender_type === 'klo'
+  const author = isKlo ? 'Klo' : sender_name || (sender_type === 'seller' ? 'You' : 'Buyer')
+  const authorClass = isKlo ? 'text-klo' : 'text-navy'
   return (
-    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[80%] px-3 py-2 rounded-2xl text-[14px] leading-snug shadow-sm ${
-          isMine
-            ? 'bg-seller-bubble text-navy rounded-br-md'
-            : 'bg-white text-navy rounded-bl-md'
-        }`}
-      >
-        {!isMine && sender_name && (
-          <div className="text-[11px] font-semibold text-klo">{sender_name}</div>
-        )}
-        <div className="whitespace-pre-wrap break-words">{content}</div>
-        <div className="text-[10px] text-navy/40 text-right mt-0.5">
-          {formatTime(created_at)}
-        </div>
+    <article className="px-4 md:px-6 py-4 border-b border-navy/5 last:border-b-0">
+      <div className="flex items-baseline gap-2 mb-1">
+        {isKlo && <span className="text-klo leading-none" aria-hidden>◆</span>}
+        <span className={`text-[12px] font-semibold ${authorClass}`}>{author}</span>
+        <span className="text-[11px] text-navy/40 ml-auto">{formatTime(created_at)}</span>
       </div>
-    </div>
+      <p className="text-[14px] leading-relaxed text-navy whitespace-pre-wrap break-words">
+        {content}
+      </p>
+    </article>
   )
 }
 
 function KloTyping() {
   return (
-    <div className="flex justify-center">
-      <div className="bg-klo-bg border border-klo/30 px-3 py-2 rounded-xl text-klo text-xs flex items-center gap-1.5 klo-typing">
-        <span>◆</span> Klo is thinking
-        <span>·</span><span>·</span><span>·</span>
-      </div>
+    <div className="px-4 md:px-6 py-3 text-klo text-xs flex items-center gap-1.5 klo-typing border-b border-navy/5">
+      <span aria-hidden>◆</span> Klo is thinking
+      <span>·</span><span>·</span><span>·</span>
     </div>
   )
 }

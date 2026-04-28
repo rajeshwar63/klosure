@@ -138,7 +138,7 @@ export default function Sidebar({
       {/* Deal list */}
       <div
         className={`flex-1 overflow-y-auto ${
-          collapsed ? 'px-1.5 py-2' : 'px-2 pb-3'
+          collapsed ? 'px-1.5 py-2' : 'px-2 pb-2'
         } flex flex-col gap-0.5`}
       >
         {loading && sorted.length === 0 ? (
@@ -153,15 +153,6 @@ export default function Sidebar({
           !collapsed && (
             <div className="px-2 py-3 text-[12px] text-navy/50">
               <p>No active deals yet</p>
-              {onNewDeal && (
-                <button
-                  type="button"
-                  onClick={onNewDeal}
-                  className="mt-2 text-[12px] text-klo font-medium hover:underline"
-                >
-                  + New deal
-                </button>
-              )}
             </div>
           )
         ) : (
@@ -177,6 +168,19 @@ export default function Sidebar({
           ))
         )}
       </div>
+
+      {/* Phase 9 — "+ New deal" sits below the deal list as a quiet CTA. */}
+      {!collapsed && onNewDeal && (
+        <div className="px-2 pt-2 pb-3 border-t border-navy/5 shrink-0">
+          <button
+            type="button"
+            onClick={onNewDeal}
+            className="w-full text-left text-[13px] font-medium text-klo hover:bg-klo/5 rounded-md px-3 py-2 transition-colors"
+          >
+            <span className="font-semibold mr-1">+</span> New deal
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       {!collapsed && (
