@@ -80,24 +80,39 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
           <BuyerEmptyState />
         ) : (
           <>
-            <BuyerKloBriefHero buyerView={buyerView} />
-            <BuyerSignalsRow signals={buyerView.signals} />
-            <BuyerPlaybookCard playbook={buyerView.playbook} dealId={deal.id} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <BuyerStakeholderMap stakeholders={buyerView.stakeholder_takes} />
-              <BuyerVendorTeamCard deal={deal} />
-            </div>
-            <BuyerTimelineStrip
-              stage={klo.stage}
-              deadline={klo.deadline}
-              blockers={klo.blockers}
-            />
-            <PendingTasksTwoCol kloState={klo} perspective="buyer" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <BuyerMomentumChart buyerView={buyerView} />
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold tracking-wide uppercase text-navy/65">Do this now</h2>
+              <BuyerKloBriefHero buyerView={buyerView} />
+              <BuyerSignalsRow signals={buyerView.signals} />
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold tracking-wide uppercase text-navy/65">Unblock this week</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                <BuyerPlaybookCard playbook={buyerView.playbook} dealId={deal.id} />
+                <PendingTasksTwoCol kloState={klo} perspective="buyer" />
+              </div>
               <BuyerRisksList risks={buyerView.risks_klo_is_watching} />
-            </div>
-            <BuyerRecentMomentsFeed moments={buyerView.recent_moments} />
+              <BuyerTimelineStrip
+                stage={klo.stage}
+                deadline={klo.deadline}
+                blockers={klo.blockers}
+              />
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold tracking-wide uppercase text-navy/65">Who to pull in</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <BuyerStakeholderMap stakeholders={buyerView.stakeholder_takes} />
+                <BuyerVendorTeamCard deal={deal} />
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold tracking-wide uppercase text-navy/65">Context</h2>
+              <BuyerMomentumChart buyerView={buyerView} />
+              <BuyerRecentMomentsFeed moments={buyerView.recent_moments} />
+            </section>
           </>
         )}
       </div>
