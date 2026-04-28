@@ -3,8 +3,8 @@
 // =============================================================================
 // Won / Lost / Reopen flow. The trigger in phase4.sql flips `locked` and
 // `archived_at` based on status, and refuses any future writes to messages /
-// commitments / context once locked. We never delete a deal — closed rooms
-// stay searchable forever.
+// context once locked. We never delete a deal — closed rooms stay searchable
+// forever.
 // =============================================================================
 
 import { supabase } from '../lib/supabase.js'

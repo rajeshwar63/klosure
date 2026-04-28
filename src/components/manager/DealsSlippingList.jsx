@@ -2,7 +2,7 @@
 //
 // A deal counts as "slipping" if any of these are true:
 //   - confidence trend is down with delta <= -5
-//   - health is amber and there's an overdue commitment
+//   - health is amber
 //   - the deal has been at the same stage for >= 4 weeks
 // Items sort by composite severity score; cap at 5.
 
@@ -27,7 +27,6 @@ function severityScore(deal) {
   }
   if (deal?.health === 'amber') score += 5
   if (deal?.health === 'red') score += 15
-  if ((deal?.overdueCount ?? 0) > 0) score += 10
   if (weeksAtStage(deal) >= 4) score += 8
   return score
 }
@@ -36,7 +35,6 @@ function buildSummary(deal) {
   const parts = []
   const w = weeksAtStage(deal)
   if (w >= 2) parts.push(`Stuck ${w}w`)
-  if ((deal?.overdueCount ?? 0) > 0) parts.push(`${deal.overdueCount} overdue`)
   const topBlocker = deal?.klo_state?.blockers?.[0]?.text
   if (topBlocker && parts.length < 3) {
     parts.push(

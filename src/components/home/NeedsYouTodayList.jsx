@@ -1,97 +1,29 @@
-// Phase 6 step 06 — flat list of action items across the seller's pipeline.
-//
-// Three categories, in priority order:
-//   1. Overdue commitments (red dot)
-//   2. Commitments due today (amber dot)
-//   3. Slipping deals — confidence dropped >=10pts and no commitment item
-//      already covers that deal
-// Capped at 5; if more qualify, link to /deals.
+// Phase 6 step 06 + Phase 9 — flat list of action items across the seller's
+// pipeline. Phase 9 dropped the commitments table; for now this list shows
+// only slipping deals (confidence dropped >=10pts). Step 03's pending tasks
+// extraction will refill this with Klo-extracted items.
 
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-function isSameDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
-}
-
-function daysOverdue(due) {
-  if (!due) return 0
-  const dueDate = new Date(due)
-  const now = new Date()
-  dueDate.setHours(0, 0, 0, 0)
-  now.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.round((now - dueDate) / (1000 * 60 * 60 * 24)))
-}
-
-function isDueToday(due) {
-  if (!due) return false
-  const d = new Date(due)
-  if (Number.isNaN(d.getTime())) return false
-  return isSameDay(d, new Date())
-}
-
-function isPending(status) {
-  return status === 'confirmed' || status === 'proposed'
-}
-
 export function computeNeedsYouToday(deals) {
   const items = []
-  const dealsCovered = new Set()
 
   for (const deal of deals || []) {
     if (deal.status !== 'active') continue
-    const commitments = deal.commitments || []
 
-    for (const c of commitments) {
-      if (c.owner !== 'seller') continue
-      if (c.status !== 'overdue') continue
-      const od = daysOverdue(c.due_date)
+    const c = deal.klo_state?.confidence
+    if (c?.trend === 'down' && typeof c?.delta === 'number' && c.delta <= -10) {
+      const company = deal.buyer_company || deal.title
       items.push({
-        key: `overdue:${c.id}`,
-        severity: 'overdue',
-        dot: 'red',
-        title: c.task,
-        subtitle: `${deal.title} · overdue ${od}d`,
-        dealId: deal.id,
-        sortKey: -od * 100, // most overdue first
-      })
-      dealsCovered.add(deal.id)
-    }
-
-    for (const c of commitments) {
-      if (c.owner !== 'seller') continue
-      if (!isPending(c.status)) continue
-      if (!isDueToday(c.due_date)) continue
-      items.push({
-        key: `today:${c.id}`,
-        severity: 'today',
+        key: `slip:${deal.id}`,
+        severity: 'slipping',
         dot: 'amber',
-        title: c.task,
-        subtitle: `${deal.title} · due today`,
+        title: `${company} has been silent`,
+        subtitle: `Confidence dropped ${Math.abs(c.delta)} pts this week`,
         dealId: deal.id,
-        sortKey: 0,
+        sortKey: c.delta, // bigger drop = smaller value = higher priority
       })
-      dealsCovered.add(deal.id)
-    }
-
-    if (!dealsCovered.has(deal.id)) {
-      const c = deal.klo_state?.confidence
-      if (c?.trend === 'down' && typeof c?.delta === 'number' && c.delta <= -10) {
-        const company = deal.buyer_company || deal.title
-        items.push({
-          key: `slip:${deal.id}`,
-          severity: 'slipping',
-          dot: 'amber',
-          title: `${company} has been silent`,
-          subtitle: `Confidence dropped ${Math.abs(c.delta)} pts this week`,
-          dealId: deal.id,
-          sortKey: c.delta, // bigger drop = smaller value = higher priority
-        })
-      }
     }
   }
 

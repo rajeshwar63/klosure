@@ -152,8 +152,8 @@ export interface BuyerView {
 
   // Single number 0-100 — buyer-facing "deal momentum" signal.
   // NOT the seller's confidence score — different framing, different scale meaning.
-  // High = deal is moving forward (commitments kept, stakeholders engaged).
-  // Low = deal is stalling (commitments slipping, stakeholders quiet).
+  // High = deal is moving forward (tasks delivered, stakeholders engaged).
+  // Low = deal is stalling (tasks slipping, stakeholders quiet).
   momentum_score: number | null;
 
   // 'up' | 'down' | 'flat' — direction of momentum vs last update.

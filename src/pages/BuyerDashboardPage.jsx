@@ -11,7 +11,6 @@ import BuyerPlaybookCard from '../components/buyer/BuyerPlaybookCard.jsx'
 import BuyerStakeholderMap from '../components/buyer/BuyerStakeholderMap.jsx'
 import BuyerVendorTeamCard from '../components/buyer/BuyerVendorTeamCard.jsx'
 import BuyerTimelineStrip from '../components/buyer/BuyerTimelineStrip.jsx'
-import BuyerCommitmentsTwoCol from '../components/buyer/BuyerCommitmentsTwoCol.jsx'
 import BuyerMomentumChart from '../components/buyer/BuyerMomentumChart.jsx'
 import BuyerRisksList from '../components/buyer/BuyerRisksList.jsx'
 import BuyerRecentMomentsFeed from '../components/buyer/BuyerRecentMomentsFeed.jsx'
@@ -27,7 +26,6 @@ function BuyerLoadingState() {
 
 export default function BuyerDashboardPage({ deal: dealProp, embedded = false }) {
   const [deal, setDeal] = useState(dealProp ?? null)
-  const [commitments, setCommitments] = useState([])
   const [loading, setLoading] = useState(!dealProp)
 
   useEffect(() => {
@@ -36,23 +34,6 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
       setLoading(false)
     }
   }, [dealProp])
-
-  // Load commitments whenever the deal id is known.
-  useEffect(() => {
-    const dealId = deal?.id
-    if (!dealId) return undefined
-    let mounted = true
-    supabase
-      .from('commitments')
-      .select('*')
-      .eq('deal_id', dealId)
-      .then(({ data }) => {
-        if (mounted) setCommitments(data ?? [])
-      })
-    return () => {
-      mounted = false
-    }
-  }, [deal?.id])
 
   // Realtime subscription on this single deal — picks up klo_state updates
   // (including buyer_view regenerations) without a refresh.
@@ -110,7 +91,6 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
               deadline={klo.deadline}
               blockers={klo.blockers}
             />
-            <BuyerCommitmentsTwoCol commitments={commitments} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <BuyerMomentumChart buyerView={buyerView} />
               <BuyerRisksList risks={buyerView.risks_klo_is_watching} />

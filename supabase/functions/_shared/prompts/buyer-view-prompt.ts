@@ -28,7 +28,7 @@ ${BUYER_VIEW_VOICE_SECTION}
 ${BUYER_VIEW_HARD_STOPS_SECTION}
 
 <grounding>
-Use ONLY the data in <current_klo_state> and <recent_messages>. Do not invent stakeholders, dates, deal values, or commitments. If a field is unclear, leave it null or use an empty array. Buyer-facing fabrication is worse than missing data — the buyer will lose trust the first time they spot something wrong.
+Use ONLY the data in <current_klo_state> and <recent_messages>. Do not invent stakeholders, dates, deal values, or pending tasks. If a field is unclear, leave it null or use an empty array. Buyer-facing fabrication is worse than missing data — the buyer will lose trust the first time they spot something wrong.
 </grounding>
 
 <turn_workflow>

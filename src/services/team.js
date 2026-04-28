@@ -20,21 +20,14 @@ export async function loadTeamPipeline({ teamId }) {
 
   const memberIds = (members ?? []).map((m) => m.user_id)
   let deals = []
-  let commitments = []
   if (memberIds.length > 0) {
-    const [dealsRes, commitsRes] = await Promise.all([
-      supabase
-        .from('deals')
-        .select('*')
-        .in('seller_id', memberIds)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('commitments')
-        .select('id, deal_id, status, due_date, task'),
-    ])
+    const dealsRes = await supabase
+      .from('deals')
+      .select('*')
+      .in('seller_id', memberIds)
+      .order('created_at', { ascending: false })
     if (dealsRes.error) return { error: dealsRes.error.message }
     deals = dealsRes.data ?? []
-    commitments = commitsRes.data ?? []
   }
 
   const sellerById = new Map()
@@ -42,7 +35,7 @@ export async function loadTeamPipeline({ teamId }) {
     sellerById.set(m.user_id, m.users || { id: m.user_id, name: 'Member', email: '' })
   }
   const enriched = deals.map((d) => ({
-    ...enrichDeal(d, commitments),
+    ...enrichDeal(d),
     seller_name: sellerById.get(d.seller_id)?.name || sellerById.get(d.seller_id)?.email || 'Member',
   }))
   const sorted = sortDeals(enriched)
@@ -70,7 +63,6 @@ export function rollUpByMember(deals, members) {
     role: m.role,
     activeCount: 0,
     redCount: 0,
-    overdueCount: 0,
     pipelineValue: 0,
     valueAtRisk: 0,
   }))
@@ -80,7 +72,6 @@ export function rollUpByMember(deals, members) {
     if (!row) continue
     if (d.status !== 'active') continue
     row.activeCount += 1
-    row.overdueCount += d.overdueCount
     const v = Number(d.value) || 0
     row.pipelineValue += v
     if (d.health === 'red') {

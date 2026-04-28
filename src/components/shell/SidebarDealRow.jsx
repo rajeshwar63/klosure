@@ -2,12 +2,12 @@
 //
 // Inactive: ● Title                         42
 // Active:   ● Title                         42
-//             Stuck · 5w · 1 overdue
+//             Stuck · 5w
 //
 // Health dot color encodes the at-a-glance read of the deal:
 //   green  = on track (confidence >= 60)
 //   amber  = stuck / slipping (confidence 30-59 OR slipping >= 10pts)
-//   red    = at risk (confidence < 30 OR multiple overdue commitments)
+//   red    = at risk (confidence < 30)
 //   gray   = unknown (no klo_state.confidence yet)
 // "Worse" wins when multiple conditions match.
 
@@ -26,9 +26,8 @@ export function dealHealth(deal) {
   const v = c?.value
   const slipping =
     c?.trend === 'down' && typeof c?.delta === 'number' && c.delta <= -10
-  const overdue = deal?.overdueCount ?? 0
   if (v == null) return 'gray'
-  if (v < 30 || overdue > 1) return 'red'
+  if (v < 30) return 'red'
   if (v < 60 || slipping) return 'amber'
   return 'green'
 }
@@ -69,9 +68,6 @@ function activeSubtitle(deal, health) {
 
   const weeks = weeksSince(deal?.updated_at || deal?.created_at)
   if (weeks != null) parts.push(`${weeks}w`)
-
-  const overdue = deal?.overdueCount ?? 0
-  if (overdue > 0) parts.push(`${overdue} overdue`)
 
   return parts.join(' · ')
 }

@@ -157,7 +157,7 @@ export default function DealHeader({
   function handleDeleteClick() {
     if (
       !window.confirm(
-        'Permanently delete this deal? All messages and commitments will be lost. This cannot be undone.',
+        'Permanently delete this deal? All messages will be lost. This cannot be undone.',
       )
     ) {
       return

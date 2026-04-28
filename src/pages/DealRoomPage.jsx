@@ -1,10 +1,6 @@
 // Phase 6 step 08 — new deal page shell. Three tabs (Overview / Chat /
 // History) and a dark deal header at the top. The page lives inside the
 // AppShell, so the sidebar is always visible on the left.
-//
-// Data layer is unchanged from Phase 5.5 — we still load the deal +
-// dealContext + messages + commitments, and subscribe to realtime changes
-// the same way DealRoom.jsx did. We just rehouse the UI in a new layout.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -12,7 +8,6 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { useShellDeals } from '../hooks/useShellDeals.jsx'
-import { listCommitments } from '../services/commitments.js'
 import { greetingForRole } from '../services/klo.js'
 import { canShareWithBuyer } from '../lib/plans.js'
 import {
@@ -74,9 +69,7 @@ export default function DealRoomPage() {
   const [deal, setDeal] = useState(null)
   const [dealContext, setDealContext] = useState(null)
   const [messages, setMessages] = useState([])
-  const [commitments, setCommitments] = useState([])
   const [kloThinking, setKloThinking] = useState(false)
-  const [highlightCommitmentId, setHighlightCommitmentId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -90,11 +83,6 @@ export default function DealRoomPage() {
   function handleTabChange(next) {
     setActiveTab(next)
     saveDealTab(id, next)
-  }
-
-  function handleCommitmentJump(commitmentId) {
-    setHighlightCommitmentId(commitmentId)
-    handleTabChange('chat')
   }
 
   // Load the deal + context + profile.
@@ -121,25 +109,21 @@ export default function DealRoomPage() {
     }
   }, [user, id])
 
-  // Load messages + commitments and subscribe to realtime updates.
+  // Load messages and subscribe to realtime updates.
   useEffect(() => {
     if (!deal?.id) return
     let mounted = true
     async function load() {
-      const [msgRes, commits] = await Promise.all([
-        supabase
-          .from('messages')
-          .select('*')
-          .eq('deal_id', deal.id)
-          .order('created_at', { ascending: true }),
-        listCommitments(deal.id),
-      ])
+      const msgRes = await supabase
+        .from('messages')
+        .select('*')
+        .eq('deal_id', deal.id)
+        .order('created_at', { ascending: true })
       if (!mounted) return
       if (msgRes.error) {
         console.error('Failed to load messages', msgRes.error)
         return
       }
-      setCommitments(commits)
       const data = msgRes.data ?? []
       if (data.length === 0) {
         // Phase 1 first-message greeting from Klo.
@@ -175,28 +159,6 @@ export default function DealRoomPage() {
           setMessages((prev) => {
             if (prev.find((m) => m.id === payload.new.id)) return prev
             return [...prev, payload.new]
-          })
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'commitments',
-          filter: `deal_id=eq.${deal.id}`,
-        },
-        (payload) => {
-          setCommitments((prev) => {
-            if (payload.eventType === 'DELETE') {
-              return prev.filter((c) => c.id !== payload.old.id)
-            }
-            const row = payload.new
-            const idx = prev.findIndex((c) => c.id === row.id)
-            if (idx === -1) return [...prev, row]
-            const next = [...prev]
-            next[idx] = row
-            return next
           })
         },
       )
@@ -337,9 +299,7 @@ export default function DealRoomPage() {
             <OverviewTab
               deal={deal}
               viewerRole="seller"
-              commitments={commitments}
               onSwitchToChat={() => handleTabChange('chat')}
-              onCommitmentJump={handleCommitmentJump}
             />
           </div>
         )}
@@ -354,18 +314,15 @@ export default function DealRoomPage() {
               currentUserName={sellerName}
               messages={messages}
               setMessages={setMessages}
-              commitments={commitments}
               kloThinking={kloThinking}
               setKloThinking={setKloThinking}
-              highlightCommitmentId={highlightCommitmentId}
-              onHighlightConsumed={() => setHighlightCommitmentId(null)}
               locked={deal.locked}
             />
           </div>
         )}
         {activeTab === 'buyer' && (
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <BuyerViewPreview deal={deal} commitments={commitments} />
+            <BuyerViewPreview deal={deal} />
           </div>
         )}
       </div>

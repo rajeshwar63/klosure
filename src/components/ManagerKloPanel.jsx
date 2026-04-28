@@ -11,7 +11,7 @@ import { formatTime } from '../lib/format.js'
 const SUGGESTIONS = [
   'Which deals are at risk?',
   'Where is my pipeline stuck?',
-  'Who has the most overdue commitments?',
+  'Who has open tasks slipping?',
   'Which reps need help this week?',
 ]
 

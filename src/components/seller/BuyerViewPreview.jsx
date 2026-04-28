@@ -10,7 +10,6 @@ import BuyerPlaybookCard from '../buyer/BuyerPlaybookCard.jsx'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
 import BuyerVendorTeamCard from '../buyer/BuyerVendorTeamCard.jsx'
 import BuyerTimelineStrip from '../buyer/BuyerTimelineStrip.jsx'
-import BuyerCommitmentsTwoCol from '../buyer/BuyerCommitmentsTwoCol.jsx'
 import BuyerMomentumChart from '../buyer/BuyerMomentumChart.jsx'
 import BuyerRisksList from '../buyer/BuyerRisksList.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
@@ -30,7 +29,7 @@ function relativeTime(iso) {
   return days === 1 ? '1 day ago' : `${days} days ago`
 }
 
-export default function BuyerViewPreview({ deal, commitments }) {
+export default function BuyerViewPreview({ deal }) {
   const { session } = useAuth()
   const buyerView = deal?.klo_state?.buyer_view ?? null
 
@@ -164,7 +163,6 @@ export default function BuyerViewPreview({ deal, commitments }) {
               deadline={deal?.klo_state?.deadline}
               blockers={deal?.klo_state?.blockers}
             />
-            <BuyerCommitmentsTwoCol commitments={commitments} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <BuyerMomentumChart buyerView={buyerView} />
               <BuyerRisksList risks={buyerView.risks_klo_is_watching} />
