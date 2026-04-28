@@ -257,11 +257,38 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { deal_id, triggering_message_id } = await req.json()
+    const { deal_id, triggering_message_id, regenerate_buyer_view } = await req.json()
     if (!deal_id) return json({ error: "deal_id required" }, 400)
 
     // 1. Load context
     const ctx = await loadDealContext(deal_id)
+
+    // Phase 8 — manual buyer-view refresh path. Skip the main extraction;
+    // just rerun the buyer-view generation against the current klo_state.
+    if (regenerate_buyer_view) {
+      if (!ctx.deal.klo_state) {
+        return json({ error: "no klo_state to base buyer view on" }, 400)
+      }
+      let sellerProfileForRefresh: SellerProfile | null = null
+      try {
+        sellerProfileForRefresh = await loadSellerProfile(
+          SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY,
+          ctx.deal.seller_id as string,
+        )
+      } catch {
+        sellerProfileForRefresh = null
+      }
+      const refreshedView = await runBuyerViewRefresh({
+        deal: ctx.deal,
+        currentState: ctx.deal.klo_state,
+        sellerProfile: sellerProfileForRefresh,
+      })
+      if (!refreshedView) {
+        return json({ ok: false, error: "buyer view refresh failed" }, 502)
+      }
+      return json({ ok: true, buyer_view: refreshedView })
+    }
 
     // 1b. Load the seller's profile (Phase 8) — null if no profile saved yet.
     //     Failure to load must not block the turn; fall back to no injection.
@@ -419,6 +446,67 @@ async function maybeRegenerateBuyerView(args: {
     reason: buyerView.generation_reason,
     momentum_score: buyerView.momentum_score,
   }))
+}
+
+async function runBuyerViewRefresh(args: {
+  deal: DealContext["deal"]
+  currentState: KloState
+  sellerProfile: SellerProfile | null
+}): Promise<BuyerView | null> {
+  const { deal, currentState, sellerProfile } = args
+
+  const buyerViewPrompt = buildBuyerViewPrompt({
+    dealTitle: deal.title,
+    buyerCompany: deal.buyer_company ?? "the buyer",
+    sellerCompany: deal.seller_company ?? "the vendor",
+    recipientLabel: "the buyer",
+    currentState,
+    sellerProfile,
+    previousMomentumScore: currentState.buyer_view?.momentum_score ?? null,
+  })
+
+  const result = await callLlm<{ buyer_view: BuyerView }>({
+    systemPrompt: buyerViewPrompt,
+    messages: [{ role: "user", content: "Emit the buyer dashboard." }],
+    tool: BUYER_VIEW_TOOL,
+    maxTokens: 1500,
+    temperature: 0.6,
+  })
+  if (!result.toolCalled || !result.input?.buyer_view) {
+    console.warn("buyer_view manual refresh: tool not called")
+    return null
+  }
+  const buyerView = result.input.buyer_view
+  buyerView.generated_at = new Date().toISOString()
+  buyerView.generation_reason = "manual_refresh"
+  const prevHistory = currentState.buyer_view?.momentum_history ?? []
+  const nextHistory = buyerView.momentum_score == null
+    ? prevHistory
+    : [...prevHistory, { date: buyerView.generated_at, score: buyerView.momentum_score }]
+  buyerView.momentum_history = nextHistory.slice(-30)
+
+  const { data: fresh } = await sb
+    .from("deals")
+    .select("klo_state")
+    .eq("id", deal.id)
+    .maybeSingle()
+  const baseState = (fresh?.klo_state ?? currentState) as KloState
+  const mergedState: KloState = { ...baseState, buyer_view: buyerView }
+  const { error: updateErr } = await sb
+    .from("deals")
+    .update({ klo_state: mergedState })
+    .eq("id", deal.id)
+  if (updateErr) {
+    console.error("buyer_view manual refresh persist failed", updateErr)
+    return null
+  }
+  console.log(JSON.stringify({
+    event: "buyer_view_generated",
+    deal_id: deal.id,
+    reason: "manual_refresh",
+    momentum_score: buyerView.momentum_score,
+  }))
+  return buyerView
 }
 
 async function countMessagesSince(dealId: string, sinceISO: string | null): Promise<number> {

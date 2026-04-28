@@ -6,6 +6,7 @@ const STORAGE_KEY_PREFIX = 'klosure:dealTab:'
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'chat', label: 'Chat' },
+  { id: 'buyer', label: 'Buyer view' },
 ]
 
 export function loadDealTab(dealId, fallback = 'overview') {

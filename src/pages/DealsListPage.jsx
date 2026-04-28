@@ -225,10 +225,25 @@ function EmptyState() {
   )
 }
 
+function buyerViewBadgeFor(deal) {
+  const generatedAt = deal?.klo_state?.buyer_view?.generated_at
+  if (!generatedAt) return false
+  try {
+    const lastViewed = window.localStorage.getItem(
+      `klosure:lastViewedBuyerView:${deal.id}`,
+    )
+    if (!lastViewed) return true
+    return new Date(generatedAt).getTime() > new Date(lastViewed).getTime()
+  } catch {
+    return false
+  }
+}
+
 function DealRow({ deal, archived = false }) {
   const subline = archived
     ? `${deal.buyer_company || '—'} · ${formatCurrency(deal.value)}`
     : `${deal.buyer_company || '—'} · ${formatCurrency(deal.value)}`
+  const showBuyerViewBadge = !archived && buyerViewBadgeFor(deal)
 
   const closedTag = archived
     ? deal.status === 'won'
@@ -269,12 +284,17 @@ function DealRow({ deal, archived = false }) {
               </>
             )}
           </div>
-          {!archived && (deal.overdueCount > 0 || deal.openCount > 0 || deal.summary) && (
+          {!archived && (deal.overdueCount > 0 || deal.openCount > 0 || deal.summary || showBuyerViewBadge) && (
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[11px]">
               {deal.overdueCount > 0 && (
                 <Pill tone="red">{deal.overdueCount} overdue</Pill>
               )}
               {deal.openCount > 0 && <Pill tone="neutral">{deal.openCount} open</Pill>}
+              {showBuyerViewBadge && (
+                <span className="px-1.5 py-0.5 rounded-full font-semibold bg-klo/10 text-klo">
+                  ✨ Buyer view updated
+                </span>
+              )}
               {deal.summary && (
                 <span className="text-navy/50 truncate flex-1 min-w-0">{deal.summary}</span>
               )}
