@@ -384,8 +384,17 @@ Deno.serve(async (req) => {
       ctx.recipientRole,
     )
 
-    // 4. Update deals.klo_state (and sync legacy fields)
-    await updateDealState(deal_id, output.klo_state)
+    // 4. Update deals.klo_state (and sync legacy fields). The main extraction
+    //    tool does not emit buyer_view (that's a separate gated call), so
+    //    carry forward the previous buyer_view to avoid dropping it on every
+    //    non-material turn. maybeRegenerateBuyerView below will overwrite it
+    //    when material change is detected.
+    const stateToWrite: KloState = {
+      ...output.klo_state,
+      buyer_view:
+        output.klo_state.buyer_view ?? ctx.deal.klo_state?.buyer_view ?? null,
+    }
+    await updateDealState(deal_id, stateToWrite)
 
     // 5. Insert chat_reply as a Klo message scoped to recipientRole
     await postKloMessage(deal_id, output.chat_reply, ctx.recipientRole)
