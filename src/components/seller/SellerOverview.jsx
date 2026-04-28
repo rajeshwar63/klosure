@@ -6,6 +6,8 @@ import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
 import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
 import SellerTimelineStrip from './SellerTimelineStrip.jsx'
 
+const MIN_CONFIDENCE_TREND_POINTS = 3
+
 const STAGE_OPTIONS = [
   { value: 'discovery', label: 'Discovery', idx: 1 },
   { value: 'proposal', label: 'Proposal', idx: 2 },
@@ -31,6 +33,30 @@ function formatShortDate(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatConfidencePointDate(point) {
+  return point?.date || point?.at || point?.created_at || point?.computed_at || null
+}
+
+function trackConfidenceTrendMetric(eventName, payload = {}) {
+  if (typeof window === 'undefined') return
+  try {
+    const key = `klosure:metrics:confidence_trend:${eventName}`
+    const current = Number(window.localStorage.getItem(key) || '0')
+    window.localStorage.setItem(key, String(current + 1))
+  } catch {
+    // Ignore storage errors; CustomEvent tracking still fires.
+  }
+  window.dispatchEvent(
+    new CustomEvent('klosure:analytics', {
+      detail: {
+        event: eventName,
+        ts: new Date().toISOString(),
+        ...payload,
+      },
+    }),
+  )
 }
 
 function snapshotPlaceholders(field) {
@@ -544,42 +570,138 @@ function VendorTeamCard({ deal }) {
   )
 }
 
-function ConfidenceChart({ history }) {
+function ConfidenceChart({ history, confidence, dealId }) {
   const points = history ?? []
-  if (points.length === 0) {
+  const datedPoints = points.filter((p) => {
+    const pointDate = new Date(formatConfidencePointDate(p) || '')
+    return typeof p?.value === 'number' && !Number.isNaN(pointDate.getTime())
+  })
+  const pointCount = datedPoints.length
+  const viewMode = pointCount === 0 ? 'empty' : pointCount === 1 ? 'single' : pointCount === 2 ? 'delta' : 'chart'
+
+  useEffect(() => {
+    trackConfidenceTrendMetric('confidence_trend_card_viewed', {
+      deal_id: dealId ?? null,
+      mode: viewMode,
+      dated_points: pointCount,
+    })
+    if (pointCount < MIN_CONFIDENCE_TREND_POINTS) {
+      trackConfidenceTrendMetric('confidence_trend_insufficient_data', {
+        deal_id: dealId ?? null,
+        mode: viewMode,
+        dated_points: pointCount,
+      })
+    }
+  }, [dealId, pointCount, viewMode])
+
+  const lastPoint = datedPoints[datedPoints.length - 1] ?? null
+  const currentValue = Math.round(confidence?.value ?? lastPoint?.value ?? 0)
+  const lastUpdatedText = formatShortDate(confidence?.computed_at || formatConfidencePointDate(lastPoint)) || 'recently'
+  const secondaryText = `Current confidence: ${currentValue}% (last updated ${lastUpdatedText})`
+
+  function onFallbackCtaClick(kind) {
+    trackConfidenceTrendMetric('confidence_trend_fallback_cta_clicked', {
+      deal_id: dealId ?? null,
+      mode: viewMode,
+      cta_kind: kind,
+      dated_points: pointCount,
+    })
+  }
+
+  if (pointCount === 0) {
     return (
       <div className="bg-white border border-navy/10 rounded-2xl">
         <div className="px-5 py-4 border-b border-navy/5">
           <h3 className="text-sm font-semibold text-navy">Confidence trend</h3>
         </div>
-        <div className="p-5 text-sm text-navy/55">
-          The trend line will fill in as Klo updates its read across more chat turns.
+        <div className="p-5">
+          <p className="text-sm text-navy/65">We need more updates to show a trend.</p>
+          <p className="text-[12px] text-navy/50 mt-1">{secondaryText}</p>
+          <button
+            type="button"
+            className="mt-3 text-[12px] font-medium text-klo hover:text-klo/80"
+            onClick={() => onFallbackCtaClick('log_update')}
+          >
+            Log update
+          </button>
         </div>
       </div>
     )
   }
-  const max = Math.max(...points.map((p) => p.value ?? 0), 100)
+
+  if (pointCount === 1) {
+    return (
+      <div className="bg-white border border-navy/10 rounded-2xl">
+        <div className="px-5 py-4 border-b border-navy/5">
+          <h3 className="text-sm font-semibold text-navy">Confidence trend</h3>
+        </div>
+        <div className="p-5">
+          <p className="text-[11px] uppercase tracking-wider font-semibold text-navy/55">Current confidence</p>
+          <p className="text-3xl font-semibold text-navy mt-1 tabular-nums">{currentValue}%</p>
+          <p className="text-[12px] text-navy/50 mt-1">{secondaryText}</p>
+          <button
+            type="button"
+            className="mt-3 text-[12px] font-medium text-klo hover:text-klo/80"
+            onClick={() => onFallbackCtaClick('refresh_confidence_inputs')}
+          >
+            Refresh confidence inputs
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (pointCount === 2) {
+    const delta = Math.round((datedPoints[1]?.value ?? 0) - (datedPoints[0]?.value ?? 0))
+    const deltaPrefix = delta > 0 ? '+' : ''
+    const deltaTone = delta > 0 ? 'text-emerald-700' : delta < 0 ? 'text-red-700' : 'text-navy/70'
+    return (
+      <div className="bg-white border border-navy/10 rounded-2xl">
+        <div className="px-5 py-4 border-b border-navy/5">
+          <h3 className="text-sm font-semibold text-navy">Confidence trend</h3>
+        </div>
+        <div className="p-5">
+          <p className="text-[11px] uppercase tracking-wider font-semibold text-navy/55">Directional delta</p>
+          <p className={`text-3xl font-semibold mt-1 tabular-nums ${deltaTone}`}>{deltaPrefix}{delta}%</p>
+          <p className="text-[12px] text-navy/50 mt-1">{secondaryText}</p>
+          <button
+            type="button"
+            className="mt-3 text-[12px] font-medium text-klo hover:text-klo/80"
+            onClick={() => onFallbackCtaClick('refresh_confidence_inputs')}
+          >
+            Refresh confidence inputs
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const max = Math.max(...datedPoints.map((p) => p.value ?? 0), 100)
   const min = 0
   const W = 240
   const H = 80
-  const stepX = points.length > 1 ? W / (points.length - 1) : 0
+  const stepX = datedPoints.length > 1 ? W / (datedPoints.length - 1) : 0
   const yFor = (v) => H - ((v - min) / (max - min)) * H
-  const pathD = points
+  const pathD = datedPoints
     .map((p, i) => `${i === 0 ? 'M' : 'L'}${i * stepX},${yFor(p.value ?? 0)}`)
     .join(' ')
+  const firstValue = Math.round(datedPoints[0]?.value ?? 0)
+  const lastValue = Math.round(datedPoints[datedPoints.length - 1]?.value ?? 0)
+  const trendAlt = `Confidence trend from ${firstValue}% to ${lastValue}% across ${datedPoints.length} updates.`
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
         <h3 className="text-sm font-semibold text-navy">Confidence trend</h3>
       </div>
       <div className="p-5">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20" role="img" aria-label={trendAlt}>
           <path d={pathD} fill="none" stroke="#4F8EF7" strokeWidth="2" />
-          {points.map((p, i) => (
+          {datedPoints.map((p, i) => (
             <circle key={i} cx={i * stepX} cy={yFor(p.value ?? 0)} r="2" fill="#4F8EF7" />
           ))}
         </svg>
-        <p className="text-[11px] text-navy/45 mt-2">{points.length} points</p>
+        <p className="sr-only">{trendAlt}</p>
+        <p className="text-[11px] text-navy/45 mt-2">{datedPoints.length} points</p>
       </div>
     </div>
   )
@@ -691,7 +813,7 @@ export default function SellerOverview({ deal, viewerRole = 'seller', onDealUpda
       <PendingTasksTwoCol kloState={klo} perspective="seller" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <ConfidenceChart history={momentumHistory} />
+        <ConfidenceChart history={momentumHistory} confidence={klo?.confidence} dealId={deal?.id} />
         <RisksList blockers={klo.blockers} />
       </div>
 
