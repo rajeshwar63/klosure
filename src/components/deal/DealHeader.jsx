@@ -144,7 +144,6 @@ export default function DealHeader({
   }
 
   function handleReopenClick() {
-    if (!window.confirm('Reopen this deal? The room becomes editable again.')) return
     withSubmitting(async () => {
       await onReopen?.()
     })

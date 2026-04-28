@@ -3,23 +3,6 @@
 // destructive enough that they should sit far from the everyday actions.
 
 export default function DangerZoneFooter({ onArchive, onDelete, locked }) {
-  function handleArchive() {
-    if (locked) return
-    if (!window.confirm('Archive this deal? It becomes read-only but stays in your archive.')) return
-    onArchive?.()
-  }
-
-  function handleDelete() {
-    if (
-      !window.confirm(
-        'Permanently delete this deal? All messages will be lost. This cannot be undone.',
-      )
-    ) {
-      return
-    }
-    onDelete?.()
-  }
-
   return (
     <footer className="border-t border-navy/10 mt-12 py-6 px-4 md:px-6">
       <div className="max-w-[1080px] mx-auto">
@@ -30,7 +13,7 @@ export default function DangerZoneFooter({ onArchive, onDelete, locked }) {
           {!locked && (
             <button
               type="button"
-              onClick={handleArchive}
+              onClick={() => onArchive?.()}
               className="text-[13px] font-medium text-red-700/80 hover:text-red-700 hover:underline"
             >
               Archive deal
@@ -38,7 +21,7 @@ export default function DangerZoneFooter({ onArchive, onDelete, locked }) {
           )}
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => onDelete?.()}
             className="text-[13px] font-medium text-red-700/80 hover:text-red-700 hover:underline"
           >
             Delete deal

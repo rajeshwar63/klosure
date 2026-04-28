@@ -26,6 +26,8 @@ import DealTabs, {
 import SellerOverview from '../components/seller/SellerOverview.jsx'
 import BuyerViewPreview from '../components/seller/BuyerViewPreview.jsx'
 import DangerZoneFooter from '../components/deal/DangerZoneFooter.jsx'
+import AppPromptModal from '../components/ui/AppPromptModal.jsx'
+import AppToast from '../components/ui/AppToast.jsx'
 
 function DealPageSkeleton() {
   return (
@@ -75,6 +77,17 @@ export default function DealRoomPage() {
   const [error, setError] = useState('')
 
   const [activeTab, setActiveTab] = useState(() => loadDealTab(id))
+  const [toast, setToast] = useState({ open: false, tone: 'info', message: '' })
+  const [dialog, setDialog] = useState({
+    open: false,
+    tone: 'default',
+    title: '',
+    message: '',
+    confirmLabel: 'OK',
+    cancelLabel: '',
+    onConfirm: null,
+    busy: false,
+  })
 
   // Re-read the per-deal tab when the dealId in the URL changes.
   useEffect(() => {
@@ -197,14 +210,27 @@ export default function DealRoomPage() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(url).catch(() => {})
     }
-    window.alert(`Share link copied:\n${url}`)
+    setToast({
+      open: true,
+      tone: 'success',
+      message: `Share link copied.\n${url}`,
+    })
   }, [deal?.buyer_token])
 
   const handleWin = useCallback(async () => {
     if (!deal?.id) return
     const res = await markDealWon({ dealId: deal.id })
     if (!res.ok) {
-      window.alert(res.error || 'Could not mark deal as won.')
+      setDialog({
+        open: true,
+        tone: 'danger',
+        title: 'Could not mark this deal as won',
+        message: res.error || 'Please try again in a moment.',
+        confirmLabel: 'OK',
+        cancelLabel: '',
+        onConfirm: null,
+        busy: false,
+      })
       return
     }
     setDeal((d) => ({ ...d, ...res.deal }))
@@ -216,7 +242,16 @@ export default function DealRoomPage() {
       if (!deal?.id) return
       const res = await markDealLost({ dealId: deal.id, reason })
       if (!res.ok) {
-        window.alert(res.error || 'Could not mark deal as lost.')
+        setDialog({
+          open: true,
+          tone: 'danger',
+          title: 'Could not mark this deal as lost',
+          message: res.error || 'Please try again in a moment.',
+          confirmLabel: 'OK',
+          cancelLabel: '',
+          onConfirm: null,
+          busy: false,
+        })
         return
       }
       setDeal((d) => ({ ...d, ...res.deal }))
@@ -229,7 +264,16 @@ export default function DealRoomPage() {
     if (!deal?.id) return
     const res = await archiveDeal({ dealId: deal.id })
     if (!res.ok) {
-      window.alert(res.error || 'Could not archive the deal.')
+      setDialog({
+        open: true,
+        tone: 'danger',
+        title: 'Could not archive this deal',
+        message: res.error || 'Please try again in a moment.',
+        confirmLabel: 'OK',
+        cancelLabel: '',
+        onConfirm: null,
+        busy: false,
+      })
       return
     }
     setDeal((d) => ({ ...d, ...res.deal }))
@@ -240,7 +284,16 @@ export default function DealRoomPage() {
     if (!deal?.id) return
     const res = await reopenDeal({ dealId: deal.id })
     if (!res.ok) {
-      window.alert(res.error || 'Could not reopen the deal.')
+      setDialog({
+        open: true,
+        tone: 'danger',
+        title: 'Could not reopen this deal',
+        message: res.error || 'Please try again in a moment.',
+        confirmLabel: 'OK',
+        cancelLabel: '',
+        onConfirm: null,
+        busy: false,
+      })
       return
     }
     setDeal((d) => ({ ...d, ...res.deal }))
@@ -251,7 +304,16 @@ export default function DealRoomPage() {
     if (!deal?.id) return
     const res = await deleteDeal({ dealId: deal.id, locked: !!deal.locked })
     if (!res.ok) {
-      window.alert(res.error || 'Could not delete the deal.')
+      setDialog({
+        open: true,
+        tone: 'danger',
+        title: 'Could not delete this deal',
+        message: res.error || 'Please try again in a moment.',
+        confirmLabel: 'OK',
+        cancelLabel: '',
+        onConfirm: null,
+        busy: false,
+      })
       return
     }
     reloadShellDeals()
@@ -274,6 +336,63 @@ export default function DealRoomPage() {
   if (loading) return <DealPageSkeleton />
   if (error || !deal) return <DealNotFound error={error} />
 
+  function closeDialog() {
+    setDialog((prev) => ({ ...prev, open: false, onConfirm: null, busy: false }))
+  }
+
+  async function runDialogConfirm() {
+    if (!dialog.onConfirm || dialog.busy) {
+      closeDialog()
+      return
+    }
+    setDialog((prev) => ({ ...prev, busy: true }))
+    try {
+      await dialog.onConfirm()
+      closeDialog()
+    } catch {
+      setDialog((prev) => ({ ...prev, busy: false }))
+    }
+  }
+
+  function openArchiveDialog() {
+    setDialog({
+      open: true,
+      tone: 'danger',
+      title: 'Archive this deal?',
+      message: 'This deal will become read-only and move to your archive.',
+      confirmLabel: 'Archive deal',
+      cancelLabel: 'Cancel',
+      onConfirm: handleArchive,
+      busy: false,
+    })
+  }
+
+  function openDeleteDialog() {
+    setDialog({
+      open: true,
+      tone: 'danger',
+      title: 'Delete this deal permanently?',
+      message: 'All messages and context will be removed. This action cannot be undone.',
+      confirmLabel: 'Delete forever',
+      cancelLabel: 'Cancel',
+      onConfirm: handleDelete,
+      busy: false,
+    })
+  }
+
+  function openReopenDialog() {
+    setDialog({
+      open: true,
+      tone: 'default',
+      title: 'Reopen this deal?',
+      message: 'The deal room will become editable again.',
+      confirmLabel: 'Reopen',
+      cancelLabel: 'Cancel',
+      onConfirm: handleReopen,
+      busy: false,
+    })
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <DealHeader
@@ -283,7 +402,7 @@ export default function DealRoomPage() {
         onShare={handleShare}
         onWin={handleWin}
         onLost={handleLost}
-        onReopen={handleReopen}
+        onReopen={openReopenDialog}
       />
       <DealTabs
         activeTab={activeTab}
@@ -296,8 +415,8 @@ export default function DealRoomPage() {
           <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
             <SellerOverview deal={deal} viewerRole="seller" onDealUpdate={(next) => setDeal((d) => ({ ...d, ...next }))} />
             <DangerZoneFooter
-              onArchive={handleArchive}
-              onDelete={handleDelete}
+              onArchive={openArchiveDialog}
+              onDelete={openDeleteDialog}
               locked={!!deal?.locked}
             />
           </div>
@@ -325,6 +444,24 @@ export default function DealRoomPage() {
           </div>
         )}
       </div>
+      <AppPromptModal
+        open={dialog.open}
+        tone={dialog.tone}
+        title={dialog.title}
+        message={dialog.message}
+        confirmLabel={dialog.confirmLabel}
+        cancelLabel={dialog.cancelLabel}
+        onConfirm={runDialogConfirm}
+        onCancel={closeDialog}
+        busy={dialog.busy}
+      />
+      <AppToast
+        open={toast.open}
+        tone={toast.tone}
+        message={toast.message}
+        actionLabel="Close"
+        onAction={() => setToast((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   )
 }
