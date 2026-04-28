@@ -22,6 +22,7 @@ import DealTabs, {
   saveDealTab,
 } from '../components/deal/DealTabs.jsx'
 import OverviewTab from '../components/deal/OverviewTab.jsx'
+import BuyerViewPreview from '../components/seller/BuyerViewPreview.jsx'
 
 function DealPageSkeleton() {
   return (
@@ -290,6 +291,11 @@ export default function DealRoomPage() {
               onHighlightConsumed={() => setHighlightCommitmentId(null)}
               locked={deal.locked}
             />
+          </div>
+        )}
+        {activeTab === 'buyer' && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <BuyerViewPreview deal={deal} commitments={commitments} />
           </div>
         )}
       </div>

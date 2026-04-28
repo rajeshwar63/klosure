@@ -21,6 +21,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { callLlm } from "../_shared/llm-client.ts"
+import { loadSellerProfile } from "../_shared/seller-profile-loader.ts"
+import { buildSellerProfileSection } from "../_shared/prompts/sections.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -175,8 +177,26 @@ ${JSON.stringify(digest, null, 2)}
 
 Write today's coaching paragraph.`
 
+    // Phase 8 — inject seller profile so daily focus is grounded in role/ICP.
+    let sellerProfile = null
+    try {
+      sellerProfile = await loadSellerProfile(SUPABASE_URL, SERVICE_ROLE_KEY, sellerId)
+    } catch (err) {
+      console.warn("seller_profile_load_failed", err)
+    }
+    console.log(JSON.stringify({
+      event: "seller_profile_loaded",
+      user_id: sellerId,
+      has_profile: !!sellerProfile,
+      fn: "klo-daily-focus",
+    }))
+    const profileSection = buildSellerProfileSection(sellerProfile)
+    const systemPrompt = profileSection
+      ? `${SYSTEM_PROMPT}\n\n${profileSection}`
+      : SYSTEM_PROMPT
+
     const result = await callLlm({
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt,
       messages: [{ role: "user", content: userMessage }],
       maxTokens: 600,
       temperature: 0.7,

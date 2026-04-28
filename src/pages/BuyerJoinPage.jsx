@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import DealRoom from '../components/DealRoom.jsx'
+import BuyerDashboardPage from './BuyerDashboardPage.jsx'
+import BuyerDealHeader from '../components/buyer/BuyerDealHeader.jsx'
 
 const STORAGE_KEY = 'klosure.buyer.profile'
 
 export default function BuyerJoinPage() {
   const { token } = useParams()
   const [deal, setDeal] = useState(null)
-  const [dealContext, setDealContext] = useState(null)
+  // dealContext is loaded for compatibility with the legacy chat fallback,
+  // even though Phase 8's dashboard does not use it directly.
+  const [, setDealContext] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [buyerName, setBuyerName] = useState('')
@@ -53,6 +56,29 @@ export default function BuyerJoinPage() {
       setLoading(false)
     }
     load()
+
+    // Subscribe to klo_state updates (including buyer_view regenerations)
+    // for as long as this page is open.
+    const channel = supabase
+      .channel(`buyer-token-${token}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'deals',
+          filter: `buyer_token=eq.${token}`,
+        },
+        (payload) => {
+          setDeal((d) => (d ? { ...d, ...payload.new } : payload.new))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      supabase.removeChannel(channel)
+    }
   }, [token])
 
   async function handleJoin(e) {
@@ -149,11 +175,9 @@ export default function BuyerJoinPage() {
   }
 
   return (
-    <DealRoom
-      deal={deal}
-      dealContext={dealContext}
-      role="buyer"
-      currentUserName={buyerName}
-    />
+    <div className="min-h-screen bg-[#f5f6f8] flex flex-col">
+      <BuyerDealHeader deal={deal} />
+      <BuyerDashboardPage deal={deal} embedded />
+    </div>
   )
 }

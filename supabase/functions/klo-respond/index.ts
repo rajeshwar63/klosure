@@ -7,9 +7,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { buildBootstrapPrompt } from "../_shared/prompts/bootstrap-prompt.ts"
 import { buildExtractionPrompt } from "../_shared/prompts/extraction-prompt.ts"
-import type { KloState, KloRespondOutput } from "../_shared/klo-state-types.ts"
+import type { KloState, KloRespondOutput, BuyerView } from "../_shared/klo-state-types.ts"
 import type { LlmMessage, LlmToolDefinition } from "../_shared/llm-types.ts"
 import { callLlm } from "../_shared/llm-client.ts"
+import { loadSellerProfile, type SellerProfile } from "../_shared/seller-profile-loader.ts"
+import { detectMaterialChange } from "../_shared/material-change-detector.ts"
+import { buildBuyerViewPrompt } from "../_shared/prompts/buyer-view-prompt.ts"
+import { BUYER_VIEW_TOOL } from "../_shared/buyer-view-tool.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -253,16 +257,63 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { deal_id, triggering_message_id } = await req.json()
+    const { deal_id, triggering_message_id, regenerate_buyer_view } = await req.json()
     if (!deal_id) return json({ error: "deal_id required" }, 400)
 
     // 1. Load context
     const ctx = await loadDealContext(deal_id)
 
+    // Phase 8 — manual buyer-view refresh path. Skip the main extraction;
+    // just rerun the buyer-view generation against the current klo_state.
+    if (regenerate_buyer_view) {
+      if (!ctx.deal.klo_state) {
+        return json({ error: "no klo_state to base buyer view on" }, 400)
+      }
+      let sellerProfileForRefresh: SellerProfile | null = null
+      try {
+        sellerProfileForRefresh = await loadSellerProfile(
+          SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY,
+          ctx.deal.seller_id as string,
+        )
+      } catch {
+        sellerProfileForRefresh = null
+      }
+      const refreshedView = await runBuyerViewRefresh({
+        deal: ctx.deal,
+        currentState: ctx.deal.klo_state,
+        sellerProfile: sellerProfileForRefresh,
+      })
+      if (!refreshedView) {
+        return json({ ok: false, error: "buyer view refresh failed" }, 502)
+      }
+      return json({ ok: true, buyer_view: refreshedView })
+    }
+
+    // 1b. Load the seller's profile (Phase 8) — null if no profile saved yet.
+    //     Failure to load must not block the turn; fall back to no injection.
+    let sellerProfile: SellerProfile | null = null
+    try {
+      sellerProfile = await loadSellerProfile(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+        ctx.deal.seller_id as string,
+      )
+    } catch (err) {
+      console.warn("seller_profile_load_failed", err)
+      sellerProfile = null
+    }
+    console.log(JSON.stringify({
+      event: "seller_profile_loaded",
+      user_id: ctx.deal.seller_id,
+      has_profile: !!sellerProfile,
+      fn: "klo-respond",
+    }))
+
     // 2. Decide path: bootstrap (state is null) vs normal turn
     const output = ctx.deal.klo_state == null
-      ? await runBootstrap(ctx)
-      : await runExtraction(ctx, triggering_message_id ?? null)
+      ? await runBootstrap(ctx, sellerProfile)
+      : await runExtraction(ctx, triggering_message_id ?? null, sellerProfile)
 
     // 2b. Preserve previous confidence value so the next turn can compute trend/delta.
     if (output.klo_state.confidence) {
@@ -285,12 +336,189 @@ Deno.serve(async (req) => {
     // 5. Insert chat_reply as a Klo message scoped to recipientRole
     await postKloMessage(deal_id, output.chat_reply, ctx.recipientRole)
 
+    // 6. Phase 8 — buyer_view regeneration (gated by material change).
+    //    Best-effort: a failure here must NOT fail the chat turn.
+    try {
+      await maybeRegenerateBuyerView({
+        deal: ctx.deal,
+        beforeState: ctx.deal.klo_state,
+        newState: output.klo_state,
+        sellerProfile,
+      })
+    } catch (err) {
+      console.error("buyer_view generation failed", err)
+    }
+
     return json({ ok: true })
   } catch (err) {
     console.error("klo-respond error", err)
     return json({ ok: false, error: String(err) }, 500)
   }
 })
+
+async function maybeRegenerateBuyerView(args: {
+  deal: DealContext["deal"]
+  beforeState: KloState | null
+  newState: KloState
+  sellerProfile: SellerProfile | null
+}): Promise<void> {
+  const { deal, beforeState, newState, sellerProfile } = args
+
+  const sinceISO = beforeState?.buyer_view?.generated_at ?? null
+  const messagesSinceLastBuyerView = await countMessagesSince(deal.id, sinceISO)
+
+  const materialCheck = detectMaterialChange({
+    before: beforeState,
+    after: newState,
+    messagesSinceLastBuyerView,
+  })
+
+  console.log(JSON.stringify({
+    event: "buyer_view_gating_decision",
+    deal_id: deal.id,
+    is_material: materialCheck.isMaterial,
+    reasons: materialCheck.reasons,
+    messages_since_last: messagesSinceLastBuyerView,
+  }))
+
+  if (!materialCheck.isMaterial) return
+
+  const buyerViewPrompt = buildBuyerViewPrompt({
+    dealTitle: deal.title,
+    buyerCompany: deal.buyer_company ?? "the buyer",
+    sellerCompany: deal.seller_company ?? "the vendor",
+    recipientLabel: "the buyer",
+    currentState: newState,
+    sellerProfile,
+    previousMomentumScore: beforeState?.buyer_view?.momentum_score ?? null,
+  })
+
+  const buyerViewResult = await callLlm<{ buyer_view: BuyerView }>({
+    systemPrompt: buyerViewPrompt,
+    messages: [{ role: "user", content: "Emit the buyer dashboard." }],
+    tool: BUYER_VIEW_TOOL,
+    maxTokens: 1500,
+    temperature: 0.6,
+  })
+
+  if (!buyerViewResult.toolCalled) {
+    console.warn("buyer_view tool not called — skipping update")
+    return
+  }
+
+  const buyerView = buyerViewResult.input.buyer_view
+  if (!buyerView) {
+    console.warn("buyer_view missing in tool input — skipping update")
+    return
+  }
+  buyerView.generated_at = new Date().toISOString()
+  buyerView.generation_reason = beforeState?.buyer_view ? "material_change" : "initial"
+
+  // Append to the momentum history (cap at 30 entries) so the dashboard chart
+  // gets a real series instead of just the latest point.
+  const prevHistory = beforeState?.buyer_view?.momentum_history ?? []
+  const nextHistory = buyerView.momentum_score == null
+    ? prevHistory
+    : [...prevHistory, { date: buyerView.generated_at, score: buyerView.momentum_score }]
+  buyerView.momentum_history = nextHistory.slice(-30)
+
+  // Read fresh state, merge, write — avoids stomping any other concurrent write.
+  const { data: fresh } = await sb
+    .from("deals")
+    .select("klo_state")
+    .eq("id", deal.id)
+    .maybeSingle()
+  const baseState = (fresh?.klo_state ?? newState) as KloState
+  const mergedState: KloState = { ...baseState, buyer_view: buyerView }
+
+  const { error: updateErr } = await sb
+    .from("deals")
+    .update({ klo_state: mergedState })
+    .eq("id", deal.id)
+  if (updateErr) {
+    console.error("buyer_view persist failed", updateErr)
+    return
+  }
+
+  console.log(JSON.stringify({
+    event: "buyer_view_generated",
+    deal_id: deal.id,
+    reason: buyerView.generation_reason,
+    momentum_score: buyerView.momentum_score,
+  }))
+}
+
+async function runBuyerViewRefresh(args: {
+  deal: DealContext["deal"]
+  currentState: KloState
+  sellerProfile: SellerProfile | null
+}): Promise<BuyerView | null> {
+  const { deal, currentState, sellerProfile } = args
+
+  const buyerViewPrompt = buildBuyerViewPrompt({
+    dealTitle: deal.title,
+    buyerCompany: deal.buyer_company ?? "the buyer",
+    sellerCompany: deal.seller_company ?? "the vendor",
+    recipientLabel: "the buyer",
+    currentState,
+    sellerProfile,
+    previousMomentumScore: currentState.buyer_view?.momentum_score ?? null,
+  })
+
+  const result = await callLlm<{ buyer_view: BuyerView }>({
+    systemPrompt: buyerViewPrompt,
+    messages: [{ role: "user", content: "Emit the buyer dashboard." }],
+    tool: BUYER_VIEW_TOOL,
+    maxTokens: 1500,
+    temperature: 0.6,
+  })
+  if (!result.toolCalled || !result.input?.buyer_view) {
+    console.warn("buyer_view manual refresh: tool not called")
+    return null
+  }
+  const buyerView = result.input.buyer_view
+  buyerView.generated_at = new Date().toISOString()
+  buyerView.generation_reason = "manual_refresh"
+  const prevHistory = currentState.buyer_view?.momentum_history ?? []
+  const nextHistory = buyerView.momentum_score == null
+    ? prevHistory
+    : [...prevHistory, { date: buyerView.generated_at, score: buyerView.momentum_score }]
+  buyerView.momentum_history = nextHistory.slice(-30)
+
+  const { data: fresh } = await sb
+    .from("deals")
+    .select("klo_state")
+    .eq("id", deal.id)
+    .maybeSingle()
+  const baseState = (fresh?.klo_state ?? currentState) as KloState
+  const mergedState: KloState = { ...baseState, buyer_view: buyerView }
+  const { error: updateErr } = await sb
+    .from("deals")
+    .update({ klo_state: mergedState })
+    .eq("id", deal.id)
+  if (updateErr) {
+    console.error("buyer_view manual refresh persist failed", updateErr)
+    return null
+  }
+  console.log(JSON.stringify({
+    event: "buyer_view_generated",
+    deal_id: deal.id,
+    reason: "manual_refresh",
+    momentum_score: buyerView.momentum_score,
+  }))
+  return buyerView
+}
+
+async function countMessagesSince(dealId: string, sinceISO: string | null): Promise<number> {
+  if (!sinceISO) return 999
+  const { count } = await sb
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("deal_id", dealId)
+    .gt("created_at", sinceISO)
+    .neq("sender_type", "klo")
+  return count ?? 0
+}
 
 // --- Stubs (filled in step 07) ---
 
@@ -308,6 +536,7 @@ interface DealContext {
     title: string
     buyer_company: string | null
     seller_company: string | null
+    seller_id: string
     value: number | null
     deadline: string | null
     mode: "solo" | "shared"
@@ -350,7 +579,10 @@ async function loadDealContext(deal_id: string): Promise<DealContext> {
   return { deal, context, messages, recipientRole }
 }
 
-async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
+async function runBootstrap(
+  ctx: DealContext,
+  sellerProfile: SellerProfile | null,
+): Promise<KloRespondOutput> {
   const system = buildBootstrapPrompt({
     dealTitle: ctx.deal.title,
     buyerCompany: ctx.deal.buyer_company ?? "",
@@ -365,6 +597,7 @@ async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
     whatNeedsToHappen: ctx.context?.what_needs_to_happen ?? null,
     budgetNotes: ctx.context?.budget_notes ?? null,
     notes: ctx.context?.notes ?? null,
+    sellerProfile,
   })
 
   return runLlm(system, ctx.messages, ctx.deal.id)
@@ -373,6 +606,7 @@ async function runBootstrap(ctx: DealContext): Promise<KloRespondOutput> {
 async function runExtraction(
   ctx: DealContext,
   _triggering_message_id: string | null,
+  sellerProfile: SellerProfile | null,
 ): Promise<KloRespondOutput> {
   // currentState is non-null on the extraction path (skeleton routes on null).
   const currentState = ctx.deal.klo_state as KloState
@@ -383,6 +617,7 @@ async function runExtraction(
     mode: ctx.deal.mode,
     recipientRole: ctx.recipientRole,
     currentState,
+    sellerProfile,
   })
 
   return runLlm(system, ctx.messages, ctx.deal.id)

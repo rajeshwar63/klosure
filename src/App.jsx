@@ -19,6 +19,7 @@ const BillingPage = lazy(() => import('./pages/BillingPage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage.jsx'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
 const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
+const TrainKloPage = lazy(() => import('./pages/TrainKloPage.jsx'))
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/team/reps" element={<RepsPlaceholderPage />} />
           <Route path="/team/askklo" element={<AskKloPage />} />
           <Route path="/billing" element={<BillingPage />} />
+          <Route path="/settings/train-klo" element={<TrainKloPage />} />
         </Route>
 
         {/* Buyer flow stays outside the shell. */}

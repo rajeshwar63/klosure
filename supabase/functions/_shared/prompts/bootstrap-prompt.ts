@@ -10,7 +10,9 @@ import {
   HARD_STOPS_SECTION,
   MOMENTUM_SECTION,
   CONFIDENCE_SCORING_SECTION,
+  buildSellerProfileSection,
 } from './sections.ts';
+import type { SellerProfile } from '../seller-profile-loader.ts';
 
 // Static header — same on every call. Mirrors EXTRACTION_PROMPT_HEADER but
 // scoped to the first-state-build path (no prior klo_state to merge into).
@@ -57,8 +59,10 @@ export function buildBootstrapPrompt(args: {
   budgetNotes: string | null;
   notes: string | null;
   todayISO?: string;
+  sellerProfile: SellerProfile | null;
 }): string {
   const today = args.todayISO ?? new Date().toISOString().slice(0, 10);
+  const profileBlock = buildSellerProfileSection(args.sellerProfile);
   return `${BOOTSTRAP_PROMPT_HEADER}
 
 <today_date>${today}</today_date>
@@ -74,6 +78,8 @@ export function buildBootstrapPrompt(args: {
 - Budget notes: ${args.budgetNotes ?? 'none'}
 - Other notes: ${args.notes ?? 'none'}
 </deal_context>
+
+${profileBlock}
 
 Now call emit_klo_response with the bootstrapped klo_state and a short opening chat reply.`;
 }
