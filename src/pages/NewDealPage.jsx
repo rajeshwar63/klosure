@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { canCreateDeal, planConfig, nextPlanFor } from '../lib/plans.js'
+import { requestKloCoaching } from '../services/klo.js'
 
 const EMPTY_STAKEHOLDER = { name: '', role: '', company: '' }
 
@@ -12,7 +13,7 @@ export default function NewDealPage() {
   const [params] = useSearchParams()
   const wantsShare = params.get('share') === '1'
   const { user } = useAuth()
-  const { plan } = useProfile()
+  const { plan, profile } = useProfile()
   const [activeCount, setActiveCount] = useState(null)
 
   useEffect(() => {
@@ -97,13 +98,54 @@ export default function NewDealPage() {
 
       if (dealError) throw dealError
 
+      const whatNeeds = form.what_needs_to_happen.trim()
+      const notes = form.notes.trim()
+
       const { error: contextError } = await supabase.from('deal_context').insert({
         deal_id: deal.id,
         stakeholders: cleanStakeholders,
-        what_needs_to_happen: form.what_needs_to_happen.trim() || null,
-        notes: form.notes.trim() || null
+        what_needs_to_happen: whatNeeds || null,
+        notes: notes || null
       })
       if (contextError) throw contextError
+
+      // Seed the chat with the seller's context as the first message so Klo
+      // responds to it instead of opening with a generic greeting. If both
+      // fields are empty, fall through to the existing greeting in
+      // DealRoomPage.
+      const seedParts = []
+      if (whatNeeds) seedParts.push(`What needs to happen:\n${whatNeeds}`)
+      if (notes) seedParts.push(`Notes:\n${notes}`)
+      if (seedParts.length > 0) {
+        const sellerName = profile?.name || user?.email || 'Seller'
+        const { data: seedMsg, error: seedError } = await supabase
+          .from('messages')
+          .insert({
+            deal_id: deal.id,
+            sender_type: 'seller',
+            sender_name: sellerName,
+            content: seedParts.join('\n\n'),
+          })
+          .select()
+          .single()
+        if (seedError) {
+          console.warn('[NewDeal] failed to seed chat from context', seedError)
+        } else {
+          requestKloCoaching({
+            deal,
+            dealContext: {
+              stakeholders: cleanStakeholders,
+              what_needs_to_happen: whatNeeds || null,
+              notes: notes || null,
+            },
+            messages: [seedMsg],
+            role: 'seller',
+            mode: 'solo',
+          }).catch((err) => {
+            console.warn('[NewDeal] Klo coaching kickoff failed', err)
+          })
+        }
+      }
 
       navigate(`/deals/${deal.id}${wantsShare ? '?share=1' : ''}`, { replace: true })
     } catch (err) {

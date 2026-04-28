@@ -3,9 +3,11 @@
 // Title + health dot + optional "Stuck · Nw" chip + Share + "Open in chat".
 // Subtitle line: company · stage · value · deadline.
 
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCurrency, formatDeadline } from '../../lib/format.js'
 import { formatNextMeeting, isMeetingPast } from '../../services/meetingFormat.js'
+import { LOSS_REASONS } from '../../services/archive.js'
 
 const STAGE_LABEL = {
   discovery: 'Discovery',
@@ -84,6 +86,11 @@ export default function DealHeader({
   canShare = false,
   onShare,
   onOpenChat,
+  onWin,
+  onLost,
+  onArchive,
+  onDelete,
+  onReopen,
 }) {
   const stuck = weeksAt(deal)
   const showStuck = stuck >= 2 && deal?.health !== 'green'
@@ -91,6 +98,81 @@ export default function DealHeader({
   const value =
     deal?.klo_state?.deal_value?.amount ?? deal?.value ?? null
   const nextMeeting = deal?.klo_state?.next_meeting ?? null
+  const isSeller = viewerRole === 'seller'
+  const locked = !!deal?.locked
+
+  const [submitting, setSubmitting] = useState(false)
+  const [lostOpen, setLostOpen] = useState(false)
+  const lostPopoverRef = useRef(null)
+  const lostButtonRef = useRef(null)
+
+  useEffect(() => {
+    if (!lostOpen) return
+    function onMouseDown(e) {
+      if (
+        lostPopoverRef.current?.contains(e.target) ||
+        lostButtonRef.current?.contains(e.target)
+      ) {
+        return
+      }
+      setLostOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [lostOpen])
+
+  async function withSubmitting(fn) {
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      await fn()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleWinClick() {
+    setLostOpen(false)
+    withSubmitting(async () => {
+      await onWin?.()
+    })
+  }
+
+  function handleLostPick(reason) {
+    setLostOpen(false)
+    withSubmitting(async () => {
+      await onLost?.(reason)
+    })
+  }
+
+  function handleArchiveClick() {
+    if (!window.confirm('Archive this deal? It becomes read-only but stays in your archive.')) {
+      return
+    }
+    withSubmitting(async () => {
+      await onArchive?.()
+    })
+  }
+
+  function handleDeleteClick() {
+    if (
+      !window.confirm(
+        'Permanently delete this deal? All messages and commitments will be lost. This cannot be undone.',
+      )
+    ) {
+      return
+    }
+    withSubmitting(async () => {
+      await onDelete?.()
+    })
+  }
+
+  function handleReopenClick() {
+    if (!window.confirm('Reopen this deal? The room becomes editable again.')) return
+    withSubmitting(async () => {
+      await onReopen?.()
+    })
+  }
 
   return (
     <header
@@ -115,7 +197,85 @@ export default function DealHeader({
 
         <NextMeetingChip meeting={nextMeeting} />
 
-        <div className="ml-auto flex gap-2 shrink-0">
+        <div className="ml-auto flex gap-2 shrink-0 items-center flex-wrap">
+          {isSeller && !locked && (
+            <>
+              <button
+                type="button"
+                onClick={handleWinClick}
+                disabled={submitting}
+                className="px-3 py-1 rounded-md text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-white disabled:opacity-50"
+              >
+                Win
+              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  ref={lostButtonRef}
+                  onClick={() => setLostOpen((v) => !v)}
+                  disabled={submitting}
+                  aria-haspopup="menu"
+                  aria-expanded={lostOpen}
+                  className="px-3 py-1 rounded-md text-xs font-semibold bg-red-500 hover:bg-red-400 text-white disabled:opacity-50"
+                >
+                  Lost
+                </button>
+                {lostOpen && (
+                  <div
+                    ref={lostPopoverRef}
+                    role="menu"
+                    className="absolute right-0 mt-1 z-20 w-56 bg-white text-navy rounded-lg shadow-xl border border-navy/10 py-1"
+                  >
+                    <p className="px-3 pt-1.5 pb-1 text-[10px] uppercase tracking-wider font-semibold text-navy/50">
+                      Why was it lost?
+                    </p>
+                    {LOSS_REASONS.map((r) => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleLostPick(r.value)}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-navy/5"
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleArchiveClick}
+                disabled={submitting}
+                className="px-3 py-1 rounded-md text-xs border border-white/30 bg-transparent text-white hover:bg-white/10 disabled:opacity-50"
+              >
+                Archive
+              </button>
+            </>
+          )}
+
+          {isSeller && locked && (
+            <button
+              type="button"
+              onClick={handleReopenClick}
+              disabled={submitting}
+              className="px-3 py-1 rounded-md text-xs border border-white/30 bg-transparent text-white hover:bg-white/10 disabled:opacity-50"
+            >
+              Reopen
+            </button>
+          )}
+
+          {isSeller && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              disabled={submitting}
+              className="px-3 py-1 rounded-md text-xs border border-white/20 bg-transparent text-white/70 hover:bg-red-500/20 hover:border-red-400/50 hover:text-white disabled:opacity-50"
+            >
+              Delete
+            </button>
+          )}
+
           {viewerRole === 'seller' && canShare && (
             <button
               type="button"

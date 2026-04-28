@@ -65,3 +65,36 @@ export async function reopenDeal({ dealId }) {
   if (error) return { ok: false, error: error.message }
   return { ok: true, deal: data }
 }
+
+export async function archiveDeal({ dealId }) {
+  if (!dealId) return { ok: false, error: 'no deal' }
+  const { data, error } = await supabase
+    .from('deals')
+    .update({
+      status: 'archived',
+      stage: 'closed',
+      closed_reason: null,
+    })
+    .eq('id', dealId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, deal: data }
+}
+
+// Hard delete. The guard_locked_deal trigger blocks cascade-deletes on child
+// rows when the parent is locked, so we unlock first by flipping status back
+// to 'active', then issue the delete. Both writes are gated by RLS.
+export async function deleteDeal({ dealId, locked = false }) {
+  if (!dealId) return { ok: false, error: 'no deal' }
+  if (locked) {
+    const { error: unlockError } = await supabase
+      .from('deals')
+      .update({ status: 'active', closed_reason: null })
+      .eq('id', dealId)
+    if (unlockError) return { ok: false, error: unlockError.message }
+  }
+  const { error } = await supabase.from('deals').delete().eq('id', dealId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}

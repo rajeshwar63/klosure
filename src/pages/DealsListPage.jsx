@@ -73,10 +73,16 @@ export default function DealsListPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to="/deals/new"
+              className="text-xs px-3 py-1.5 rounded-lg bg-klo hover:bg-klo/90 font-semibold flex items-center gap-1"
+            >
+              <span className="text-base leading-none">+</span> New deal
+            </Link>
             {isManager && (
               <Link
                 to="/team"
-                className="text-xs px-3 py-1.5 rounded-lg bg-klo hover:bg-klo/90 font-medium"
+                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-medium border border-white/20"
               >
                 Team
               </Link>
@@ -94,7 +100,7 @@ export default function DealsListPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pb-32 pt-4">
+      <main className="max-w-3xl mx-auto px-4 pb-12 pt-4">
         <InstallPrompt />
 
         {loading ? (
@@ -146,14 +152,6 @@ export default function DealsListPage() {
           </>
         )}
       </main>
-
-      <Link
-        to="/deals/new"
-        className="fixed bottom-6 right-6 sm:right-[calc(50%-22rem)] bg-klo hover:bg-klo/90 text-white shadow-lg rounded-full px-5 py-3 font-semibold flex items-center gap-2"
-        style={{ bottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-      >
-        <span className="text-xl leading-none">+</span> New deal
-      </Link>
     </div>
   )
 }

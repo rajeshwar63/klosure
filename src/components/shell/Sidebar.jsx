@@ -14,6 +14,8 @@ import SidebarDealRow from './SidebarDealRow.jsx'
 const SELLER_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
   { id: 'deals', icon: '≡', label: 'Deals' },
+  { id: 'team', icon: '◇', label: 'Team' },
+  { id: 'train-klo', icon: '✦', label: 'Train Klo' },
 ]
 
 const MANAGER_NAV = [
@@ -189,29 +191,11 @@ export default function Sidebar({
             <p className="text-[12px] font-medium text-navy truncate">
               {user?.name || user?.email || 'You'}
             </p>
-            <div className="flex items-center gap-2 mt-0.5">
-              {role === 'manager' ? (
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-klo">
-                  Mgr
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handle('team')}
-                  className="text-[11px] text-navy/55 hover:text-klo"
-                >
-                  Team →
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handle('train-klo')}
-                className="text-[11px] text-navy/55 hover:text-klo"
-                title="Train Klo on your role and ICP"
-              >
-                Train Klo
-              </button>
-            </div>
+            {role === 'manager' && (
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-klo mt-0.5 inline-block">
+                Mgr
+              </span>
+            )}
           </div>
         </div>
       )}
