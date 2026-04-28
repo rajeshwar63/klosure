@@ -99,19 +99,24 @@ export default function PendingTasksTwoCol({ kloState, perspective = 'seller' })
   const onVendorActive = onVendorAll.filter((t) => t.status !== 'done')
   const onVendorDone = onVendorAll.filter((t) => t.status === 'done')
 
+  const leftTitle = isSellerView ? 'On your team' : 'On you'
+  const rightTitle = isSellerView ? 'On buyer team' : 'On vendor'
+  const leftEmpty = isSellerView ? 'No pending items on your team' : 'No pending items on you'
+  const rightEmpty = isSellerView ? 'No pending items on buyer team' : 'No pending items on vendor'
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <Column
-        title="On you"
+        title={leftTitle}
         items={onYouActive}
         completed={onYouDone}
-        emptyText="No pending items on you"
+        emptyText={leftEmpty}
       />
       <Column
-        title="On vendor"
+        title={rightTitle}
         items={onVendorActive}
         completed={onVendorDone}
-        emptyText="No pending items on vendor"
+        emptyText={rightEmpty}
       />
     </div>
   )

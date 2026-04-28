@@ -37,18 +37,20 @@ function StakeholderCard({ stakeholder }) {
   )
 }
 
-export default function BuyerStakeholderMap({ stakeholders }) {
+export default function BuyerStakeholderMap({
+  stakeholders,
+  title = 'Your team on this deal',
+  emptyCopy = 'Klo will identify your internal stakeholders as they appear in your conversations with the vendor.',
+}) {
   const items = stakeholders ?? []
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
-        <h3 className="text-sm font-semibold text-navy">Your team on this deal</h3>
+        <h3 className="text-sm font-semibold text-navy">{title}</h3>
       </div>
       <div className="p-5">
         {items.length === 0 ? (
-          <p className="text-sm text-navy/55">
-            Klo will identify your internal stakeholders as they appear in your conversations with the vendor.
-          </p>
+          <p className="text-sm text-navy/55">{emptyCopy}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {items.map((s, idx) => (

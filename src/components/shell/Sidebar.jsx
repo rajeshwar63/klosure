@@ -8,6 +8,7 @@
 // because the sidebar is a "what needs my attention" surface — the deals that
 // need work float to the top.
 
+import { useMemo, useState } from 'react'
 import SidebarNavItem from './SidebarNavItem.jsx'
 import SidebarDealRow from './SidebarDealRow.jsx'
 
@@ -76,11 +77,28 @@ export default function Sidebar({
   user,
   onNavigate,
   onNewDeal,
+  onLogout,
   collapsed = false,
   onCollapseToggle,
 }) {
+  const [query, setQuery] = useState('')
   const navItems = role === 'manager' ? MANAGER_NAV : SELLER_NAV
   const sorted = sortDealsForSidebar(deals)
+  const filteredDeals = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter((deal) => {
+      const haystack = [
+        deal?.title,
+        deal?.buyer_company,
+        deal?.seller_company,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [query, sorted])
   const currentDealId = activeDealId(activeView)
   const handle = (view) => () => onNavigate?.(view)
 
@@ -134,6 +152,17 @@ export default function Sidebar({
           </span>
         </div>
       )}
+      {!collapsed && (
+        <div className="px-3 pb-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search deals…"
+            className="w-full rounded-md border border-navy/15 bg-white px-2.5 py-1.5 text-[12px] text-navy placeholder:text-navy/35 focus:outline-none focus:ring-2 focus:ring-klo/20 focus:border-klo/35"
+          />
+        </div>
+      )}
 
       {/* Deal list */}
       <div
@@ -149,14 +178,14 @@ export default function Sidebar({
               <DealRowSkeleton />
             </>
           )
-        ) : sorted.length === 0 ? (
+        ) : filteredDeals.length === 0 ? (
           !collapsed && (
             <div className="px-2 py-3 text-[12px] text-navy/50">
-              <p>No active deals yet</p>
+              <p>{query ? 'No deals match your search' : 'No active deals yet'}</p>
             </div>
           )
         ) : (
-          sorted.map((deal) => (
+          filteredDeals.map((deal) => (
             <SidebarDealRow
               key={deal.id}
               deal={deal}
@@ -201,6 +230,15 @@ export default function Sidebar({
               </span>
             )}
           </div>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="text-[11px] text-navy/55 hover:text-klo hover:underline"
+            >
+              Logout
+            </button>
+          )}
         </div>
       )}
     </aside>

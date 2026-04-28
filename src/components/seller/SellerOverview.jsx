@@ -5,11 +5,10 @@
 // same insight across the page.
 
 import { useEffect, useMemo, useState } from 'react'
-import BuyerKloBriefHero from '../buyer/BuyerKloBriefHero.jsx'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
-import BuyerTimelineStrip from '../buyer/BuyerTimelineStrip.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
 import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
+import SellerTimelineStrip from './SellerTimelineStrip.jsx'
 
 function relativeTime(iso) {
   if (!iso) return null
@@ -215,12 +214,12 @@ function VendorTeamCard({ deal }) {
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
-        <h3 className="text-sm font-semibold text-navy">Vendor team</h3>
+        <h3 className="text-sm font-semibold text-navy">Your company team</h3>
       </div>
       <div className="p-5">
         <p className="text-sm text-navy">{company}</p>
         <p className="text-[12px] text-navy/55 mt-1">
-          Bring teammates into the room from the share menu.
+          Add teammates from your company in the share menu.
         </p>
       </div>
     </div>
@@ -363,15 +362,15 @@ export default function SellerOverview({ deal }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <BuyerStakeholderMap stakeholders={stakeholders} />
+        <BuyerStakeholderMap
+          stakeholders={stakeholders}
+          title="Buyer-side stakeholders"
+          emptyCopy="Klo will surface buyer-side stakeholders from your deal conversations."
+        />
         <VendorTeamCard deal={deal} />
       </div>
 
-      <BuyerTimelineStrip
-        stage={klo.stage}
-        deadline={klo.deadline}
-        blockers={klo.blockers}
-      />
+      <SellerTimelineStrip kloState={klo} />
 
       <PendingTasksTwoCol kloState={klo} perspective="seller" />
 
@@ -380,7 +379,11 @@ export default function SellerOverview({ deal }) {
         <RisksList blockers={klo.blockers} />
       </div>
 
-      <BuyerRecentMomentsFeed moments={klo.buyer_view?.recent_moments} />
+      <BuyerRecentMomentsFeed
+        moments={klo.buyer_view?.recent_moments}
+        title="Deal moments"
+        emptyCopy="No key moments captured yet — Klo will add them as this deal progresses."
+      />
     </div>
   )
 }
