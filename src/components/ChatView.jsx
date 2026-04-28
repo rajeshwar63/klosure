@@ -189,7 +189,7 @@ function MessageRow({ message }) {
   const author = isKlo ? 'Klo' : sender_name || (sender_type === 'seller' ? 'You' : 'Buyer')
   const authorClass = isKlo ? 'text-klo' : 'text-navy'
   return (
-    <article className="px-4 md:px-6 py-4 border-b border-navy/5 last:border-b-0">
+    <article className={`px-4 md:px-6 py-4 border-b border-navy/5 last:border-b-0 ${isKlo ? 'bg-klo/5' : ''}`}>
       <div className="flex items-baseline gap-2 mb-1">
         {isKlo && <span className="text-klo leading-none" aria-hidden>◆</span>}
         <span className={`text-[12px] font-semibold ${authorClass}`}>{author}</span>

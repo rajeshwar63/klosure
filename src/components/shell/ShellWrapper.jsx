@@ -2,7 +2,7 @@
 // and feeds them into the shell. Used as a layout route so every page below
 // renders inside the same shell.
 
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.jsx'
 import { useProfile } from '../../hooks/useProfile.jsx'
 import { useShellDeals } from '../../hooks/useShellDeals.jsx'
@@ -42,7 +42,8 @@ export function resolvePageTitle(pathname, deals) {
 
 export default function ShellWrapper() {
   const location = useLocation()
-  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { user, signOut } = useAuth()
   const { profile, isManager } = useProfile()
   const { deals, loading: dealsLoading } = useShellDeals()
 
@@ -55,6 +56,11 @@ export default function ShellWrapper() {
     email: user?.email,
   }
 
+  async function handleLogout() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <AppShell
       role={role}
@@ -63,6 +69,7 @@ export default function ShellWrapper() {
       deals={deals}
       dealsLoading={dealsLoading}
       user={userForShell}
+      onLogout={handleLogout}
     >
       <Outlet />
     </AppShell>

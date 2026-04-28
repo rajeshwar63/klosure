@@ -7,17 +7,19 @@ function formatDate(iso) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function BuyerRecentMomentsFeed({ moments }) {
+export default function BuyerRecentMomentsFeed({
+  moments,
+  title = 'Recent moments',
+  emptyCopy = 'No moments yet — Klo records the milestones that matter as the deal develops.',
+}) {
   const items = (moments ?? []).slice().reverse()
   return (
     <div className="bg-white border border-navy/10 rounded-2xl">
       <div className="px-5 py-4 border-b border-navy/5">
-        <h3 className="text-sm font-semibold text-navy">Recent moments</h3>
+        <h3 className="text-sm font-semibold text-navy">{title}</h3>
       </div>
       {items.length === 0 ? (
-        <div className="px-5 py-5 text-sm text-navy/55">
-          No moments yet — Klo records the milestones that matter as the deal develops.
-        </div>
+        <div className="px-5 py-5 text-sm text-navy/55">{emptyCopy}</div>
       ) : (
         <ul className="divide-y divide-navy/5">
           {items.map((m, idx) => (
