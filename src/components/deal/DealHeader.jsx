@@ -1,6 +1,7 @@
-// Phase 6 step 08 — dark header at the top of the deal page.
-//
-// Title + health dot + optional "Stuck · Nw" chip + Share + "Open in chat".
+// Phase 6 step 08 + Phase 9 step 08 — dark header at the top of the deal
+// page. Title + health dot + optional "Stuck · Nw" chip + Share. Win/Lost
+// stay top because they're status changes; Archive/Delete moved to a
+// danger-zone footer at the bottom of the deal page.
 // Subtitle line: company · stage · value · deadline.
 
 import { useEffect, useRef, useState } from 'react'
@@ -85,11 +86,8 @@ export default function DealHeader({
   viewerRole = 'seller',
   canShare = false,
   onShare,
-  onOpenChat,
   onWin,
   onLost,
-  onArchive,
-  onDelete,
   onReopen,
 }) {
   const stuck = weeksAt(deal)
@@ -142,28 +140,6 @@ export default function DealHeader({
     setLostOpen(false)
     withSubmitting(async () => {
       await onLost?.(reason)
-    })
-  }
-
-  function handleArchiveClick() {
-    if (!window.confirm('Archive this deal? It becomes read-only but stays in your archive.')) {
-      return
-    }
-    withSubmitting(async () => {
-      await onArchive?.()
-    })
-  }
-
-  function handleDeleteClick() {
-    if (
-      !window.confirm(
-        'Permanently delete this deal? All messages and commitments will be lost. This cannot be undone.',
-      )
-    ) {
-      return
-    }
-    withSubmitting(async () => {
-      await onDelete?.()
     })
   }
 
@@ -243,14 +219,6 @@ export default function DealHeader({
                   </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={handleArchiveClick}
-                disabled={submitting}
-                className="px-3 py-1 rounded-md text-xs border border-white/30 bg-transparent text-white hover:bg-white/10 disabled:opacity-50"
-              >
-                Archive
-              </button>
             </>
           )}
 
@@ -262,17 +230,6 @@ export default function DealHeader({
               className="px-3 py-1 rounded-md text-xs border border-white/30 bg-transparent text-white hover:bg-white/10 disabled:opacity-50"
             >
               Reopen
-            </button>
-          )}
-
-          {isSeller && (
-            <button
-              type="button"
-              onClick={handleDeleteClick}
-              disabled={submitting}
-              className="px-3 py-1 rounded-md text-xs border border-white/20 bg-transparent text-white/70 hover:bg-red-500/20 hover:border-red-400/50 hover:text-white disabled:opacity-50"
-            >
-              Delete
             </button>
           )}
 
@@ -294,14 +251,6 @@ export default function DealHeader({
               Share · Pro
             </Link>
           )}
-          <button
-            type="button"
-            onClick={onOpenChat}
-            className="px-3 py-1 rounded-md text-xs font-medium"
-            style={{ background: '#FFFFFF', color: '#2C2C2A' }}
-          >
-            Open in chat
-          </button>
         </div>
       </div>
 

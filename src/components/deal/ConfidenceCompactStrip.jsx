@@ -1,7 +1,6 @@
 // Phase 6.1 step 05 — collapsed-strip version of ConfidenceSidePanel.
-// Now that Commitments has the secondary hero slot, confidence collapses
-// to a single horizontal bar below the two-column hero. Click to expand
-// for rationale + factors.
+// Confidence collapses to a single horizontal bar. Click to expand for
+// rationale + factors.
 
 import { useState } from 'react'
 

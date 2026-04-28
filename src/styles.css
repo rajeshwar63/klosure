@@ -25,12 +25,9 @@ body {
   color: #1A1A2E;
 }
 
-/* WhatsApp-style chat doodle background */
+/* Phase 9 — flat document-style chat (replaces the bubble-chat look). */
 .chat-doodle {
-  background-color: #ECE5DD;
-  background-image:
-    radial-gradient(circle at 25% 25%, rgba(255,255,255,0.4) 0, rgba(255,255,255,0) 40%),
-    radial-gradient(circle at 75% 75%, rgba(255,255,255,0.3) 0, rgba(255,255,255,0) 40%);
+  background-color: #ffffff;
 }
 
 /* Hide scrollbar for horizontal pill strip */
@@ -53,14 +50,3 @@ body {
 .klo-typing span:nth-child(2) { animation-delay: 0.2s; }
 .klo-typing span:nth-child(3) { animation-delay: 0.4s; }
 
-/* Brief ring pulse used when the user clicks a commitment in the Overview's
-   action zone — we switch to Chat, scroll to the card, and run this for ~1.2s
-   so it's visually obvious which item they jumped to. */
-@keyframes commitment-jump {
-  0%   { box-shadow: 0 0 0 0 rgba(79, 142, 247, 0.55); }
-  60%  { box-shadow: 0 0 0 8px rgba(79, 142, 247, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(79, 142, 247, 0); }
-}
-.commitment-jump {
-  animation: commitment-jump 1.2s ease-out;
-}

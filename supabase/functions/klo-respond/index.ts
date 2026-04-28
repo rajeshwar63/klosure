@@ -220,6 +220,57 @@ The klo_state is the complete structured record of this deal AFTER incorporating
             },
             required: ["date", "title"],
           },
+          pending_on_seller: {
+            type: "array",
+            description: "Tasks the seller (vendor) owes — extracted from chat. Max 10 active items. See extraction rules for what qualifies. Always emit (empty array if none).",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Stable hash-derived ID. Same task across turns gets same ID." },
+                task: { type: "string", description: "≤ 12 words." },
+                due_date: { type: ["string", "null"], description: "ISO date or null." },
+                status: { type: "string", enum: ["pending", "overdue", "done"] },
+                source_message_id: { type: ["string", "null"] },
+                added_at: { type: "string", description: "ISO timestamp when first detected." },
+              },
+              required: ["id", "task", "due_date", "status", "source_message_id", "added_at"],
+            },
+          },
+          pending_on_buyer: {
+            type: "array",
+            description: "Tasks the buyer (client) owes — extracted from chat. Max 10 active items. See extraction rules for what qualifies. Always emit (empty array if none).",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Stable hash-derived ID. Same task across turns gets same ID." },
+                task: { type: "string", description: "≤ 12 words." },
+                due_date: { type: ["string", "null"], description: "ISO date or null." },
+                status: { type: "string", enum: ["pending", "overdue", "done"] },
+                source_message_id: { type: ["string", "null"] },
+                added_at: { type: "string", description: "ISO timestamp when first detected." },
+              },
+              required: ["id", "task", "due_date", "status", "source_message_id", "added_at"],
+            },
+          },
+          next_actions: {
+            type: "array",
+            description: "3-5 seller-side moves for this week (mirrors buyer playbook). Empty array if nothing meaningful to recommend.",
+            maxItems: 5,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Stable hash-derived ID." },
+                action: { type: "string", description: "≤ 12 words, imperative voice." },
+                why_it_matters: { type: "string", description: "1 sentence in Klo's seller voice." },
+                who: { type: "string", description: "'you', a teammate role, or a named stakeholder." },
+                deadline: { type: ["string", "null"], description: "ISO date or null." },
+                status: { type: "string", enum: ["not_started", "in_flight", "done"] },
+              },
+              required: ["id", "action", "why_it_matters", "who", "deadline", "status"],
+            },
+          },
         },
         required: [
           "version",
@@ -237,6 +288,9 @@ The klo_state is the complete structured record of this deal AFTER incorporating
           "confidence",
           "next_meeting",
           "last_meeting",
+          "pending_on_seller",
+          "pending_on_buyer",
+          "next_actions",
         ],
       },
       chat_reply: {

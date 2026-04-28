@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { canCreateDeal, planConfig, nextPlanFor } from '../lib/plans.js'
 import { requestKloCoaching } from '../services/klo.js'
+import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
 
 const EMPTY_STAKEHOLDER = { name: '', role: '', company: '' }
 
@@ -37,9 +38,45 @@ export default function NewDealPage() {
   const overLimit = activeCount !== null && !canCreateDeal({ plan, activeCount })
   const upsell = nextPlanFor('unlimited_deals')
 
+  const [sellerCompany, setSellerCompany] = useState(null) // null = unknown, '' = profile loaded but empty
+  const [companyDraft, setCompanyDraft] = useState('')
+  const [savingCompany, setSavingCompany] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    let mounted = true
+    getSellerProfile(user.id)
+      .then((row) => {
+        if (!mounted) return
+        setSellerCompany(row?.seller_company ?? '')
+      })
+      .catch(() => {
+        if (mounted) setSellerCompany('')
+      })
+    return () => {
+      mounted = false
+    }
+  }, [user])
+
+  const needsCompany = sellerCompany === ''
+  const profileLoaded = sellerCompany !== null
+
+  async function saveCompany() {
+    const v = companyDraft.trim()
+    if (!v || !user || savingCompany) return
+    setSavingCompany(true)
+    try {
+      await upsertSellerProfile(user.id, { seller_company: v })
+      setSellerCompany(v)
+    } catch (err) {
+      setError(err?.message ?? 'Could not save your company name.')
+    } finally {
+      setSavingCompany(false)
+    }
+  }
+
   const [form, setForm] = useState({
     title: '',
-    seller_company: '',
     buyer_company: '',
     value: '',
     deadline: '',
@@ -85,7 +122,7 @@ export default function NewDealPage() {
         .insert({
           seller_id: user.id,
           title: form.title.trim(),
-          seller_company: form.seller_company.trim() || null,
+          seller_company: sellerCompany || null,
           buyer_company: form.buyer_company.trim() || null,
           value: form.value === '' ? null : Number(form.value),
           deadline: form.deadline || null,
@@ -188,13 +225,34 @@ export default function NewDealPage() {
             </Link>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        {needsCompany && (
+          <Card>
+            <p className="text-[13px] text-navy/80 leading-snug mb-2">
+              <strong>Quick — what's your company called?</strong>{' '}
+              We'll save it to your profile so we don't ask again.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={companyDraft}
+                onChange={(e) => setCompanyDraft(e.target.value)}
+                placeholder="Klosure"
+                className="flex-1 border border-navy/15 rounded-lg px-3 py-2.5 focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+              />
+              <button
+                type="button"
+                onClick={saveCompany}
+                disabled={!companyDraft.trim() || savingCompany}
+                className="bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold text-sm px-4 py-2 rounded-lg"
+              >
+                {savingCompany ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </Card>
+        )}
+        <form onSubmit={handleSubmit} className={`space-y-5 ${needsCompany ? 'opacity-50 pointer-events-none' : ''}`} aria-disabled={needsCompany}>
           <Card>
             <Field label="Deal title" required value={form.title} onChange={(v) => update('title', v)} placeholder="DIB — Learning Experience Platform" />
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="Your company" value={form.seller_company} onChange={(v) => update('seller_company', v)} placeholder="Acme Learning" />
-              <Field label="Buyer company" value={form.buyer_company} onChange={(v) => update('buyer_company', v)} placeholder="Dubai Islamic Bank" />
-            </div>
+            <Field label="Buyer company" value={form.buyer_company} onChange={(v) => update('buyer_company', v)} placeholder="Dubai Islamic Bank" />
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Deal value (USD)" type="number" min="0" value={form.value} onChange={(v) => update('value', v)} placeholder="120000" />
               <Field label="Deadline" type="date" value={form.deadline} onChange={(v) => update('deadline', v)} />
@@ -273,7 +331,7 @@ export default function NewDealPage() {
             </Link>
             <button
               type="submit"
-              disabled={submitting || !form.title.trim() || overLimit}
+              disabled={submitting || !form.title.trim() || overLimit || !profileLoaded || needsCompany}
               className="flex-1 bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold py-3 rounded-xl"
             >
               {submitting ? 'Creating…' : 'Create deal & open Klo'}

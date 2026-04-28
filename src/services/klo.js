@@ -104,13 +104,13 @@ async function stubReply({ deal, messages = [], role = 'seller', mode = 'solo' }
     return `Confirm the meeting in writing with the agenda and the decision you need at the end. Meetings without a decision are just conversations.`
   }
   if (days !== null && days <= 14 && days >= 0) {
-    return `${days} days to deadline. This is the danger zone — every commitment from here needs a date and an owner. Tell me what's still open and I'll help you sequence it.`
+    return `${days} days to deadline. This is the danger zone — every open task from here needs a date and an owner. Tell me what's still open and I'll help you sequence it.`
   }
   if (days !== null && days < 0) {
     return `The deadline has passed. Don't pretend it hasn't. Reset it explicitly with the buyer today — a new date with a clear reason rebuilds momentum.`
   }
   if (mode === 'solo') {
-    return `Tell me three things: who's the economic buyer, what's the next commitment on the table, and when it's due. I'll tell you the move.`
+    return `Tell me three things: who's the economic buyer, what's the next open action on the table, and when it's due. I'll tell you the move.`
   }
-  return `Got it. I'll watch the room. When either side commits to something with a date, I'll lock it.`
+  return `Got it. I'll watch the room and track every open action between you and the buyer.`
 }

@@ -152,8 +152,8 @@ export interface BuyerView {
 
   // Single number 0-100 — buyer-facing "deal momentum" signal.
   // NOT the seller's confidence score — different framing, different scale meaning.
-  // High = deal is moving forward (commitments kept, stakeholders engaged).
-  // Low = deal is stalling (commitments slipping, stakeholders quiet).
+  // High = deal is moving forward (tasks delivered, stakeholders engaged).
+  // Low = deal is stalling (tasks slipping, stakeholders quiet).
   momentum_score: number | null;
 
   // 'up' | 'down' | 'flat' — direction of momentum vs last update.
@@ -196,6 +196,44 @@ export interface KloState {
   // gated LLM call (see klo-respond → buyer-view extraction). Optional
   // because existing rows do not have it; the UI must handle the missing case.
   buyer_view?: BuyerView | null;
+
+  // Phase 9 — pending tasks extracted from chat. Single source of truth for
+  // who owes what, with seller-side and buyer-side splits. Both arrays are
+  // always present (possibly empty).
+  pending_on_seller?: PendingTask[];
+  pending_on_buyer?: PendingTask[];
+
+  // Phase 9 — seller-side this-week's-moves. Mirrors the buyer playbook
+  // structure with seller voice. Optional — falls back to factors_to_raise.
+  next_actions?: NextAction[];
+}
+
+// =============================================================================
+// Phase 9 — Pending tasks (replaces commitments table)
+// =============================================================================
+
+export type PendingTaskStatus = 'pending' | 'overdue' | 'done';
+
+export interface PendingTask {
+  id: string;                   // stable id derived from task hash — for client-side localStorage status overrides
+  task: string;                 // ≤ 12 words, imperative if possible. "Send SOC 2 report"
+  due_date: string | null;      // ISO date or null
+  status: PendingTaskStatus;
+  source_message_id: string | null;
+  added_at: string;             // ISO timestamp — when Klo first detected this task
+}
+
+// =============================================================================
+// Phase 9 — Seller-side next actions (mirror of buyer playbook)
+// =============================================================================
+
+export interface NextAction {
+  id: string;
+  action: string;                                  // ≤ 12 words, imperative
+  why_it_matters: string;                          // 1 sentence, seller voice
+  who: string;                                     // "you", "your CFO", etc.
+  deadline: string | null;
+  status: 'not_started' | 'in_flight' | 'done';
 }
 
 export interface KloRespondOutput {

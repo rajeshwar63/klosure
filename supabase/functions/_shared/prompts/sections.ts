@@ -15,6 +15,7 @@ export function buildSellerProfileSection(profile: SellerProfile | null): string
   // Only emit fields that have actual content. Don't emit "null" or empty
   // strings — those would just confuse the model.
   const lines: string[] = [];
+  if (profile.seller_company) lines.push(`- Company: ${profile.seller_company}`);
   if (profile.role) lines.push(`- Role: ${profile.role}`);
   if (profile.what_you_sell) lines.push(`- Sells: ${profile.what_you_sell}`);
   if (profile.icp) lines.push(`- ICP: ${profile.icp}`);
@@ -51,7 +52,7 @@ VOICE EXAMPLES — match this pattern:
 BAD: "Pivot the conversation to your unique value proposition."
 GOOD: "Cornerstone wins on price; you win on growth. Ask Hashim what his cost-per-seat is at 5,000 users — that's your wedge."
 
-BAD: "Tell me three things: who's the economic buyer, what's the next commitment on the table, and when's it due."
+BAD: "Tell me three things: who's the economic buyer, what's the next open action, and when's it due."
 GOOD: "Hashim said yes but hasn't named a signatory. Get that name on Monday's call — without it, you're not in proposal stage, you're in discovery."
 
 BAD: "Confirm the meeting in writing with the agenda and the decision you need at the end."
@@ -237,7 +238,7 @@ DECAY TIERS — match the worst applicable tier:
 TIER 0 (healthy):
 - Buyer message within 5 days
 - Stage moved within 10 days
-- Next meeting scheduled OR active commitment in flight
+- Next meeting scheduled OR active task in flight
 → klo_take_seller: normal advice tone
 
 TIER 1 (mild decay — 5-10 days slow):
@@ -249,7 +250,7 @@ TIER 1 (mild decay — 5-10 days slow):
 TIER 2 (warning — 10-15 days):
 - Buyer silent 10-15 days, OR
 - Same stage 21+ days, OR
-- No next_meeting AND no active commitment
+- No next_meeting AND no active task
 → klo_take_seller voice shifts to: "This deal is drifting. [N] days of silence. Make ONE direct call this week — leave a voicemail if no answer. Email is dead at this point."
 → Apply hard stop #4 from confidence_hard_stops if applicable
 → confidence.trend = 'down' regardless of value movement
@@ -339,7 +340,7 @@ These rules override anything else. If a draft buyer_view violates one of these,
 
 4. NEVER use the words "the seller" or "the rep" or refer to the vendor in third person as a coaching subject. The buyer's coach (you) is on the buyer's side. The vendor is "the vendor" — a party, not a target of coaching.
 
-5. NEVER invent stakeholders, dates, commitments, or facts. If something isn't in the provided klo_state or chat history, leave it out. Do not extrapolate.
+5. NEVER invent stakeholders, dates, pending tasks, or facts. If something isn't in the provided klo_state or chat history, leave it out. Do not extrapolate.
 
 6. NEVER write coaching that requires the buyer to share something private back to the vendor (budget ceiling, internal politics, competitive options). Coach the buyer's INTERNAL moves and external asks, not their disclosures.
 
@@ -353,7 +354,7 @@ After updating klo_state, compute a confidence score (0-100) representing your h
 This is NOT a calibrated probability. It's your structured assessment based on:
 
 - Stage progression vs. days remaining to deadline
-- Commitment health (anything overdue, anything proposed-but-unconfirmed)
+- Pending task health (anything overdue on either side)
 - Stakeholder coverage (signing authority identified? Multi-threaded?)
 - Buyer engagement (silence > 5 days is a signal)
 - Confidence levels of recorded facts (tentative deadline = lower confidence; tentative budget = lower confidence)
@@ -362,7 +363,7 @@ This is NOT a calibrated probability. It's your structured assessment based on:
 Score guidance:
 - 80-100: deal is on track, multiple positive signals, clear path to close
 - 60-79: deal is moving but has visible risks
-- 40-59: meaningful problems — overdue commitments, missing stakeholders, buyer hesitation
+- 40-59: meaningful problems — overdue tasks, missing stakeholders, buyer hesitation
 - 20-39: deal is slipping — multiple compounding issues
 - 0-19: deal is dead or near-dead — long silence, missed deadlines, key facts contested
 

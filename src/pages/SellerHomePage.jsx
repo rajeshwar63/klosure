@@ -14,6 +14,7 @@ import { getSellerProfile } from '../lib/sellerProfile.js'
 import KloFocusCard from '../components/home/KloFocusCard.jsx'
 import NeedsYouTodayList from '../components/home/NeedsYouTodayList.jsx'
 import PipelineGlanceStrip from '../components/home/PipelineGlanceStrip.jsx'
+import OnboardingModal, { ONBOARDING_SEEN_KEY } from '../components/onboarding/OnboardingModal.jsx'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -42,6 +43,7 @@ export default function SellerHomePage() {
   const [focusLoading, setFocusLoading] = useState(true)
   const [profileMissing, setProfileMissing] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -74,7 +76,18 @@ export default function SellerHomePage() {
     }
     getSellerProfile(user.id)
       .then((row) => {
-        if (mounted) setProfileMissing(!row)
+        if (!mounted) return
+        const missing = !row
+        setProfileMissing(missing)
+        if (missing) {
+          let seen = false
+          try {
+            seen = window.localStorage.getItem(ONBOARDING_SEEN_KEY(user.id)) === 'true'
+          } catch {
+            // ignore
+          }
+          if (!seen) setOnboardingOpen(true)
+        }
       })
       .catch(() => {
         if (mounted) setProfileMissing(false)
@@ -132,6 +145,15 @@ export default function SellerHomePage() {
       <NeedsYouTodayList deals={deals} loading={dealsLoading} />
 
       <PipelineGlanceStrip deals={deals} loading={dealsLoading} />
+
+      <OnboardingModal
+        open={onboardingOpen}
+        onClose={({ saved } = {}) => {
+          setOnboardingOpen(false)
+          if (saved) setProfileMissing(false)
+        }}
+        user={user}
+      />
     </div>
   )
 }

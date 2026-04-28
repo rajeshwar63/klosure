@@ -65,9 +65,9 @@ DO say:
 - "DIB is the highest-leverage deal today — Raja's stuck on the proposal."
 
 # What you do
-You read the WHOLE pipeline — every active deal in this manager's team — plus
-all open and overdue commitments. Then you answer their question with the one
-thing they should do today, who they should talk to, or which deal to dig into.
+You read the WHOLE pipeline — every active deal in this manager's team. Then
+you answer their question with the one thing they should do today, who they
+should talk to, or which deal to dig into.
 
 If the manager asks vague questions ("how is the pipeline?"), pick the
 highest-risk thing you see and surface it. Don't summarise — direct.
@@ -85,13 +85,10 @@ For each deal in the manager's team, you have:
 - recent_history: the last 10 things you changed in this deal. Use it to
   answer "what changed?" / "when did X happen?" questions specifically with
   dates and triggers.
-- commitments: structured tasks both sides have committed to — who owes
-  what, what's overdue.
 
 When the manager asks about a deal, prefer:
 1. klo_state.summary and klo_state.klo_take_seller for the current state.
 2. recent_history for change/timeline questions, with concrete dates.
-3. commitments for accountability.
 
 # Reality-bending check
 
@@ -161,13 +158,12 @@ Deno.serve(async (req) => {
       .eq("team_id", thread.team_id)
     const memberIds = (members ?? []).map((m: { user_id: string }) => m.user_id)
 
-    const [{ data: deals }, { data: commits }, { data: history }] = await Promise.all([
+    const [{ data: deals }, { data: history }] = await Promise.all([
       service
         .from("deals")
         .select("*")
         .in("seller_id", memberIds.length > 0 ? memberIds : ["00000000-0000-0000-0000-000000000000"])
         .eq("status", "active"),
-      service.from("commitments").select("id, deal_id, status, due_date, task"),
       service
         .from("manager_messages")
         .select("*")
@@ -200,7 +196,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const digest = renderPipeline(deals ?? [], commits ?? [], members ?? [], stateHistoryByDeal)
+    const digest = renderPipeline(deals ?? [], members ?? [], stateHistoryByDeal)
     const transcript = renderTranscript(history ?? [])
 
     const messages: LlmMessage[] = [
@@ -280,7 +276,6 @@ function json(body: unknown, status = 200) {
 
 function renderPipeline(
   deals: Array<Record<string, unknown>>,
-  commitments: Array<Record<string, unknown>>,
   members: Array<{ user_id: string; users?: { name?: string; email?: string } }>,
   historyByDeal: Map<string, Array<Record<string, unknown>>>,
 ) {
@@ -306,16 +301,13 @@ function renderPipeline(
   lines.push(`\n## Deals`)
   for (const d of sorted) {
     const sellerName = memberById.get(d.seller_id as string) || "Member"
-    const own = commitments.filter((c) => c.deal_id === d.id)
-    const overdue = own.filter((c) => c.status === "overdue").length
-    const open = own.filter((c) => c.status === "confirmed" || c.status === "proposed").length
     const ks = (d.klo_state as Record<string, unknown> | null) ?? null
     const summary = (ks?.summary as string | undefined) || (d.summary as string | undefined) || ""
     const stage = (ks?.stage as string | undefined) || (d.stage as string | undefined) || ""
     const takeSeller = (ks?.klo_take_seller as string | undefined) || ""
 
     lines.push(
-      `\n- [${(d.health as string).toUpperCase()}] "${d.title}" — ${sellerName} · ${d.buyer_company || "buyer"} · ${formatUsd(Number(d.value) || 0)} · ${d.deadline ? `deadline ${d.deadline}` : "no deadline"} · stage ${stage} · ${overdue} overdue / ${open} open commitments`,
+      `\n- [${(d.health as string).toUpperCase()}] "${d.title}" — ${sellerName} · ${d.buyer_company || "buyer"} · ${formatUsd(Number(d.value) || 0)} · ${d.deadline ? `deadline ${d.deadline}` : "no deadline"} · stage ${stage}`,
     )
     if (summary) lines.push(`    summary: ${summary}`)
     if (takeSeller) lines.push(`    klo_take_seller: ${takeSeller}`)
