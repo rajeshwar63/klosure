@@ -89,6 +89,84 @@ export interface ConfidenceScore {
   computed_at: string;          // ISO timestamp
 }
 
+// =============================================================================
+// Phase 8 — Buyer view structured shape
+// =============================================================================
+
+export type SignalLevel = 'strong' | 'mixed' | 'weak';
+
+export interface BuyerSignal {
+  // Three buyer-facing health indicators that sit under the Klo brief.
+  // These are NOT the seller's confidence factors. Buyer-relevant only.
+  kind: 'timeline_health' | 'stakeholder_alignment' | 'vendor_responsiveness';
+  level: SignalLevel;
+  one_line_why: string;        // ≤ 14 words explaining the level
+}
+
+export interface BuyerPlaybookItem {
+  action: string;              // imperative, ≤ 12 words. "Loop in your CISO before Friday"
+  why_it_matters: string;      // 1 sentence, Klo's voice
+  who: 'you' | 'your_team' | 'vendor' | string; // free text — "your CFO", "your CISO", "vendor's SE"
+  deadline: string | null;     // ISO date or null
+  status: 'not_started' | 'in_flight' | 'done'; // server-side default 'not_started'
+  source_message_id: string | null;
+}
+
+export interface BuyerStakeholderTake {
+  // Buyer-side internal stakeholders only — vendor team is captured separately.
+  name: string;
+  role: string;                // "CFO", "CISO", "Procurement Lead", "End-user lead"
+  engagement: 'aligned' | 'engaged' | 'quiet' | 'blocker' | 'unknown';
+  klo_note: string | null;     // 1 sentence — what to do about this stakeholder
+}
+
+export interface BuyerRisk {
+  label: string;               // ≤ 10 words. "Procurement timeline"
+  why_it_matters: string;      // 1-2 sentences in Klo's voice, buyer-side framing
+  mitigation: string;          // 1 sentence — what the buyer should do
+}
+
+export interface BuyerRecentMoment {
+  // Buyer-friendly history feed. Last 3-5 important things from the seller's chat.
+  date: string;                // ISO date
+  text: string;                // ≤ 16 words. "Vendor sent SOC 2 report"
+}
+
+export interface BuyerView {
+  // The buyer-facing brief — the hero card on the dashboard.
+  // Written TO the buyer, not about them. 3-5 sentences. Klo's voice.
+  // Action-oriented framing. Never reveals seller strategy or confidence.
+  klo_brief_for_buyer: string;
+
+  // Three signals shown under the brief. Always 3 — one of each kind.
+  signals: BuyerSignal[];
+
+  // 3-5 specific moves the buyer should make this week.
+  playbook: BuyerPlaybookItem[];
+
+  // Buyer's internal stakeholder map. 3-8 people max.
+  stakeholder_takes: BuyerStakeholderTake[];
+
+  // 2-3 risks Klo is watching, framed as opportunities to act.
+  risks_klo_is_watching: BuyerRisk[];
+
+  // Single number 0-100 — buyer-facing "deal momentum" signal.
+  // NOT the seller's confidence score — different framing, different scale meaning.
+  // High = deal is moving forward (commitments kept, stakeholders engaged).
+  // Low = deal is stalling (commitments slipping, stakeholders quiet).
+  momentum_score: number | null;
+
+  // 'up' | 'down' | 'flat' — direction of momentum vs last update.
+  momentum_trend: 'up' | 'down' | 'flat' | null;
+
+  // 3-5 buyer-friendly history items, oldest to newest.
+  recent_moments: BuyerRecentMoment[];
+
+  // Bookkeeping
+  generated_at: string;        // ISO timestamp — when this buyer_view was last written
+  generation_reason: 'initial' | 'material_change' | 'manual_refresh';
+}
+
 export interface KloState {
   version: 1;
   summary: string;              // one-sentence present-tense status
@@ -107,6 +185,11 @@ export interface KloState {
   previous_confidence_value?: number;       // tracks the previous score so we can compute trend/delta
   next_meeting?: NextMeeting | null;        // most imminent future meeting, if any
   last_meeting?: LastMeeting | null;        // most recently completed meeting, if any
+
+  // Phase 8 — buyer-facing dashboard projection. Written by a separate
+  // gated LLM call (see klo-respond → buyer-view extraction). Optional
+  // because existing rows do not have it; the UI must handle the missing case.
+  buyer_view?: BuyerView | null;
 }
 
 export interface KloRespondOutput {
