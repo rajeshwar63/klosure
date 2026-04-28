@@ -1,14 +1,18 @@
-// Phase 9 step 07 — seller's Overview tab. Same component library as the
-// buyer view, with seller voice and seller-only sections (confidence card,
-// Klo's full take, confidence chart). Replaces the old three-card pattern
-// (Klo Recommends / Klo's Confidence / Klo's Full Read) that repeated the
-// same insight across the page.
-
 import { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../../lib/supabase.js'
+import { daysUntil, formatCurrency } from '../../lib/format.js'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
 import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
 import SellerTimelineStrip from './SellerTimelineStrip.jsx'
+
+const STAGE_OPTIONS = [
+  { value: 'discovery', label: 'Discovery', idx: 1 },
+  { value: 'proposal', label: 'Proposal', idx: 2 },
+  { value: 'negotiation', label: 'Negotiation', idx: 3 },
+  { value: 'legal', label: 'Legal', idx: 4 },
+  { value: 'closed', label: 'Closed', idx: 5 },
+]
 
 function relativeTime(iso) {
   if (!iso) return null
@@ -20,6 +24,24 @@ function relativeTime(iso) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   const days = Math.floor(diff / 86400)
   return days === 1 ? '1 day ago' : `${days} days ago`
+}
+
+function formatShortDate(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function snapshotPlaceholders(field) {
+  const map = {
+    stage: 'Set stage',
+    value: 'Add value',
+    deadline: 'Set close date',
+    rating: 'Waiting for Klo rating',
+    probability: 'No probability yet',
+  }
+  return map[field] ?? '—'
 }
 
 function KloBriefSeller({ klo_take_seller, computed_at }) {
@@ -42,6 +64,244 @@ function KloBriefSeller({ klo_take_seller, computed_at }) {
         </p>
       )}
     </div>
+  )
+}
+
+function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
+  const isSeller = viewerRole === 'seller'
+  const stage = klo?.stage ?? deal?.stage ?? null
+  const stageMeta = STAGE_OPTIONS.find((s) => s.value === stage) ?? null
+  const deadline = klo?.deadline?.date ?? deal?.deadline ?? null
+  const valueAmount = klo?.deal_value?.amount ?? deal?.value ?? null
+  const valueConfidence = klo?.deal_value?.confidence
+  const confidence = klo?.confidence?.value ?? null
+  const ratingTrend = klo?.confidence?.trend ?? 'flat'
+  const trendArrow = ratingTrend === 'up' ? '↑' : ratingTrend === 'down' ? '↓' : '→'
+
+  const risksCount = Array.isArray(klo?.risks) ? klo.risks.length : 0
+  const blockersCount = Array.isArray(klo?.blockers) ? klo.blockers.length : 0
+  const openActionsCount = (klo?.next_actions ?? []).filter((a) => a?.status !== 'done').length
+
+  const lastUpdated = relativeTime(klo?.confidence?.computed_at ?? deal?.updated_at ?? deal?.created_at)
+  const daysInStage = (() => {
+    const source = deal?.updated_at ?? deal?.created_at
+    if (!source) return null
+    const diff = Math.floor((Date.now() - new Date(source).getTime()) / 86400000)
+    return Number.isNaN(diff) ? null : Math.max(0, diff)
+  })()
+  const daysToDeadline = daysUntil(deadline)
+
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [draft, setDraft] = useState({ stage: stage ?? '', value: valueAmount ?? '', deadline: deadline ?? '' })
+
+  useEffect(() => {
+    setDraft({
+      stage: stage ?? '',
+      value: valueAmount ?? '',
+      deadline: deadline ?? '',
+    })
+  }, [stage, valueAmount, deadline])
+
+  async function saveQuickEdit() {
+    if (!isSeller || !deal?.id || saving) return
+    setSaving(true)
+    setError('')
+
+    const valueNumber = draft.value === '' ? null : Number(draft.value)
+    if (draft.value !== '' && Number.isNaN(valueNumber)) {
+      setError('Deal value must be a number.')
+      setSaving(false)
+      return
+    }
+
+    const updates = {
+      stage: draft.stage || null,
+      value: valueNumber,
+      deadline: draft.deadline || null,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data, error: updateError } = await supabase
+      .from('deals')
+      .update(updates)
+      .eq('id', deal.id)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      setError(updateError.message || 'Could not save changes.')
+      setSaving(false)
+      return
+    }
+
+    onDealUpdate?.(data)
+    setEditing(false)
+    setSaving(false)
+  }
+
+  const stageChipTone = stage === 'closed' ? 'bg-emerald-100 text-emerald-800' : 'bg-klo/10 text-klo'
+
+  return (
+    <section className="md:sticky md:top-4 z-10 bg-white border border-navy/10 rounded-2xl p-4 md:p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-navy">Deal snapshot</h2>
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${stageChipTone}`}>
+            {stageMeta ? `${stageMeta.label} · ${stageMeta.idx}/5` : snapshotPlaceholders('stage')}
+          </span>
+          <span className="text-[11px] text-navy/55">
+            {daysInStage == null ? 'SLA: add stage history' : `${daysInStage} day${daysInStage === 1 ? '' : 's'} in stage`}
+          </span>
+        </div>
+      </div>
+
+      <p className="mt-2 text-[11px] text-navy/45">
+        Last updated {lastUpdated || 'recently'}
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <FieldCard label="Deal stage" value={stageMeta?.label || snapshotPlaceholders('stage')} hint={!stageMeta ? 'Prompt: choose current stage' : null} />
+        <FieldCard
+          label="Deal value"
+          value={valueAmount != null ? formatCurrency(valueAmount) : snapshotPlaceholders('value')}
+          hint={
+            valueConfidence === 'tentative'
+              ? 'Confidence range: tentative'
+              : valueConfidence
+                ? `Confidence range: ${valueConfidence}`
+                : valueAmount == null
+                  ? 'Prompt: add expected contract value'
+                  : null
+          }
+        />
+        <FieldCard
+          label="Target close"
+          value={formatShortDate(deadline) || snapshotPlaceholders('deadline')}
+          hint={
+            daysToDeadline == null
+              ? 'Prompt: set expected close deadline'
+              : daysToDeadline < 0
+                ? `${Math.abs(daysToDeadline)}d overdue`
+                : daysToDeadline === 0
+                  ? 'due today'
+                  : `${daysToDeadline} days left`
+          }
+        />
+        <FieldCard
+          label="Klo rating"
+          value={confidence == null ? snapshotPlaceholders('rating') : `${confidence}% ${trendArrow}`}
+          hint={confidence == null ? 'Prompt: ask Klo for an updated read' : `Trend: ${ratingTrend}`}
+        />
+        <FieldCard
+          label="Probability to close"
+          value={confidence == null ? snapshotPlaceholders('probability') : `${confidence}%`}
+          hint={confidence == null ? 'Prompt: capture more deal signals in chat' : null}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <MiniHealth label="Risks" count={risksCount} tone="risk" />
+        <MiniHealth label="Blockers" count={blockersCount} tone="blocker" />
+        <MiniHealth label="Open actions" count={openActionsCount} tone="action" />
+      </div>
+
+      {isSeller && (
+        <div className="mt-4 border-t border-navy/10 pt-3">
+          {!editing ? (
+            <button
+              type="button"
+              className="text-xs font-semibold text-klo hover:underline"
+              onClick={() => setEditing(true)}
+            >
+              Quick edit stage / value / deadline
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <label className="text-xs text-navy/70">
+                  Stage
+                  <select
+                    value={draft.stage}
+                    onChange={(e) => setDraft((p) => ({ ...p, stage: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm"
+                  >
+                    <option value="">Select stage</option>
+                    {STAGE_OPTIONS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-navy/70">
+                  Value (USD)
+                  <input
+                    type="number"
+                    min="0"
+                    value={draft.value}
+                    onChange={(e) => setDraft((p) => ({ ...p, value: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm"
+                    placeholder="120000"
+                  />
+                </label>
+                <label className="text-xs text-navy/70">
+                  Close date
+                  <input
+                    type="date"
+                    value={draft.deadline}
+                    onChange={(e) => setDraft((p) => ({ ...p, deadline: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm"
+                  />
+                </label>
+              </div>
+              {error && <p className="text-xs text-red-600">{error}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={saveQuickEdit}
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold bg-klo text-white hover:bg-klo/90 disabled:opacity-60"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setEditing(false)}
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold border border-navy/15 text-navy"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function FieldCard({ label, value, hint }) {
+  return (
+    <div className="rounded-xl border border-navy/10 px-3 py-2.5 bg-[#fbfcfe] min-h-[76px]">
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-navy">{value}</p>
+      {hint && <p className="mt-1 text-[11px] text-navy/50">{hint}</p>}
+    </div>
+  )
+}
+
+function MiniHealth({ label, count, tone }) {
+  const toneClass = {
+    risk: 'bg-amber-50 text-amber-800 border-amber-200',
+    blocker: 'bg-red-50 text-red-700 border-red-200',
+    action: 'bg-sky-50 text-sky-800 border-sky-200',
+  }
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${toneClass[tone] || 'bg-white text-navy border-navy/15'}`}>
+      <span>{label}</span>
+      <span className="font-semibold">{count}</span>
+    </span>
   )
 }
 
@@ -299,8 +559,6 @@ function RisksList({ blockers }) {
 }
 
 function deriveStakeholdersForSeller(klo) {
-  // Prefer buyer_view.stakeholder_takes (richer with klo_note + engagement);
-  // fall back to klo_state.people if buyer_view hasn't been generated yet.
   const fromView = klo?.buyer_view?.stakeholder_takes ?? []
   if (fromView.length > 0) return fromView
   return (klo?.people ?? []).map((p) => ({
@@ -315,8 +573,6 @@ function deriveActions(klo) {
   if (Array.isArray(klo?.next_actions) && klo.next_actions.length > 0) {
     return klo.next_actions
   }
-  // Fallback: synthesize from confidence.factors_to_raise so the section
-  // never renders empty for older klo_state rows that predate next_actions.
   const factors = klo?.confidence?.factors_to_raise ?? []
   return factors.map((f, i) => ({
     id: `fallback-${i}`,
@@ -328,7 +584,7 @@ function deriveActions(klo) {
   }))
 }
 
-export default function SellerOverview({ deal }) {
+export default function SellerOverview({ deal, viewerRole = 'seller', onDealUpdate }) {
   const klo = deal?.klo_state ?? null
 
   const stakeholders = useMemo(() => deriveStakeholdersForSeller(klo), [klo])
@@ -351,6 +607,8 @@ export default function SellerOverview({ deal }) {
 
   return (
     <div className="p-4 md:p-6 max-w-[1080px] mx-auto space-y-5">
+      <DealSnapshotPanel deal={deal} klo={klo} viewerRole={viewerRole} onDealUpdate={onDealUpdate} />
+
       <KloBriefSeller
         klo_take_seller={klo.klo_take_seller}
         computed_at={klo.confidence?.computed_at}
