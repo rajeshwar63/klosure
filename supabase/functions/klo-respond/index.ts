@@ -387,6 +387,14 @@ async function maybeRegenerateBuyerView(args: {
   buyerView.generated_at = new Date().toISOString()
   buyerView.generation_reason = beforeState?.buyer_view ? "material_change" : "initial"
 
+  // Append to the momentum history (cap at 30 entries) so the dashboard chart
+  // gets a real series instead of just the latest point.
+  const prevHistory = beforeState?.buyer_view?.momentum_history ?? []
+  const nextHistory = buyerView.momentum_score == null
+    ? prevHistory
+    : [...prevHistory, { date: buyerView.generated_at, score: buyerView.momentum_score }]
+  buyerView.momentum_history = nextHistory.slice(-30)
+
   // Read fresh state, merge, write — avoids stomping any other concurrent write.
   const { data: fresh } = await sb
     .from("deals")

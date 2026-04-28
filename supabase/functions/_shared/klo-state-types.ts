@@ -165,6 +165,12 @@ export interface BuyerView {
   // Bookkeeping
   generated_at: string;        // ISO timestamp — when this buyer_view was last written
   generation_reason: 'initial' | 'material_change' | 'manual_refresh';
+
+  // Optional rolling momentum history — last 30 entries, appended on each
+  // generation. Drives the BuyerMomentumChart on the dashboard. Optional
+  // because earlier generations may have been written before this field
+  // was added.
+  momentum_history?: Array<{ date: string; score: number }>;
 }
 
 export interface KloState {
