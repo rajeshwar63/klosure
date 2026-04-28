@@ -37,12 +37,98 @@ const STATUS_DOT = {
   in_flight: { glyph: '◐', color: 'text-amber-500' },
   done: { glyph: '●', color: 'text-emerald-500' },
 }
+const PRIORITY_META = {
+  critical: {
+    label: 'Critical',
+    pill: 'bg-rose-50 text-rose-700 border border-rose-200',
+  },
+  important: {
+    label: 'Important',
+    pill: 'bg-amber-50 text-amber-700 border border-amber-200',
+  },
+  nice_to_have: {
+    label: 'Nice-to-have',
+    pill: 'bg-slate-100 text-slate-700 border border-slate-200',
+  },
+}
+
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+function getPriorityTier(item) {
+  const explicitPriority = normalizeText(item?.priority || item?.priority_tier || item?.metadata?.priority)
+  if (['critical', 'important', 'nice_to_have'].includes(explicitPriority)) return explicitPriority
+  if (explicitPriority === 'nice-to-have') return 'nice_to_have'
+
+  const actionText = normalizeText(item?.action)
+  const whyText = normalizeText(item?.why_it_matters)
+  const combined = `${actionText} ${whyText}`
+
+  if (/\b(urgent|blocker|legal|redline|security|exec|approval|contract)\b/.test(combined)) {
+    return 'critical'
+  }
+  if (/\b(alignment|stakeholder|review|prep|timeline|follow up)\b/.test(combined)) {
+    return 'important'
+  }
+  return 'nice_to_have'
+}
+
+function getDependencyHint(item) {
+  if (item?.dependency_hint) return item.dependency_hint
+  if (item?.depends_on) return `Do after ${item.depends_on}`
+  if (item?.dependency) return `Do after ${item.dependency}`
+  if (Array.isArray(item?.dependencies) && item.dependencies.length > 0) {
+    return `Do after ${item.dependencies.join(', ')}`
+  }
+
+  const actionText = normalizeText(item?.action)
+  if (actionText.includes('procurement') || actionText.includes('legal')) {
+    return 'Do after Legal redlines complete'
+  }
+  if (actionText.includes('pricing')) {
+    return 'Do after internal budget alignment'
+  }
+  return 'No blockers noted'
+}
+
+function getImpactIfDelayed(item, priority) {
+  if (item?.impact_if_delayed) return item.impact_if_delayed
+  if (item?.delay_impact) return item.delay_impact
+
+  if (priority === 'critical') {
+    return 'Deal timeline can slip and executive confidence may drop.'
+  }
+  if (priority === 'important') {
+    return 'Momentum slows and follow-up work increases.'
+  }
+  return 'Limited near-term impact; can defer if needed.'
+}
 
 function formatDeadline(iso) {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function getDueState(deadline, status) {
+  if (!deadline || status === 'done') return null
+  const date = new Date(deadline)
+  if (Number.isNaN(date.getTime())) return null
+
+  const now = new Date()
+  const msPerDay = 1000 * 60 * 60 * 24
+  const daysUntil = Math.ceil((date - now) / msPerDay)
+  if (daysUntil < 0) return 'overdue'
+  if (daysUntil <= 3) return 'due_soon'
+  return null
+}
+
+function handleQuickCta(cta, item) {
+  // Placeholder for future integration hooks.
+  // eslint-disable-next-line no-console
+  console.info(`[playbook-cta:${cta}]`, item)
 }
 
 export default function BuyerPlaybookCard({ playbook, dealId }) {
@@ -79,9 +165,23 @@ export default function BuyerPlaybookCard({ playbook, dealId }) {
             const hash = actionHash(item)
             const status = overrides[hash] ?? item?.status ?? 'not_started'
             const dot = STATUS_DOT[status] ?? STATUS_DOT.not_started
+            const priority = getPriorityTier(item)
+            const priorityMeta = PRIORITY_META[priority]
+            const dependencyHint = getDependencyHint(item)
+            const impactIfDelayed = getImpactIfDelayed(item, priority)
             const deadline = formatDeadline(item?.deadline)
+            const dueState = getDueState(item?.deadline, status)
             return (
-              <li key={`${hash}-${idx}`} className="flex gap-3 px-5 py-4">
+              <li
+                key={`${hash}-${idx}`}
+                className={`flex gap-3 px-5 py-4 ${
+                  dueState === 'overdue'
+                    ? 'bg-rose-50/40'
+                    : dueState === 'due_soon'
+                      ? 'bg-amber-50/40'
+                      : ''
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => cycleStatus(item)}
@@ -94,11 +194,32 @@ export default function BuyerPlaybookCard({ playbook, dealId }) {
                   <p className={`text-[14px] font-medium text-navy leading-snug ${status === 'done' ? 'line-through text-navy/45' : ''}`}>
                     {item?.action}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${priorityMeta.pill}`}>
+                      {priorityMeta.label}
+                    </span>
+                    {dueState === 'overdue' && (
+                      <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-rose-100 text-rose-700">
+                        Overdue
+                      </span>
+                    )}
+                    {dueState === 'due_soon' && (
+                      <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700">
+                        Due soon
+                      </span>
+                    )}
+                  </div>
                   {item?.why_it_matters && (
                     <p className="text-[12px] text-navy/55 mt-0.5 leading-snug">
                       {item.why_it_matters}
                     </p>
                   )}
+                  <p className="text-[12px] text-navy/60 mt-1 leading-snug">
+                    Dependency: <span className="text-navy/80">{dependencyHint}</span>
+                  </p>
+                  <p className="text-[12px] text-navy/60 mt-0.5 leading-snug">
+                    Impact if delayed: <span className="text-navy/80">{impactIfDelayed}</span>
+                  </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-navy/50">
                     {item?.who && (
                       <span>
@@ -110,6 +231,29 @@ export default function BuyerPlaybookCard({ playbook, dealId }) {
                         By: <span className="text-navy/75">{deadline}</span>
                       </span>
                     )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickCta('draft_email', item)}
+                      className="text-[11px] font-medium text-navy/80 border border-navy/20 hover:border-navy/40 hover:bg-navy/[0.03] rounded-md px-2 py-1"
+                    >
+                      Draft email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickCta('schedule_call', item)}
+                      className="text-[11px] font-medium text-navy/80 border border-navy/20 hover:border-navy/40 hover:bg-navy/[0.03] rounded-md px-2 py-1"
+                    >
+                      Schedule call
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickCta('message_klo', item)}
+                      className="text-[11px] font-medium text-klo border border-klo/30 hover:border-klo/60 hover:bg-klo/[0.06] rounded-md px-2 py-1"
+                    >
+                      Message Klo
+                    </button>
                   </div>
                 </div>
               </li>
