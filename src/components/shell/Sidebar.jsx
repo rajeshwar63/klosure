@@ -147,7 +147,7 @@ export default function Sidebar({
       {/* My deals header — "+" creates a new deal */}
       {!collapsed && (
         <div className="px-3 pt-2 pb-1 flex items-center justify-between gap-2">
-          <span className="text-[13px] uppercase tracking-wider font-semibold text-navy/45">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
             My deals
           </span>
           {onNewDeal && (
