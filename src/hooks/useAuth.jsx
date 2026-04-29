@@ -39,10 +39,20 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       return { data, error }
     },
-    signOut: async ({ allDevices = false } = {}) => {
-      const scope = allDevices ? 'global' : 'local'
-      const { error } = await supabase.auth.signOut({ scope })
-      if (error) throw error
+    signOut: async () => {
+      await supabase.auth.signOut()
+    },
+    changePassword: async ({ newPassword }) => {
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword })
+      return { data, error }
+    },
+    signOutOthers: async () => {
+      try {
+        const { error } = await supabase.auth.signOut({ scope: 'others' })
+        return { supported: true, error }
+      } catch (error) {
+        return { supported: false, error }
+      }
     }
   }), [session, loading])
 
