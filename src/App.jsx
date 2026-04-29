@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth.jsx'
 import { useProfile } from './hooks/useProfile.jsx'
 import LandingPage from './pages/LandingPage.jsx'
+import ComingSoonPage from './pages/ComingSoonPage.jsx'
 import AuthPage from './pages/AuthPage.jsx'
 import DealsListPage from './pages/DealsListPage.jsx'
 import BuyerJoinPage from './pages/BuyerJoinPage.jsx'
@@ -76,6 +77,11 @@ export default function App() {
           <Route path="/settings/train-klo" element={<TrainKloPage />} />
           <Route path="/settings/password" element={<ChangePasswordPage />} />
         </Route>
+
+        {/* Marketing-only placeholder routes referenced from the homepage footer. */}
+        <Route path="/privacy" element={<ComingSoonPage title="Privacy policy" />} />
+        <Route path="/terms" element={<ComingSoonPage title="Terms of service" />} />
+        <Route path="/refund" element={<ComingSoonPage title="Refund policy" />} />
 
         {/* Buyer flow stays outside the shell. */}
         <Route path="/join/:token" element={<BuyerJoinPage />} />
