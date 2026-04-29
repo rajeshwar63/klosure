@@ -24,6 +24,7 @@ const MANAGER_NAV = [
   { id: 'forecast', icon: '↗', label: 'Forecast' },
   { id: 'reps', icon: '◎', label: 'Reps' },
   { id: 'askklo', icon: '✦', label: 'Ask Klo' },
+  { id: 'train-klo', icon: '⚙', label: 'Settings' },
 ]
 
 function sortDealsForSidebar(deals) {
@@ -78,8 +79,7 @@ export default function Sidebar({
   onNavigate,
   onNewDeal,
   onLogout,
-  onLogoutAllDevices,
-  canLogoutAllDevices = false,
+  onProfileClick,
   collapsed = false,
   onCollapseToggle,
 }) {
@@ -216,38 +216,37 @@ export default function Sidebar({
       {/* Footer */}
       {!collapsed && (
         <div className="border-t border-navy/5 px-3 py-2.5 flex items-center gap-2 shrink-0">
-          <div
-            className="w-7 h-7 rounded-full bg-klo/15 text-klo text-[11px] font-semibold flex items-center justify-center shrink-0"
-            aria-hidden
+          <button
+            type="button"
+            onClick={onProfileClick}
+            disabled={!onProfileClick}
+            className="flex items-center gap-2 flex-1 min-w-0 text-left rounded-md px-1 py-1 -mx-1 hover:bg-navy/5 disabled:cursor-default disabled:hover:bg-transparent"
+            aria-label="Open profile"
           >
-            {userInitials(user)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-navy truncate">
-              {user?.name || user?.email || 'You'}
-            </p>
-            {role === 'manager' && (
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-klo mt-0.5 inline-block">
-                Mgr
-              </span>
-            )}
-          </div>
+            <div
+              className="w-7 h-7 rounded-full bg-klo/15 text-klo text-[11px] font-semibold flex items-center justify-center shrink-0"
+              aria-hidden
+            >
+              {userInitials(user)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium text-navy truncate">
+                {user?.name || user?.email || 'You'}
+              </p>
+              {role === 'manager' && (
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-klo mt-0.5 inline-block">
+                  Mgr
+                </span>
+              )}
+            </div>
+          </button>
           {onLogout && (
             <button
               type="button"
               onClick={onLogout}
-              className="text-[11px] text-navy/55 hover:text-klo hover:underline"
+              className="text-[11px] text-navy/55 hover:text-klo hover:underline shrink-0"
             >
               Log out
-            </button>
-          )}
-          {canLogoutAllDevices && onLogoutAllDevices && (
-            <button
-              type="button"
-              onClick={onLogoutAllDevices}
-              className="text-[11px] text-navy/55 hover:text-red-600 hover:underline"
-            >
-              Log out of all devices
             </button>
           )}
         </div>

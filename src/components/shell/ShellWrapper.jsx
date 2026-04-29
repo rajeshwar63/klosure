@@ -9,6 +9,8 @@ import { useProfile } from '../../hooks/useProfile.jsx'
 import { useShellDeals } from '../../hooks/useShellDeals.jsx'
 import AppShell from './AppShell.jsx'
 import AppPromptModal from '../ui/AppPromptModal.jsx'
+import LogoutChoiceModal from '../ui/LogoutChoiceModal.jsx'
+import ProfileModal from '../ui/ProfileModal.jsx'
 
 export function resolveActiveView(pathname, role) {
   if (pathname === '/today') return 'today'
@@ -48,8 +50,10 @@ export default function ShellWrapper() {
   const { user, signOut } = useAuth()
   const { profile, isManager } = useProfile()
   const { deals, loading: dealsLoading } = useShellDeals()
-  const [showAllDevicesConfirm, setShowAllDevicesConfirm] = useState(false)
+  const [logoutChoiceOpen, setLogoutChoiceOpen] = useState(false)
+  const [allDevicesConfirmOpen, setAllDevicesConfirmOpen] = useState(false)
   const [logoutBusy, setLogoutBusy] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const role = location.pathname.startsWith('/team') && isManager ? 'manager' : 'seller'
   const activeView = resolveActiveView(location.pathname, role)
@@ -64,19 +68,21 @@ export default function ShellWrapper() {
     setLogoutBusy(true)
     try {
       await signOut({ allDevices })
-      setShowAllDevicesConfirm(false)
+      setLogoutChoiceOpen(false)
+      setAllDevicesConfirmOpen(false)
       navigate('/login', { replace: true, state: null })
     } finally {
       setLogoutBusy(false)
     }
   }
 
-  function handleLogoutCurrentSession() {
-    return runLogout({ allDevices: false })
+  function handleOpenLogoutChoice() {
+    setLogoutChoiceOpen(true)
   }
 
   function handleRequestLogoutAllDevices() {
-    setShowAllDevicesConfirm(true)
+    setLogoutChoiceOpen(false)
+    setAllDevicesConfirmOpen(true)
   }
 
   return (
@@ -87,22 +93,30 @@ export default function ShellWrapper() {
       deals={deals}
       dealsLoading={dealsLoading}
       user={userForShell}
-      onLogout={handleLogoutCurrentSession}
-      onLogoutAllDevices={handleRequestLogoutAllDevices}
-      canLogoutAllDevices
+      onLogout={handleOpenLogoutChoice}
+      onProfileClick={() => setProfileOpen(true)}
     >
       <Outlet />
+      <LogoutChoiceModal
+        open={logoutChoiceOpen}
+        canLogoutAllDevices
+        busy={logoutBusy}
+        onLogoutThisDevice={() => runLogout({ allDevices: false })}
+        onLogoutAllDevices={handleRequestLogoutAllDevices}
+        onCancel={() => setLogoutChoiceOpen(false)}
+      />
       <AppPromptModal
-        open={showAllDevicesConfirm}
+        open={allDevicesConfirmOpen}
         tone="danger"
         title="Log out of all devices?"
         message="This signs you out everywhere this account is currently active. You will need to log in again on each device."
         confirmLabel="Log out of all devices"
         cancelLabel="Cancel"
         onConfirm={() => runLogout({ allDevices: true })}
-        onCancel={() => setShowAllDevicesConfirm(false)}
+        onCancel={() => setAllDevicesConfirmOpen(false)}
         busy={logoutBusy}
       />
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </AppShell>
   )
 }
