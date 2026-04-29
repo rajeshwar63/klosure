@@ -24,6 +24,7 @@ import { callLlm } from "../_shared/llm-client.ts"
 import type { LlmMessage } from "../_shared/llm-types.ts"
 import { loadSellerProfile } from "../_shared/seller-profile-loader.ts"
 import { buildSellerProfileSection } from "../_shared/prompts/sections.ts"
+import { canWrite } from "../_shared/can-write.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -132,6 +133,24 @@ Deno.serve(async (req) => {
       if (!body?.team_id) return json({ error: "team_id required" }, 400)
       const { data: userData, error: userErr } = await userClient.auth.getUser()
       if (userErr || !userData?.user) return json({ error: "not authorized" }, 401)
+      // Phase 12.1 — gate quarter-take generation behind the manager's status.
+      // The manager pays for the team; canWrite resolves their team plan via
+      // get_account_status (team plan takes precedence over user plan).
+      const qtCheck = await canWrite(SUPABASE_URL, SERVICE_ROLE_KEY, userData.user.id)
+      if (!qtCheck.ok) {
+        console.log(JSON.stringify({
+          event: "klo_manager_quarter_take_blocked_read_only",
+          manager_id: userData.user.id,
+          status: qtCheck.status,
+          reason: qtCheck.reason,
+        }))
+        return json({
+          ok: false,
+          error: "account_read_only",
+          status: qtCheck.status,
+          message: "This account is read-only. Upgrade to continue using Klo coaching.",
+        }, 402)
+      }
       return await handleQuarterTake(service, body.team_id, userData.user.id)
     }
 
@@ -142,6 +161,26 @@ Deno.serve(async (req) => {
     // Identify the manager — used for profile injection (Phase 8).
     const { data: managerUserData } = await userClient.auth.getUser()
     const managerUserId = managerUserData?.user?.id ?? null
+
+    // Phase 12.1 — server-side licensing gate. We need a managerUserId to
+    // check; if the JWT didn't resolve to a user, treat as unauthorized.
+    if (!managerUserId) return json({ error: "not authorized" }, 401)
+    const writeCheck = await canWrite(SUPABASE_URL, SERVICE_ROLE_KEY, managerUserId)
+    if (!writeCheck.ok) {
+      console.log(JSON.stringify({
+        event: "klo_manager_blocked_read_only",
+        manager_id: managerUserId,
+        thread_id: threadId,
+        status: writeCheck.status,
+        reason: writeCheck.reason,
+      }))
+      return json({
+        ok: false,
+        error: "account_read_only",
+        status: writeCheck.status,
+        message: "This account is read-only. Upgrade to continue using Klo coaching.",
+      }, 402)
+    }
 
     // Verify the caller actually owns the thread.
     const { data: thread, error: tErr } = await userClient
