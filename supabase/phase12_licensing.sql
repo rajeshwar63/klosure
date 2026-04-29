@@ -10,9 +10,16 @@
 alter table public.users
   add column if not exists trial_started_at timestamptz default now();
 
+-- trial_ends_at is a regular column (not generated) because timestamptz + interval
+-- is STABLE in Postgres — generated-column expressions must be IMMUTABLE.
+-- trial_started_at is fixed at signup so trial_ends_at never needs recomputing
+-- after the row is created. Default + backfill below cover both new and old rows.
 alter table public.users
-  add column if not exists trial_ends_at timestamptz
-  generated always as (trial_started_at + interval '14 days') stored;
+  add column if not exists trial_ends_at timestamptz default (now() + interval '14 days');
+
+update public.users
+   set trial_ends_at = trial_started_at + interval '14 days'
+ where trial_ends_at is null;
 
 alter table public.users
   add column if not exists currency text default 'INR'
