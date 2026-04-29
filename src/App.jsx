@@ -17,6 +17,7 @@ import ShellWrapper from './components/shell/ShellWrapper.jsx'
 const NewDealPage = lazy(() => import('./pages/NewDealPage.jsx'))
 const DealRoomPage = lazy(() => import('./pages/DealRoomPage.jsx'))
 const BillingPage = lazy(() => import('./pages/BillingPage.jsx'))
+const BillingReturnPage = lazy(() => import('./pages/BillingReturnPage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage.jsx'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
 const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
@@ -78,6 +79,12 @@ export default function App() {
           <Route path="/settings/train-klo" element={<TrainKloPage />} />
           <Route path="/settings/password" element={<ChangePasswordPage />} />
         </Route>
+
+        {/* Razorpay return — full-screen confirming-payment page outside the shell. */}
+        <Route
+          path="/billing/return"
+          element={<RequireAuth><BillingReturnPage /></RequireAuth>}
+        />
 
         {/* Marketing-only placeholder routes referenced from the homepage footer. */}
         <Route path="/privacy" element={<ComingSoonPage title="Privacy policy" />} />
