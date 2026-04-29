@@ -1,3 +1,6 @@
+/* Klosure design language tokens. The new app pages read from --klo-*. */
+@import './styles/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

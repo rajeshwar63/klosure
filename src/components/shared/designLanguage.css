@@ -1,0 +1,278 @@
+/*
+ * Klosure design-language primitives.
+ *
+ * Eight composables that carry the brand across all 11 app surfaces.
+ * Lifted from the landing page motifs in §3 of the design brief.
+ *
+ * Rules of thumb when extending this file:
+ *   - Use only --klo-* tokens.
+ *   - No shadows (hairlines only). No new colors. No icons next to status.
+ *   - One accent surface per screen.
+ */
+
+/* ─────────── Eyebrow with glowing dot ─────────── */
+.kl-eyebrow {
+  font-family: var(--klo-font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--klo-text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kl-eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--klo-accent);
+  box-shadow: 0 0 12px var(--klo-accent);
+  flex-shrink: 0;
+}
+.kl-eyebrow--plain::before {
+  display: none;
+}
+
+/* ─────────── Mono kicker / numbered feature label ─────────── */
+.kl-kicker {
+  font-family: var(--klo-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: var(--klo-text-mute);
+  text-transform: uppercase;
+  display: block;
+}
+.kl-kicker--accent {
+  color: var(--klo-accent);
+}
+
+/* ─────────── Hairline grid (the signature card layout) ─────────── */
+.kl-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--klo-line);
+  border: 1px solid var(--klo-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.kl-grid--cols-2 { grid-template-columns: repeat(2, 1fr); }
+.kl-grid--cols-3 { grid-template-columns: repeat(3, 1fr); }
+.kl-grid--cols-4 { grid-template-columns: repeat(4, 1fr); }
+.kl-grid--rows {
+  grid-template-columns: 1fr;
+}
+
+.kl-grid__cell {
+  background: var(--klo-bg);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: background 0.15s ease;
+}
+.kl-grid__cell--interactive {
+  cursor: pointer;
+}
+.kl-grid__cell--interactive:hover {
+  background: var(--klo-surface);
+}
+
+@media (max-width: 880px) {
+  .kl-grid--cols-2,
+  .kl-grid--cols-3,
+  .kl-grid--cols-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─────────── Compare strip (the "two stories" pattern) ─────────── */
+.kl-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--klo-line);
+  border: 1px solid var(--klo-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.kl-compare__col {
+  background: var(--klo-bg);
+  padding: 28px 24px;
+}
+.kl-compare__col--truth {
+  background: linear-gradient(180deg, var(--klo-accent-soft), transparent 200px), var(--klo-bg);
+}
+.kl-compare__head {
+  font-family: var(--klo-font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--klo-text-mute);
+  margin: 0 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kl-compare__tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--klo-surface-2);
+  color: var(--klo-text-dim);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.kl-compare__col--truth .kl-compare__tag {
+  background: var(--klo-accent-soft);
+  color: var(--klo-accent);
+}
+.kl-compare__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--klo-line);
+  font-size: 15px;
+  gap: 16px;
+}
+.kl-compare__row:last-child {
+  border-bottom: 0;
+}
+.kl-compare__k {
+  color: var(--klo-text-dim);
+  flex-shrink: 0;
+}
+.kl-compare__v {
+  color: var(--klo-text);
+  font-weight: 500;
+  text-align: right;
+}
+.kl-compare__v--dim  { color: var(--klo-text-mute); font-weight: 400; }
+.kl-compare__v--good { color: var(--klo-good); }
+.kl-compare__v--warn { color: var(--klo-warn); }
+.kl-compare__v--bad  { color: var(--klo-danger); }
+
+@media (max-width: 880px) {
+  .kl-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─────────── Klo brief card (the page hero on every seller surface) ─────────── */
+.kl-brief {
+  position: relative;
+  background: var(--klo-bg-elev);
+  border: 1px solid var(--klo-line);
+  border-radius: 16px;
+  padding: 28px 32px 28px 36px;
+}
+.kl-brief::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20px;
+  bottom: 20px;
+  width: 3px;
+  background: var(--klo-accent);
+  border-radius: 0 2px 2px 0;
+}
+.kl-brief__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.kl-brief__mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--klo-accent);
+  box-shadow: 0 0 16px var(--klo-accent-soft);
+  flex-shrink: 0;
+}
+.kl-brief__label {
+  font-family: var(--klo-font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--klo-text-mute);
+}
+.kl-brief__body {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--klo-text);
+  margin: 0;
+}
+.kl-brief__foot {
+  margin-top: 16px;
+  font-family: var(--klo-font-mono);
+  font-size: 11px;
+  color: var(--klo-text-mute);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* ─────────── Confidence pill ─────────── */
+.kl-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--klo-font-mono);
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--klo-surface);
+  color: var(--klo-text);
+  border: 1px solid var(--klo-line);
+  letter-spacing: 0;
+}
+.kl-pill__num {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kl-pill--good { color: var(--klo-good);   border-color: rgba(30, 138, 82, 0.24); }
+.kl-pill--warn { color: var(--klo-warn);   border-color: rgba(181, 120, 30, 0.24); }
+.kl-pill--bad  { color: var(--klo-danger); border-color: rgba(196, 69, 47, 0.24); }
+
+/* ─────────── Mono timestamp ─────────── */
+.kl-ts {
+  font-family: var(--klo-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--klo-text-mute);
+  text-transform: uppercase;
+}
+.kl-ts--dim { color: var(--klo-text-mute); }
+
+/* ─────────── Hairline list rows (for in-table list cells) ─────────── */
+.kl-list {
+  background: var(--klo-bg-elev);
+  border: 1px solid var(--klo-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.kl-list > * + * {
+  border-top: 1px solid var(--klo-line);
+}
+.kl-row {
+  transition: background 0.12s ease;
+}
+.kl-row:hover {
+  background: var(--klo-surface);
+}
+.kl-row-warn {
+  background: rgba(181, 120, 30, 0.06);
+  transition: background 0.12s ease;
+}
+.kl-row-warn:hover {
+  background: rgba(181, 120, 30, 0.1);
+}
+
+/* ─────────── Vertical accent divider ─────────── */
+.kl-divider-line {
+  width: 1px;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--klo-accent-line), transparent);
+  margin: 0 auto;
+}

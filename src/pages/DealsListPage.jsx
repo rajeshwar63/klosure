@@ -6,6 +6,13 @@ import { loadSellerDashboard } from '../services/dashboard.js'
 import { formatCurrency, formatDeadline, formatRelativeDate } from '../lib/format.js'
 import DailyFocusBanner from '../components/DailyFocusBanner.jsx'
 import InstallPrompt from '../components/InstallPrompt.jsx'
+import {
+  Eyebrow,
+  HairlineGrid,
+  MonoKicker,
+  MonoTimestamp,
+  ConfidencePill,
+} from '../components/shared/index.js'
 
 const HEALTH_DOT = {
   green: 'bg-emerald-500',
@@ -53,36 +60,56 @@ export default function DealsListPage() {
   const { active, archived } = data.deals
   const stats = data.stats
 
+  const subline = loading
+    ? 'Loading…'
+    : stats?.activeCount === 0
+      ? 'No active deals — start one.'
+      : `${stats.activeCount} active · ${stats.redCount} at risk`
+
   return (
-    <div className="min-h-screen bg-[#f5f6f8]">
-      <header className="bg-navy text-white">
+    <div className="min-h-screen" style={{ background: 'var(--klo-bg)' }}>
+      <header
+        style={{
+          background: 'var(--klo-bg)',
+          borderBottom: '1px solid var(--klo-line)',
+        }}
+      >
         <div
-          className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3"
-          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+          className="max-w-3xl mx-auto px-4 md:px-6 pt-8 pb-6 flex items-end justify-between gap-3 flex-wrap"
+          style={{ paddingTop: 'max(2rem, calc(env(safe-area-inset-top) + 1rem))' }}
         >
           <div className="min-w-0">
-            <h1 className="font-bold text-lg truncate">
-              {profile?.name ? `${profile.name.split(' ')[0]}'s deals` : 'Your deals'}
+            <Eyebrow>Deals · {stats?.activeCount ?? 0} active</Eyebrow>
+            <h1
+              className="mt-3 truncate"
+              style={{
+                fontSize: 'clamp(28px, 3.4vw, 36px)',
+                fontWeight: 600,
+                letterSpacing: '-0.03em',
+                color: 'var(--klo-text)',
+                lineHeight: 1.1,
+              }}
+            >
+              {profile?.name ? `${profile.name.split(' ')[0]}'s pipeline, by reality.` : 'Your pipeline, by reality.'}
             </h1>
-            <p className="text-white/60 text-xs">
-              {loading
-                ? 'Loading…'
-                : stats?.activeCount === 0
-                  ? 'No active deals — start one.'
-                  : `${stats.activeCount} active · ${stats.redCount} at risk`}
-            </p>
+            <MonoTimestamp className="mt-2 block">{subline}</MonoTimestamp>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link
               to="/deals/new"
-              className="text-xs px-3 py-1.5 rounded-lg bg-klo hover:bg-klo/90 font-semibold flex items-center gap-1"
+              className="inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium px-3.5 py-2"
+              style={{ background: 'var(--klo-text)', color: '#fff' }}
             >
               <span className="text-base leading-none">+</span> New deal
             </Link>
             {isManager && (
               <Link
                 to="/team"
-                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-medium border border-white/20"
+                className="inline-flex items-center rounded-lg text-[13px] px-3.5 py-2"
+                style={{
+                  color: 'var(--klo-text)',
+                  border: '1px solid var(--klo-line-strong)',
+                }}
               >
                 Team
               </Link>
@@ -92,7 +119,11 @@ export default function DealsListPage() {
                 await signOut()
                 navigate('/', { replace: true })
               }}
-              className="text-white/70 hover:text-white text-xs px-3 py-1.5 rounded-lg border border-white/20"
+              className="inline-flex items-center rounded-lg text-[13px] px-3.5 py-2"
+              style={{
+                color: 'var(--klo-text-dim)',
+                border: '1px solid var(--klo-line-strong)',
+              }}
             >
               Sign out
             </button>
@@ -100,7 +131,7 @@ export default function DealsListPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pb-12 pt-4">
+      <main className="max-w-3xl mx-auto px-4 md:px-6 pb-12 pt-6">
         <InstallPrompt />
 
         {loading ? (
@@ -117,8 +148,8 @@ export default function DealsListPage() {
             {stats && stats.activeCount > 0 && <StatsStrip stats={stats} />}
 
             {active.length > 0 && (
-              <Section title={`Needs attention (${active.length})`}>
-                <ul className="bg-white rounded-2xl border border-navy/10 divide-y divide-navy/5 overflow-hidden">
+              <Section title={`Needs attention · ${active.length}`}>
+                <ul className="kl-list">
                   {active.map((d) => (
                     <DealRow key={d.id} deal={d} />
                   ))}
@@ -128,20 +159,21 @@ export default function DealsListPage() {
 
             {archived.length > 0 && (
               <Section
-                title={`Archive (${archived.length})`}
+                title={`Archive · ${archived.length}`}
                 muted
                 action={
                   <button
                     type="button"
                     onClick={() => setShowArchive((v) => !v)}
-                    className="text-xs text-klo font-medium"
+                    className="kl-mono text-[12px]"
+                    style={{ color: 'var(--klo-accent)' }}
                   >
                     {showArchive ? 'Hide' : 'Show'}
                   </button>
                 }
               >
                 {showArchive && (
-                  <ul className="bg-white rounded-2xl border border-navy/10 divide-y divide-navy/5 overflow-hidden">
+                  <ul className="kl-list">
                     {archived.map((d) => (
                       <DealRow key={d.id} deal={d} archived />
                     ))}
@@ -158,46 +190,69 @@ export default function DealsListPage() {
 
 function StatsStrip({ stats }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-      <Stat
-        label="Weighted pipeline"
-        value={formatCurrency(stats.weightedPipeline)}
-      />
-      <Stat
-        label="Likely this quarter"
-        value={`${stats.highConfidenceCount} of ${stats.activeCount}`}
-      />
-      <Stat
-        label="Need attention"
-        value={String(stats.slippingCount)}
-        tone={stats.slippingCount > 0 ? 'amber' : 'neutral'}
-      />
-      <Stat
-        label="Closed"
-        value={`${stats.wonCount}W · ${stats.lostCount}L`}
-      />
+    <div className="mb-6">
+      <HairlineGrid cols={4}>
+        <StatCell
+          index="01"
+          label="Weighted pipeline"
+          value={formatCurrency(stats.weightedPipeline)}
+        />
+        <StatCell
+          index="02"
+          label="Likely this quarter"
+          value={`${stats.highConfidenceCount} of ${stats.activeCount}`}
+        />
+        <StatCell
+          index="03"
+          label="Need attention"
+          value={String(stats.slippingCount)}
+          tone={stats.slippingCount > 0 ? 'warn' : null}
+        />
+        <StatCell
+          index="04"
+          label="Closed"
+          value={`${stats.wonCount}W · ${stats.lostCount}L`}
+        />
+      </HairlineGrid>
     </div>
   )
 }
 
-function Stat({ label, value, tone = 'neutral' }) {
-  const valueClass =
-    tone === 'red' ? 'text-red-600' : tone === 'amber' ? 'text-amber-600' : 'text-navy'
+function StatCell({ index, label, value, tone }) {
+  const valueColor =
+    tone === 'bad'
+      ? 'var(--klo-danger)'
+      : tone === 'warn'
+        ? 'var(--klo-warn)'
+        : tone === 'good'
+          ? 'var(--klo-good)'
+          : 'var(--klo-text)'
   return (
-    <div className="bg-white border border-navy/10 rounded-xl px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-wider text-navy/50 font-semibold">{label}</p>
-      <p className={`text-base font-semibold ${valueClass}`}>{value}</p>
-    </div>
+    <HairlineGrid.Cell>
+      <MonoKicker>
+        {index} / {label}
+      </MonoKicker>
+      <p
+        className="mt-3 tabular-nums"
+        style={{
+          fontSize: 22,
+          fontWeight: 600,
+          letterSpacing: '-0.02em',
+          color: valueColor,
+          lineHeight: 1.15,
+        }}
+      >
+        {value}
+      </p>
+    </HairlineGrid.Cell>
   )
 }
 
 function Section({ title, action, muted = false, children }) {
   return (
     <section className="mb-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className={`text-xs font-semibold uppercase tracking-wider ${muted ? 'text-navy/40' : 'text-navy/60'}`}>
-          {title}
-        </h2>
+      <div className="flex items-center justify-between mb-3">
+        <Eyebrow dot={!muted}>{title}</Eyebrow>
         {action}
       </div>
       {children}
@@ -207,15 +262,26 @@ function Section({ title, action, muted = false, children }) {
 
 function EmptyState() {
   return (
-    <div className="bg-white rounded-2xl border border-navy/10 p-8 text-center mt-6">
-      <p className="text-3xl mb-1">◆</p>
-      <h2 className="font-semibold text-navy">No deals yet.</h2>
-      <p className="text-navy/60 text-sm mt-1 mb-5">
+    <div
+      className="rounded-2xl p-10 text-center mt-6"
+      style={{
+        background: 'var(--klo-bg-elev)',
+        border: '1px solid var(--klo-line)',
+      }}
+    >
+      <h2
+        className="text-[20px] font-semibold"
+        style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+      >
+        No deals yet.
+      </h2>
+      <p className="text-[15px] mt-2 mb-5" style={{ color: 'var(--klo-text-dim)' }}>
         Create a deal room and start talking to Klo. Solo mode works without a buyer.
       </p>
       <Link
         to="/onboarding"
-        className="inline-block bg-klo hover:bg-klo/90 text-white font-semibold rounded-full px-5 py-2.5"
+        className="inline-flex items-center rounded-lg text-[14px] font-medium px-5 py-2.5"
+        style={{ background: 'var(--klo-text)', color: '#fff' }}
       >
         Get started
       </Link>
@@ -251,13 +317,13 @@ function DealRow({ deal, archived = false }) {
         : { text: STATUS_LABEL[deal.status] || 'Closed', tone: 'bg-navy/10 text-navy/70' }
     : null
 
-  const slippingBg = !archived && deal.slipping ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-navy/5 active:bg-navy/10'
+  const slippingBg = !archived && deal.slipping ? 'kl-row-warn' : 'kl-row'
 
   return (
     <li>
       <Link
         to={`/deals/${deal.id}`}
-        className={`flex items-center gap-3 px-4 py-3 ${slippingBg}`}
+        className={`flex items-center gap-3 px-4 py-3.5 ${slippingBg}`}
       >
         {!archived && <ConfidenceCell confidence={deal.klo_state?.confidence} />}
         <span
@@ -316,26 +382,16 @@ function DealRow({ deal, archived = false }) {
 function ConfidenceCell({ confidence }) {
   if (!confidence) {
     return (
-      <div className="shrink-0 w-12 text-center">
-        <div className="text-[15px] font-medium leading-none text-navy/30">—</div>
+      <div className="shrink-0 w-14 text-center">
+        <span className="kl-mono text-[14px]" style={{ color: 'var(--klo-text-mute)' }}>
+          —
+        </span>
       </div>
     )
   }
-  const v = confidence.value
-  const tone =
-    v >= 60 ? 'text-emerald-700' : v >= 35 ? 'text-amber-700' : 'text-red-700'
-  let arrow = ''
-  if (confidence.trend === 'up' && confidence.delta) {
-    arrow = `↑ ${Math.abs(confidence.delta)}`
-  } else if (confidence.trend === 'down' && confidence.delta) {
-    arrow = `↓ ${Math.abs(confidence.delta)}`
-  } else if (confidence.trend === 'flat') {
-    arrow = '→'
-  }
   return (
-    <div className="shrink-0 w-12 text-center" title="Klo's read">
-      <div className={`text-[15px] font-medium leading-none ${tone}`}>{v}%</div>
-      {arrow && <div className="text-[10px] text-navy/40 mt-0.5">{arrow}</div>}
+    <div className="shrink-0" title="Klo's read">
+      <ConfidencePill value={confidence.value} delta={confidence.delta} />
     </div>
   )
 }

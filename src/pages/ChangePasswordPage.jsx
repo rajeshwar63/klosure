@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 
 const MIN_PASSWORD_LENGTH = 12
 const STRENGTH_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/
@@ -79,33 +80,99 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-navy">Change password</h1>
-      <p className="mt-1 text-sm text-navy/60">Update your password and secure active sessions.</p>
+    <div className="max-w-xl mx-auto px-6 py-10">
+      <Eyebrow>Settings · Security</Eyebrow>
+      <h1
+        className="mt-3"
+        style={{
+          fontSize: 'clamp(28px, 3.4vw, 36px)',
+          fontWeight: 600,
+          letterSpacing: '-0.03em',
+          lineHeight: 1.1,
+          color: 'var(--klo-text)',
+        }}
+      >
+        Change password.
+      </h1>
+      <p className="mt-2 text-[15px]" style={{ color: 'var(--klo-text-dim)' }}>
+        Update your password and secure active sessions.
+      </p>
 
-      <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+      <form className="mt-8 space-y-5" onSubmit={onSubmit}>
         <Field label="Current password" type="password" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" required />
         <Field label="New password" type="password" value={newPassword} onChange={setNewPassword} autoComplete="new-password" required />
         <Field label="Confirm new password" type="password" value={confirmNewPassword} onChange={setConfirmNewPassword} autoComplete="new-password" required />
 
-        <div className="text-xs text-navy/70 bg-slate-50 border border-slate-200 rounded-lg p-3">
+        <div
+          className="text-[13px] rounded-lg px-3.5 py-3"
+          style={{
+            background: 'var(--klo-surface)',
+            border: '1px solid var(--klo-line)',
+            color: 'var(--klo-text-dim)',
+          }}
+        >
           Password policy: minimum {MIN_PASSWORD_LENGTH} characters with uppercase, lowercase, number, and symbol.
         </div>
 
-        <label className="flex items-start gap-2 text-sm text-navy">
-          <input type="checkbox" checked={invalidateOtherSessions} onChange={(e) => setInvalidateOtherSessions(e.target.checked)} className="mt-0.5" />
+        <label
+          className="flex items-start gap-2 text-[14px]"
+          style={{ color: 'var(--klo-text)' }}
+        >
+          <input
+            type="checkbox"
+            checked={invalidateOtherSessions}
+            onChange={(e) => setInvalidateOtherSessions(e.target.checked)}
+            className="mt-0.5"
+          />
           Invalidate other active sessions after password change (if supported)
         </label>
 
-        <label className="flex items-start gap-2 text-sm text-navy">
-          <input type="checkbox" checked={requireFreshLogin} onChange={(e) => setRequireFreshLogin(e.target.checked)} className="mt-0.5" />
+        <label
+          className="flex items-start gap-2 text-[14px]"
+          style={{ color: 'var(--klo-text)' }}
+        >
+          <input
+            type="checkbox"
+            checked={requireFreshLogin}
+            onChange={(e) => setRequireFreshLogin(e.target.checked)}
+            className="mt-0.5"
+          />
           Require fresh login immediately after password change
         </label>
 
-        {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">{error}</div>}
-        {success && <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">{success}</div>}
+        {error && (
+          <div
+            className="text-[14px] rounded-lg px-3 py-2"
+            style={{
+              background: 'var(--klo-bg-elev)',
+              border: '1px solid var(--klo-line)',
+              borderLeft: '3px solid var(--klo-danger)',
+              color: 'var(--klo-danger)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {success && (
+          <div
+            className="text-[14px] rounded-lg px-3 py-2"
+            style={{
+              background: 'var(--klo-bg-elev)',
+              border: '1px solid var(--klo-line)',
+              borderLeft: '3px solid var(--klo-good)',
+              color: 'var(--klo-good)',
+            }}
+          >
+            {success}
+          </div>
+        )}
 
-        <button type="submit" disabled={submitting} className="bg-klo text-white font-semibold rounded-xl px-4 py-2.5 disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="font-medium text-[14px] rounded-lg px-5 py-2.5 disabled:opacity-50"
+          style={{ background: 'var(--klo-text)', color: '#fff' }}
+        >
           {submitting ? 'Updating…' : 'Change password'}
         </button>
       </form>
@@ -116,11 +183,16 @@ export default function ChangePasswordPage() {
 function Field({ label, value, onChange, ...props }) {
   return (
     <label className="block">
-      <span className="block text-sm font-medium text-navy mb-1">{label}</span>
+      <MonoKicker>{label}</MonoKicker>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-navy/15 rounded-lg px-3 py-2.5 focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+        className="mt-2 w-full rounded-lg px-3 py-2.5 text-[14px] focus:outline-none"
+        style={{
+          background: 'var(--klo-bg)',
+          border: '1px solid var(--klo-line-strong)',
+          color: 'var(--klo-text)',
+        }}
         {...props}
       />
     </label>

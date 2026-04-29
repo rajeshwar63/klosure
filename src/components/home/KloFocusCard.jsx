@@ -1,11 +1,11 @@
-// Phase 6 step 05 — hero of the seller home page. Klo's daily focus paragraph
-// framed as ONE coaching action with primary + secondary CTAs.
+// Page hero of /today. Klo's daily focus paragraph framed as ONE coaching
+// action with a primary + secondary CTA.
 //
-// The first sentence is the headline (big, weight 500). The remaining
-// sentences are the body (smaller, muted). Primary CTA jumps to the deal
-// Klo referenced; secondary CTA opens a chat asking Klo why.
+// Design language: KloBriefCard (accent left-border, mono label) + dark
+// primary button. Replaces the old amber-cream variant.
 
 import { useNavigate } from 'react-router-dom'
+import { KloBriefCard } from '../shared/index.js'
 
 function splitFocus(text) {
   const clean = (text ?? '').replace(/\*\*/g, '').trim()
@@ -26,38 +26,32 @@ function pickPrimaryDeal(focus, deals) {
 function FocusSkeleton() {
   return (
     <div
-      className="rounded-xl p-5 md:p-7 mb-6 animate-pulse"
-      style={{ background: '#FAEEDA' }}
-    >
-      <div className="h-3 w-40 rounded mb-3" style={{ background: '#BA7517', opacity: 0.3 }} />
-      <div className="h-7 w-3/4 rounded mb-2" style={{ background: '#BA7517', opacity: 0.3 }} />
-      <div className="h-4 w-full rounded mb-1" style={{ background: '#BA7517', opacity: 0.2 }} />
-      <div className="h-4 w-5/6 rounded mb-4" style={{ background: '#BA7517', opacity: 0.2 }} />
-      <div className="h-9 w-32 rounded" style={{ background: '#412402', opacity: 0.3 }} />
-    </div>
+      className="mb-6 rounded-2xl animate-pulse"
+      style={{
+        background: 'var(--klo-bg-elev)',
+        border: '1px solid var(--klo-line)',
+        height: 180,
+      }}
+    />
   )
 }
 
 function FocusEmpty({ onStart }) {
   return (
-    <div
-      className="rounded-xl p-5 md:p-7 mb-6 bg-white"
-      style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.12)' }}
-    >
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/45 mb-2">
-        ◆ KLO
-      </div>
-      <h2 className="text-lg md:text-xl font-medium text-navy leading-snug mb-4">
+    <div className="mb-6">
+      <KloBriefCard label="Klo · Your focus today">
         Once you have an active deal, Klo will tell you where to focus each morning.
-      </h2>
-      <button
-        type="button"
-        onClick={onStart}
-        className="px-4 py-2 rounded-md text-sm font-medium text-white"
-        style={{ background: '#412402' }}
-      >
-        + Start your first deal
-      </button>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={onStart}
+            className="inline-flex items-center gap-2 rounded-lg text-[14px] font-medium px-4 py-2.5"
+            style={{ background: 'var(--klo-text)', color: '#fff' }}
+          >
+            <span>+</span> Start your first deal
+          </button>
+        </div>
+      </KloBriefCard>
     </div>
   )
 }
@@ -87,53 +81,54 @@ export default function KloFocusCard({ focus, loading, deals }) {
   }
 
   return (
-    <div
-      className="rounded-xl p-5 md:p-7 mb-6"
-      style={{ background: '#FAEEDA' }}
-    >
-      <div
-        className="text-[10px] uppercase tracking-wider font-semibold mb-2"
-        style={{ color: '#854F0B' }}
-      >
-        ◆ KLO · YOUR FOCUS TODAY
-      </div>
-
-      <h2
-        className="text-xl md:text-2xl font-medium leading-snug mb-3"
-        style={{ color: '#412402' }}
-      >
-        {headline}
-      </h2>
-
-      {body && (
+    <div className="mb-6">
+      <KloBriefCard label="Klo · Your focus today">
         <p
-          className="text-sm md:text-base leading-relaxed mb-4 whitespace-pre-line"
-          style={{ color: '#633806' }}
+          className="font-medium leading-snug"
+          style={{
+            fontSize: 'clamp(20px, 2.4vw, 24px)',
+            letterSpacing: '-0.01em',
+            color: 'var(--klo-text)',
+            margin: 0,
+          }}
         >
-          {body}
+          {headline}
         </p>
-      )}
 
-      <div className="flex gap-2 flex-wrap">
-        {primaryDeal && (
+        {body && (
+          <p
+            className="mt-3 leading-relaxed whitespace-pre-line"
+            style={{ color: 'var(--klo-text-dim)', fontSize: 16 }}
+          >
+            {body}
+          </p>
+        )}
+
+        <div className="mt-5 flex gap-2 flex-wrap">
+          {primaryDeal && (
+            <button
+              type="button"
+              onClick={openPrimary}
+              className="inline-flex items-center gap-2 rounded-lg text-[14px] font-medium px-4 py-2.5"
+              style={{ background: 'var(--klo-text)', color: '#fff' }}
+            >
+              Open {primaryDeal.title}
+            </button>
+          )}
           <button
             type="button"
-            onClick={openPrimary}
-            className="px-4 py-2 rounded-md text-sm font-medium text-white"
-            style={{ background: '#412402' }}
+            onClick={askKloWhy}
+            className="inline-flex items-center gap-2 rounded-lg text-[14px] px-4 py-2.5"
+            style={{
+              background: 'transparent',
+              color: 'var(--klo-text)',
+              border: '1px solid var(--klo-line-strong)',
+            }}
           >
-            Open {primaryDeal.title}
+            Ask Klo why
           </button>
-        )}
-        <button
-          type="button"
-          onClick={askKloWhy}
-          className="px-4 py-2 rounded-md text-sm border"
-          style={{ borderColor: '#BA7517', color: '#633806' }}
-        >
-          Ask Klo why
-        </button>
-      </div>
+        </div>
+      </KloBriefCard>
     </div>
   )
 }
