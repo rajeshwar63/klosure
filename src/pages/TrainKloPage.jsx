@@ -5,7 +5,7 @@
 // actions (password reset, change password, sign out).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useBeforeUnload, useNavigate, useBlocker } from 'react-router-dom'
+import { Link, useBeforeUnload, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -162,14 +162,6 @@ export default function TrainKloPage() {
       [isDirty]
     )
   )
-
-  const blocker = useBlocker(isDirty)
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return
-    const leave = window.confirm('You have unsaved changes. Leave this page and discard them?')
-    if (leave) blocker.proceed()
-    else blocker.reset()
-  }, [blocker])
 
   const lastSavedLabel = useMemo(() => {
     if (!updatedAt) return null
