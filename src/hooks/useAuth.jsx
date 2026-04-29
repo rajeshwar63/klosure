@@ -39,8 +39,10 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       return { data, error }
     },
-    signOut: async () => {
-      await supabase.auth.signOut()
+    signOut: async ({ allDevices = false } = {}) => {
+      const scope = allDevices ? 'global' : 'local'
+      const { error } = await supabase.auth.signOut({ scope })
+      if (error) throw error
     }
   }), [session, loading])
 

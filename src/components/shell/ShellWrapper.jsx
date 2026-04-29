@@ -2,11 +2,13 @@
 // and feeds them into the shell. Used as a layout route so every page below
 // renders inside the same shell.
 
+import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.jsx'
 import { useProfile } from '../../hooks/useProfile.jsx'
 import { useShellDeals } from '../../hooks/useShellDeals.jsx'
 import AppShell from './AppShell.jsx'
+import AppPromptModal from '../ui/AppPromptModal.jsx'
 
 export function resolveActiveView(pathname, role) {
   if (pathname === '/today') return 'today'
@@ -46,6 +48,8 @@ export default function ShellWrapper() {
   const { user, signOut } = useAuth()
   const { profile, isManager } = useProfile()
   const { deals, loading: dealsLoading } = useShellDeals()
+  const [showAllDevicesConfirm, setShowAllDevicesConfirm] = useState(false)
+  const [logoutBusy, setLogoutBusy] = useState(false)
 
   const role = location.pathname.startsWith('/team') && isManager ? 'manager' : 'seller'
   const activeView = resolveActiveView(location.pathname, role)
@@ -56,9 +60,23 @@ export default function ShellWrapper() {
     email: user?.email,
   }
 
-  async function handleLogout() {
-    await signOut()
-    navigate('/login', { replace: true })
+  async function runLogout({ allDevices = false } = {}) {
+    setLogoutBusy(true)
+    try {
+      await signOut({ allDevices })
+      setShowAllDevicesConfirm(false)
+      navigate('/login', { replace: true, state: null })
+    } finally {
+      setLogoutBusy(false)
+    }
+  }
+
+  function handleLogoutCurrentSession() {
+    return runLogout({ allDevices: false })
+  }
+
+  function handleRequestLogoutAllDevices() {
+    setShowAllDevicesConfirm(true)
   }
 
   return (
@@ -69,9 +87,22 @@ export default function ShellWrapper() {
       deals={deals}
       dealsLoading={dealsLoading}
       user={userForShell}
-      onLogout={handleLogout}
+      onLogout={handleLogoutCurrentSession}
+      onLogoutAllDevices={handleRequestLogoutAllDevices}
+      canLogoutAllDevices
     >
       <Outlet />
+      <AppPromptModal
+        open={showAllDevicesConfirm}
+        tone="danger"
+        title="Log out of all devices?"
+        message="This signs you out everywhere this account is currently active. You will need to log in again on each device."
+        confirmLabel="Log out of all devices"
+        cancelLabel="Cancel"
+        onConfirm={() => runLogout({ allDevices: true })}
+        onCancel={() => setShowAllDevicesConfirm(false)}
+        busy={logoutBusy}
+      />
     </AppShell>
   )
 }
