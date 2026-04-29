@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { supabase } from '../lib/supabase.js'
 import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
 import TrainKloFormFields, { EMPTY_FIELDS } from '../components/onboarding/TrainKloFormFields.jsx'
 
@@ -38,6 +39,8 @@ export default function TrainKloPage() {
   const [saving, setSaving] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const [serverError, setServerError] = useState('')
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
 
   const [fields, setFields] = useState({ ...EMPTY_FIELDS })
   const [errors, setErrors] = useState({})
@@ -80,6 +83,29 @@ export default function TrainKloPage() {
     if (!updatedAt) return null
     return `Last saved: ${relativeFromNow(updatedAt)}`
   }, [updatedAt])
+
+  const accountIdentifier = useMemo(
+    () => user?.email || user?.user_metadata?.username || user?.phone || 'Unknown account',
+    [user],
+  )
+  const isVerified = useMemo(() => {
+    if (!user) return false
+    if (user.email) return Boolean(user.email_confirmed_at)
+    if (user.phone) return Boolean(user.phone_confirmed_at)
+    return false
+  }, [user])
+
+  async function handleResendVerification() {
+    if (!user?.email || resendBusy) return
+    setResendBusy(true)
+    setResendMessage('')
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: user.email,
+    })
+    setResendMessage(error ? (error.message || 'Could not resend verification email.') : 'Verification email sent.')
+    setResendBusy(false)
+  }
 
   function validate() {
     const next = {}
@@ -176,6 +202,33 @@ export default function TrainKloPage() {
           {serverError}
         </div>
       )}
+
+      <section className="mb-6 rounded-2xl border border-navy/10 bg-white px-4 py-4 md:px-5">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-navy">Account</h2>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              isVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+            }`}
+          >
+            {isVerified ? 'Verified' : 'Unverified'}
+          </span>
+        </div>
+        <div className="text-sm text-navy/80 break-all">{accountIdentifier}</div>
+        {!isVerified && user?.email && (
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendBusy}
+              className="text-[12px] font-medium text-klo hover:underline disabled:opacity-50"
+            >
+              {resendBusy ? 'Sending…' : 'Resend verification email'}
+            </button>
+            {resendMessage && <span className="text-[12px] text-navy/60">{resendMessage}</span>}
+          </div>
+        )}
+      </section>
 
       <form onSubmit={handleSubmit}>
         <TrainKloFormFields fields={fields} setFields={setFields} errors={errors} />
