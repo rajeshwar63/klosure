@@ -155,16 +155,27 @@ begin
 
       v_plan := v_team.plan;
       v_period_end := v_team.current_period_end;
-      v_read_only_since := v_team.read_only_since;
+      -- Either team or individual user being read-only locks the user out.
+      -- Individual lockout matters for trial expiry / cancellation on the
+      -- user row even when their team plan is otherwise active.
+      v_read_only_since := least(v_team.read_only_since, v_user.read_only_since);
       v_is_team_plan := v_plan in ('team_starter', 'team_growth', 'team_scale', 'enterprise');
     end if;
   end if;
 
-  -- 3. Solo path — fall back to user fields.
-  if v_plan is null then
-    v_plan := coalesce(v_user.plan, 'trial');
-    v_period_end := v_user.current_period_end;
-    v_read_only_since := v_user.read_only_since;
+  -- Solo path OR team-on-trial path. trial_ends_at lives on the user row;
+  -- when the team is on 'trial' the team's current_period_end is null and we
+  -- still want to surface the user's trial countdown for the UI.
+  if v_plan is null or v_plan = 'trial' then
+    if v_plan is null then
+      v_plan := coalesce(v_user.plan, 'trial');
+    end if;
+    if v_period_end is null then
+      v_period_end := v_user.current_period_end;
+    end if;
+    if v_read_only_since is null then
+      v_read_only_since := v_user.read_only_since;
+    end if;
     v_trial_ends := v_user.trial_ends_at;
   end if;
 
