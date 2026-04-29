@@ -12,14 +12,14 @@ import AppPromptModal from '../ui/AppPromptModal.jsx'
 import LogoutChoiceModal from '../ui/LogoutChoiceModal.jsx'
 import ProfileModal from '../ui/ProfileModal.jsx'
 
-export function resolveActiveView(pathname, role) {
+export function resolveActiveView(pathname) {
   if (pathname === '/today') return 'today'
   if (pathname === '/deals') return 'deals'
   if (pathname.startsWith('/deals/')) {
     const id = pathname.split('/')[2]
     if (id && id !== 'new') return `deal:${id}`
   }
-  if (pathname === '/team') return role === 'manager' ? 'today' : 'team'
+  if (pathname === '/team') return 'this-week'
   if (pathname === '/team/forecast') return 'forecast'
   if (pathname === '/team/reps') return 'reps'
   if (pathname === '/team/askklo') return 'askklo'
@@ -55,8 +55,8 @@ export default function ShellWrapper() {
   const [logoutBusy, setLogoutBusy] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
-  const role = location.pathname.startsWith('/team') && isManager ? 'manager' : 'seller'
-  const activeView = resolveActiveView(location.pathname, role)
+  const role = isManager ? 'manager' : 'seller'
+  const activeView = resolveActiveView(location.pathname)
   const pageTitle = resolvePageTitle(location.pathname, deals)
 
   const userForShell = {

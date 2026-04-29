@@ -54,11 +54,15 @@ export default function AppShell({
       return
     }
     if (view === 'today') {
-      navigate(role === 'manager' ? '/team' : '/today')
+      navigate('/today')
       return
     }
     if (view === 'deals') {
       navigate('/deals')
+      return
+    }
+    if (view === 'this-week') {
+      navigate('/team')
       return
     }
     if (view === 'forecast') {
@@ -73,11 +77,7 @@ export default function AppShell({
       navigate('/team/askklo')
       return
     }
-    if (view === 'team') {
-      navigate('/team')
-      return
-    }
-    if (view === 'train-klo') {
+    if (view === 'train-klo' || view === 'settings') {
       navigate('/settings/train-klo')
       return
     }
