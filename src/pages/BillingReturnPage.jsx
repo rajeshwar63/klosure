@@ -2,20 +2,24 @@
 // BillingReturnPage — Phase 12.3
 // =============================================================================
 // Razorpay redirects users here after they authorise a mandate on the hosted
-// checkout page. Razorpay's redirect happens before the webhook lands, so we
-// poll get_my_account_status until the user flips to paid_active (or we
-// give up after ~30s and ask them to wait for email confirmation).
+// checkout page. The BillingPage handler already attempts a verify-and-sync
+// before routing here, but we also fire one verify on mount as a belt — if
+// the user landed here via a stale tab, deep link, or the handler version
+// before the verify call, this re-syncs them. Polling continues as a final
+// fallback in case both verify and webhook fail.
 // =============================================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
+import { verifySubscription } from '../services/billing.js'
 
 export default function BillingReturnPage() {
   const navigate = useNavigate()
   const { refresh, status } = useAccountStatus()
   const [polling, setPolling] = useState(true)
   const [attempts, setAttempts] = useState(0)
+  const verifiedRef = useRef(false)
 
   useEffect(() => {
     let mounted = true
@@ -23,6 +27,19 @@ export default function BillingReturnPage() {
 
     async function poll() {
       if (!mounted) return
+
+      // Fire verify once before the first refresh — closes the gap if the
+      // BillingPage handler skipped/failed it.
+      if (!verifiedRef.current) {
+        verifiedRef.current = true
+        try {
+          await verifySubscription()
+        } catch (e) {
+          console.warn('verify on return failed', e)
+        }
+        if (!mounted) return
+      }
+
       await refresh()
       if (!mounted) return
       if (status?.status === 'paid_active' || status?.status === 'overridden') {

@@ -3,7 +3,7 @@
 // =============================================================================
 // Loads the public.users row for the signed-in user plus team membership.
 // `plan` and `team_id` drive feature gating across the app — manager view,
-// Klo team-pipeline chat, Stripe checkout buttons. Cached at the provider
+// Klo team-pipeline chat, Razorpay upgrade buttons. Cached at the provider
 // level so every page that needs it doesn't re-query Supabase.
 // =============================================================================
 
