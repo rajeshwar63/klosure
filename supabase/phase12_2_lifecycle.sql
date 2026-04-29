@@ -105,10 +105,13 @@ as $$
 declare
   v_user record;
 begin
+  -- Qualify the SELECT with a table alias — the OUT params (user_id, email)
+  -- are in scope inside the plpgsql body, and an unqualified `email` in the
+  -- SELECT is ambiguous between the column and the OUT parameter.
   for v_user in
-    select id, email from public.users
-     where read_only_since is not null
-       and read_only_since <= now() - interval '90 days'
+    select u.id, u.email from public.users u
+     where u.read_only_since is not null
+       and u.read_only_since <= now() - interval '90 days'
   loop
     -- Delete from auth.users — cascades to public.users via the FK on
     -- public.users.id (references auth.users(id) on delete cascade), which
