@@ -39,6 +39,8 @@ export default function AppShell({
   dealsLoading = false,
   user,
   onLogout,
+  onLogoutAllDevices,
+  canLogoutAllDevices = false,
   children,
 }) {
   const navigate = useNavigate()
@@ -113,6 +115,8 @@ export default function AppShell({
           onNavigate={handleNavigate}
           onNewDeal={handleNewDeal}
           onLogout={onLogout}
+          onLogoutAllDevices={onLogoutAllDevices}
+          canLogoutAllDevices={canLogoutAllDevices}
         />
       </div>
 
@@ -134,6 +138,8 @@ export default function AppShell({
           onNavigate={handleNavigate}
           onNewDeal={handleNewDeal}
           onLogout={onLogout}
+          onLogoutAllDevices={onLogoutAllDevices}
+          canLogoutAllDevices={canLogoutAllDevices}
         />
       </MobileDrawer>
     </div>
