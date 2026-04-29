@@ -103,6 +103,8 @@ export default function ManagerHomePage() {
         </p>
       </header>
 
+      <QuarterGlanceStrip deals={dealsActive} />
+
       <KloTeamBriefCard
         brief={brief}
         loading={briefLoading}
@@ -110,8 +112,6 @@ export default function ManagerHomePage() {
       />
 
       <DealsSlippingList deals={dealsActive} />
-
-      <QuarterGlanceStrip deals={dealsActive} />
     </div>
   )
 }

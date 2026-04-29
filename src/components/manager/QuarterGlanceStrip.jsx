@@ -64,17 +64,27 @@ export default function QuarterGlanceStrip({ deals }) {
   if (activeCount === 0) return null
 
   return (
-    <section>
-      <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
-        <span className="text-[10px] font-semibold tracking-wider text-navy/45">
-          QUARTER AT A GLANCE
+    <section
+      className="bg-white rounded-xl p-4 md:p-5 mb-6"
+      style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.12)' }}
+    >
+      <div className="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-navy/45">
+          Quarter at a glance
         </span>
         <span className="text-[11px] text-navy/55">
-          Commit {compactCurrency(commit)} · stretch {compactCurrency(stretch)}
+          Commit{' '}
+          <span className="font-medium text-navy/80">
+            {compactCurrency(commit)}
+          </span>{' '}
+          · stretch{' '}
+          <span className="font-medium text-navy/80">
+            {compactCurrency(stretch)}
+          </span>
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 md:gap-3">
         <BucketCard
           label="Likely close"
           amount={buckets.likely.weighted}
