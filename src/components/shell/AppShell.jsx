@@ -82,6 +82,10 @@ export default function AppShell({
       navigate('/settings/train-klo')
       return
     }
+    if (view === 'billing') {
+      navigate('/billing')
+      return
+    }
   }
 
   function handleNewDeal() {

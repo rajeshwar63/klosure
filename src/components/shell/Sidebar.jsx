@@ -233,6 +233,18 @@ export default function Sidebar({
         </div>
       )}
 
+      {/* Bottom utility nav — pinned above the trial/team badges. */}
+      {!collapsed && (
+        <div className="border-t border-navy/5 px-2 pt-2 pb-1 shrink-0">
+          <SidebarNavItem
+            icon="₹"
+            label="Billing"
+            active={activeView === 'billing'}
+            onClick={handle('billing')}
+          />
+        </div>
+      )}
+
       {/* Trial countdown — only renders while user is in trial_active */}
       {!collapsed && (
         <div className="px-3 pt-2 shrink-0">
