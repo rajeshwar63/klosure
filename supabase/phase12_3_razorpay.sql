@@ -67,22 +67,46 @@ create policy "payment_events deny all" on public.payment_events
 -- or team. Returns the user_id and team_id (whichever is set).
 create or replace function public.find_subscription_owner(p_subscription_id text)
 returns table(user_id uuid, team_id uuid, is_team boolean)
-language sql
+language plpgsql
 security definer
 stable
 set search_path = public
 as $$
-  -- Each leg parenthesised so the inner LIMIT 1 binds to that SELECT, not the
-  -- whole UNION ALL — Postgres rejects bare LIMIT inside a union without parens.
-  (select u.id as user_id, null::uuid as team_id, false as is_team
-     from public.users u
-    where u.razorpay_subscription_id = p_subscription_id
-    limit 1)
-  union all
-  (select null::uuid as user_id, t.id as team_id, true as is_team
-     from public.teams t
-    where t.razorpay_subscription_id = p_subscription_id
-    limit 1);
+declare
+  v_user_id uuid;
+  v_team_id uuid;
+begin
+  -- Check users first; a subscription belongs to either a user OR a team,
+  -- never both. plpgsql avoids the UNION ALL + LIMIT parser quirk that
+  -- bites the language-sql variant in some Postgres builds.
+  select u.id into v_user_id
+    from public.users u
+   where u.razorpay_subscription_id = p_subscription_id
+   limit 1;
+
+  if v_user_id is not null then
+    user_id := v_user_id;
+    team_id := null;
+    is_team := false;
+    return next;
+    return;
+  end if;
+
+  select t.id into v_team_id
+    from public.teams t
+   where t.razorpay_subscription_id = p_subscription_id
+   limit 1;
+
+  if v_team_id is not null then
+    user_id := null;
+    team_id := v_team_id;
+    is_team := true;
+    return next;
+    return;
+  end if;
+
+  return;  -- no owner found; caller checks NOT FOUND
+end;
 $$;
 
 -- ----- update_subscription_state helper ------------------------------------
@@ -104,7 +128,10 @@ declare
   v_read_only_since timestamptz;
 begin
   select * into v_owner from public.find_subscription_owner(p_subscription_id) limit 1;
-  if v_owner is null then
+  -- Use NOT FOUND, not IS NULL — when SELECT INTO finds no rows, the record's
+  -- fields are set to NULL but the record variable itself is never NULL, so
+  -- "v_owner is null" never fires. NOT FOUND is the canonical no-rows test.
+  if not found then
     return jsonb_build_object('ok', false, 'error', 'subscription_not_found');
   end if;
 
