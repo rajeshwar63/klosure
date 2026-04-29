@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react'
 import SidebarNavItem from './SidebarNavItem.jsx'
 import SidebarDealRow from './SidebarDealRow.jsx'
+import TeamContextBadge from './TeamContextBadge.jsx'
 
 const REP_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
@@ -228,6 +229,13 @@ export default function Sidebar({
               />
             ))}
           </nav>
+        </div>
+      )}
+
+      {/* Team context — hidden for managers and unattached sellers */}
+      {!collapsed && (
+        <div className="px-3 pt-2 shrink-0">
+          <TeamContextBadge />
         </div>
       )}
 
