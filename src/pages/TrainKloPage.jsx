@@ -3,10 +3,12 @@
 // Single-screen form, 7 fields. Saves to seller_profiles. Becomes live for
 // the next chat turn — no app restart needed.
 
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useBeforeUnload, useNavigate, useBlocker } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useProfile } from '../hooks/useProfile.jsx'
 import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
+import { supabase } from '../lib/supabase.js'
 import TrainKloFormFields, { EMPTY_FIELDS } from '../components/onboarding/TrainKloFormFields.jsx'
 
 const FIELD_MIN = 3
@@ -30,6 +32,7 @@ function relativeFromNow(ts) {
 
 export default function TrainKloPage() {
   const { user } = useAuth()
+  const { profile, refresh } = useProfile()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -38,8 +41,11 @@ export default function TrainKloPage() {
   const [saving, setSaving] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const [serverError, setServerError] = useState('')
+  const [profileBasics, setProfileBasics] = useState({ firstName: '', lastName: '', companyName: '' })
 
   const [fields, setFields] = useState({ ...EMPTY_FIELDS })
+  const [initialFields, setInitialFields] = useState({ ...EMPTY_FIELDS })
+  const initialBasicsRef = useRef({ firstName: '', lastName: '', companyName: '' })
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
@@ -61,6 +67,15 @@ export default function TrainKloPage() {
             common_deal_killer: row.common_deal_killer || '',
           })
           setUpdatedAt(row.updated_at || null)
+          setInitialFields({
+            seller_company: row.seller_company || '',
+            role: row.role || '',
+            what_you_sell: row.what_you_sell || '',
+            icp: row.icp || '',
+            region: row.region || '',
+            top_personas: Array.isArray(row.top_personas) ? row.top_personas : [],
+            common_deal_killer: row.common_deal_killer || '',
+          })
         } else {
           setHadProfile(false)
         }
@@ -76,6 +91,46 @@ export default function TrainKloPage() {
     }
   }, [user])
 
+  useEffect(() => {
+    const [first = '', ...rest] = (profile?.name || '').trim().split(/\s+/)
+    const basics = {
+      firstName: first,
+      lastName: rest.join(' '),
+      companyName: fields.seller_company || '',
+    }
+    setProfileBasics(basics)
+    initialBasicsRef.current = basics
+  }, [profile?.name, fields.seller_company])
+
+  const isDirty = useMemo(() => {
+    const initialFieldsStr = JSON.stringify(initialFields)
+    const fieldsStr = JSON.stringify(fields)
+    const basicsChanged =
+      profileBasics.firstName.trim() !== initialBasicsRef.current.firstName.trim() ||
+      profileBasics.lastName.trim() !== initialBasicsRef.current.lastName.trim() ||
+      profileBasics.companyName.trim() !== initialBasicsRef.current.companyName.trim()
+    return initialFieldsStr !== fieldsStr || basicsChanged
+  }, [fields, initialFields, profileBasics])
+
+  useBeforeUnload(
+    useMemo(
+      () => (event) => {
+        if (!isDirty) return
+        event.preventDefault()
+        event.returnValue = ''
+      },
+      [isDirty]
+    )
+  )
+
+  const blocker = useBlocker(isDirty)
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    const leave = window.confirm('You have unsaved changes. Leave this page and discard them?')
+    if (leave) blocker.proceed()
+    else blocker.reset()
+  }, [blocker])
+
   const lastSavedLabel = useMemo(() => {
     if (!updatedAt) return null
     return `Last saved: ${relativeFromNow(updatedAt)}`
@@ -90,6 +145,8 @@ export default function TrainKloPage() {
       else if (v.length > FIELD_MAX) next[key] = `Too long (max ${FIELD_MAX})`
     }
     checkText('sellerCompany', fields.seller_company)
+    checkText('firstName', profileBasics.firstName)
+    checkText('lastName', profileBasics.lastName)
     checkText('role', fields.role)
     checkText('whatYouSell', fields.what_you_sell)
     checkText('icp', fields.icp)
@@ -115,8 +172,10 @@ export default function TrainKloPage() {
     if (!user) return
     setSaving(true)
     try {
+      const fullName = `${profileBasics.firstName.trim()} ${profileBasics.lastName.trim()}`.trim()
+      await supabase.from('users').update({ name: fullName }).eq('id', user.id)
       const row = await upsertSellerProfile(user.id, {
-        seller_company: fields.seller_company.trim(),
+        seller_company: profileBasics.companyName.trim(),
         role: fields.role.trim(),
         what_you_sell: fields.what_you_sell.trim(),
         icp: fields.icp.trim(),
@@ -125,6 +184,14 @@ export default function TrainKloPage() {
         common_deal_killer: fields.common_deal_killer.trim(),
       })
       setUpdatedAt(row?.updated_at || new Date().toISOString())
+      setFields((prev) => ({ ...prev, seller_company: profileBasics.companyName.trim() }))
+      setInitialFields((prev) => ({ ...prev, ...fields, seller_company: profileBasics.companyName.trim() }))
+      initialBasicsRef.current = {
+        firstName: profileBasics.firstName.trim(),
+        lastName: profileBasics.lastName.trim(),
+        companyName: profileBasics.companyName.trim(),
+      }
+      await refresh?.()
       setHadProfile(true)
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 2000)
@@ -133,6 +200,13 @@ export default function TrainKloPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function handleCancel() {
+    setFields({ ...initialFields })
+    setProfileBasics({ ...initialBasicsRef.current })
+    setErrors({})
+    setServerError('')
   }
 
   if (loading) {
@@ -178,6 +252,37 @@ export default function TrainKloPage() {
       )}
 
       <form onSubmit={handleSubmit}>
+        <div className="space-y-4 mb-6">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="block text-[12px] font-semibold tracking-wide text-navy/75 uppercase mb-1">First Name</span>
+              <input
+                value={profileBasics.firstName}
+                onChange={(e) => setProfileBasics((p) => ({ ...p, firstName: e.target.value }))}
+                className="w-full rounded-xl border border-navy/15 px-3 py-2.5 text-sm text-navy"
+              />
+              {errors.firstName && <span className="text-[12px] text-red-600 mt-1 block">{errors.firstName}</span>}
+            </label>
+            <label className="block">
+              <span className="block text-[12px] font-semibold tracking-wide text-navy/75 uppercase mb-1">Last Name</span>
+              <input
+                value={profileBasics.lastName}
+                onChange={(e) => setProfileBasics((p) => ({ ...p, lastName: e.target.value }))}
+                className="w-full rounded-xl border border-navy/15 px-3 py-2.5 text-sm text-navy"
+              />
+              {errors.lastName && <span className="text-[12px] text-red-600 mt-1 block">{errors.lastName}</span>}
+            </label>
+          </div>
+          <label className="block">
+            <span className="block text-[12px] font-semibold tracking-wide text-navy/75 uppercase mb-1">Company Name</span>
+            <input
+              value={profileBasics.companyName}
+              onChange={(e) => setProfileBasics((p) => ({ ...p, companyName: e.target.value }))}
+              className="w-full rounded-xl border border-navy/15 px-3 py-2.5 text-sm text-navy"
+            />
+            {errors.sellerCompany && <span className="text-[12px] text-red-600 mt-1 block">{errors.sellerCompany}</span>}
+          </label>
+        </div>
         <TrainKloFormFields fields={fields} setFields={setFields} errors={errors} />
 
         <div className="flex items-center justify-end gap-3 pt-7">
@@ -185,11 +290,19 @@ export default function TrainKloPage() {
             <span className="text-[12px] text-navy/45">{lastSavedLabel}</span>
           )}
           <button
+            type="button"
+            onClick={handleCancel}
+            disabled={!isDirty || saving}
+            className="border border-navy/15 hover:border-navy/30 disabled:opacity-50 text-navy font-semibold text-sm px-5 py-2.5 rounded-xl"
+          >
+            Cancel
+          </button>
+          <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !isDirty}
             className="bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold text-sm px-5 py-2.5 rounded-xl"
           >
-            {saving ? 'Saving…' : savedFlash ? 'Saved · Klo updated' : 'Save'}
+            {saving ? 'Saving…' : savedFlash ? 'Saved · Klo updated' : 'Save changes'}
           </button>
         </div>
       </form>
