@@ -117,6 +117,11 @@ export default function ProfileModal({ open, onClose }) {
     navigate('/billing')
   }
 
+  function handleManageBilling() {
+    onClose?.()
+    navigate('/billing')
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4"
@@ -173,6 +178,20 @@ export default function ProfileModal({ open, onClose }) {
               className="px-3 py-1.5 rounded-md border border-navy/15 text-[12px] text-navy/80 hover:bg-navy/5 disabled:opacity-50"
             >
               {resetBusy ? 'Sending…' : 'Email me a link'}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-medium text-navy">Billing &amp; plan</p>
+              <p className="text-[11px] text-navy/60">View your plan, change card, or cancel.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleManageBilling}
+              className="px-3 py-1.5 rounded-md border border-navy/15 text-[12px] text-navy/80 hover:bg-navy/5"
+            >
+              Manage billing
             </button>
           </div>
 
