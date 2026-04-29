@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase.js'
 import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
 import { supabase } from '../lib/supabase.js'
 import TrainKloFormFields, { EMPTY_FIELDS } from '../components/onboarding/TrainKloFormFields.jsx'
+import { supabase } from '../lib/supabase.js'
 
 const FIELD_MIN = 3
 const FIELD_MAX = 200
@@ -48,6 +49,17 @@ export default function TrainKloPage() {
   const [initialFields, setInitialFields] = useState({ ...EMPTY_FIELDS })
   const initialBasicsRef = useRef({ firstName: '', lastName: '', companyName: '' })
   const [errors, setErrors] = useState({})
+  const [prefs, setPrefs] = useState({
+    avatarUrl: '',
+    displayNameFormat: 'first-name',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    locale: navigator?.language || 'en-US',
+    emailNotifications: true,
+    dealDigest: true,
+    inAppMentions: true,
+  })
+  const [prefSavedFlash, setPrefSavedFlash] = useState(false)
+  const [securityInfo, setSecurityInfo] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -358,11 +370,75 @@ export default function TrainKloPage() {
         </div>
       </form>
 
+      <section className="mt-10 rounded-2xl border border-navy/10 bg-white p-5">
+        <h2 className="text-lg font-semibold text-navy">Profile preferences (optional)</h2>
+        <p className="text-sm text-navy/60 mt-1">Personalize how Klosure appears for you.</p>
+
+        <div className="mt-5 grid gap-4">
+          <div>
+            <label className="text-xs font-medium text-navy/70">Avatar</label>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center text-xs text-navy/60">
+                {prefs.avatarUrl ? <img src={prefs.avatarUrl} alt="Avatar" className="h-full w-full object-cover" /> : 'No photo'}
+              </div>
+              <label className="text-sm px-3 py-1.5 rounded-lg border border-navy/15 cursor-pointer hover:bg-navy/5">
+                Upload
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarPick} />
+              </label>
+              <button type="button" onClick={() => updatePrefs({ ...prefs, avatarUrl: '' })} className="text-sm text-navy/70 hover:text-navy">Remove</button>
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="block text-xs font-medium text-navy/70 mb-1">Preferred display name format</span>
+            <select value={prefs.displayNameFormat} onChange={(e) => updatePrefs({ ...prefs, displayNameFormat: e.target.value })} className="w-full border border-navy/15 rounded-lg px-3 py-2.5">
+              <option value="first-name">First name only</option>
+              <option value="full-name">Full name</option>
+              <option value="first-last-initial">First name + last initial</option>
+            </select>
+          </label>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Field label="Time zone" type="text" value={prefs.timezone} onChange={(v) => updatePrefs({ ...prefs, timezone: v })} placeholder="America/Los_Angeles" />
+            <Field label="Locale" type="text" value={prefs.locale} onChange={(v) => updatePrefs({ ...prefs, locale: v })} placeholder="en-US" />
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-navy/70 mb-2">Notification preferences</p>
+            <div className="space-y-2 text-sm text-navy/80">
+              <Checkbox label="Email me when a buyer replies" checked={prefs.emailNotifications} onChange={(v) => updatePrefs({ ...prefs, emailNotifications: v })} />
+              <Checkbox label="Weekly deal digest" checked={prefs.dealDigest} onChange={(v) => updatePrefs({ ...prefs, dealDigest: v })} />
+              <Checkbox label="In-app mentions and reminders" checked={prefs.inAppMentions} onChange={(v) => updatePrefs({ ...prefs, inAppMentions: v })} />
+            </div>
+          </div>
+          {prefSavedFlash && <p className="text-xs text-emerald-700">Preferences saved.</p>}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-navy/10 bg-slate-50 p-5">
+        <h2 className="text-lg font-semibold text-navy">Security actions</h2>
+        <p className="text-sm text-navy/60 mt-1">Manage password and active access separately from profile preferences.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={sendPasswordReset} className="text-sm px-3 py-2 rounded-lg border border-navy/15 hover:bg-white">Send password reset email</button>
+          <button type="button" onClick={async () => { await signOut(); navigate('/login') }} className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50">Sign out</button>
+        </div>
+        {securityInfo && <p className="text-xs text-navy/70 mt-2">{securityInfo}</p>}
+      </section>
+
       <div className="mt-10 text-center">
         <Link to="/today" className="text-sm text-klo hover:underline">
           ← Back to Today
         </Link>
       </div>
     </div>
+  )
+}
+
+function Checkbox({ label, checked, onChange }) {
+  return (
+    <label className="flex items-center gap-2">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>{label}</span>
+    </label>
   )
 }
