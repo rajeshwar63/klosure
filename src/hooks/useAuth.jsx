@@ -39,7 +39,15 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       return { data, error }
     },
-    signOut: async () => {
+    signOut: async ({ allDevices = false } = {}) => {
+      if (allDevices) {
+        // Best-effort: invalidate other sessions first, then end this one.
+        try {
+          await supabase.auth.signOut({ scope: 'others' })
+        } catch {
+          // 'others' scope may be unsupported on older Supabase clients; fall through.
+        }
+      }
       await supabase.auth.signOut()
     },
     changePassword: async ({ newPassword }) => {
