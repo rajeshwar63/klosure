@@ -146,8 +146,8 @@ export default function Sidebar({
 
       {/* My deals header — "+" creates a new deal */}
       {!collapsed && (
-        <div className="px-3 pt-2 pb-1 flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
+        <div className="px-3 pt-2 pb-1 flex items-center justify-between gap-2">
+          <span className="text-[13px] uppercase tracking-wider font-semibold text-navy/45">
             My deals
           </span>
           {onNewDeal && (
@@ -155,9 +155,10 @@ export default function Sidebar({
               type="button"
               onClick={onNewDeal}
               aria-label="New deal"
-              className="text-klo hover:bg-klo/10 rounded w-5 h-5 flex items-center justify-center text-[14px] font-semibold leading-none"
+              className="text-klo hover:bg-klo/10 rounded h-7 px-2 flex items-center gap-1 text-[12px] font-semibold leading-none"
             >
-              +
+              <span className="text-[18px] leading-none">+</span>
+              <span>Create New Deal</span>
             </button>
           )}
         </div>
