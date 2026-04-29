@@ -1,21 +1,56 @@
 // Phase 8 step 02 + Phase 9 step 05 — Train Klo settings page.
 //
-// Single-screen form, 7 fields. Saves to seller_profiles. Becomes live for
-// the next chat turn — no app restart needed.
+// Single-screen profile form. Saves seller_profiles for Klo coaching plus
+// editable user basics, optional UI preferences (localStorage), and security
+// actions (password reset, change password, sign out).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useBeforeUnload, useNavigate, useBlocker } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useProfile } from '../hooks/useProfile.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
-import { supabase } from '../lib/supabase.js'
 import TrainKloFormFields, { EMPTY_FIELDS } from '../components/onboarding/TrainKloFormFields.jsx'
-import { supabase } from '../lib/supabase.js'
 
 const FIELD_MIN = 3
 const FIELD_MAX = 200
 const PERSONAS_MIN = 1
 const PERSONAS_MAX = 5
+const AVATAR_MAX_BYTES = 1.5 * 1024 * 1024
+
+const DEFAULT_PREFS = {
+  avatarUrl: '',
+  displayNameFormat: 'first-name',
+  timezone: '',
+  locale: '',
+  emailNotifications: true,
+  dealDigest: true,
+  inAppMentions: true,
+}
+
+function prefsKey(userId) {
+  return `klosure:profile-prefs:${userId || 'anon'}`
+}
+
+function loadPrefs(userId) {
+  if (typeof window === 'undefined') return { ...DEFAULT_PREFS }
+  try {
+    const raw = window.localStorage.getItem(prefsKey(userId))
+    if (!raw) return defaultPrefs()
+    const parsed = JSON.parse(raw)
+    return { ...defaultPrefs(), ...parsed }
+  } catch {
+    return defaultPrefs()
+  }
+}
+
+function defaultPrefs() {
+  return {
+    ...DEFAULT_PREFS,
+    timezone: Intl.DateTimeFormat?.().resolvedOptions?.().timeZone || 'UTC',
+    locale: (typeof navigator !== 'undefined' && navigator.language) || 'en-US',
+  }
+}
 
 function relativeFromNow(ts) {
   if (!ts) return null
@@ -32,7 +67,7 @@ function relativeFromNow(ts) {
 }
 
 export default function TrainKloPage() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { profile, refresh } = useProfile()
   const navigate = useNavigate()
 
@@ -47,19 +82,18 @@ export default function TrainKloPage() {
 
   const [fields, setFields] = useState({ ...EMPTY_FIELDS })
   const [initialFields, setInitialFields] = useState({ ...EMPTY_FIELDS })
+  const [profileBasics, setProfileBasics] = useState({ firstName: '', lastName: '', companyName: '' })
   const initialBasicsRef = useRef({ firstName: '', lastName: '', companyName: '' })
   const [errors, setErrors] = useState({})
-  const [prefs, setPrefs] = useState({
-    avatarUrl: '',
-    displayNameFormat: 'first-name',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    locale: navigator?.language || 'en-US',
-    emailNotifications: true,
-    dealDigest: true,
-    inAppMentions: true,
-  })
+
+  const [prefs, setPrefs] = useState(() => loadPrefs(user?.id))
   const [prefSavedFlash, setPrefSavedFlash] = useState(false)
   const [securityInfo, setSecurityInfo] = useState('')
+  const [securityBusy, setSecurityBusy] = useState(false)
+
+  useEffect(() => {
+    setPrefs(loadPrefs(user?.id))
+  }, [user?.id])
 
   useEffect(() => {
     if (!user) return
@@ -70,7 +104,7 @@ export default function TrainKloPage() {
         if (!mounted) return
         if (row) {
           setHadProfile(true)
-          setFields({
+          const next = {
             seller_company: row.seller_company || '',
             role: row.role || '',
             what_you_sell: row.what_you_sell || '',
@@ -78,17 +112,10 @@ export default function TrainKloPage() {
             region: row.region || '',
             top_personas: Array.isArray(row.top_personas) ? row.top_personas : [],
             common_deal_killer: row.common_deal_killer || '',
-          })
+          }
+          setFields(next)
+          setInitialFields(next)
           setUpdatedAt(row.updated_at || null)
-          setInitialFields({
-            seller_company: row.seller_company || '',
-            role: row.role || '',
-            what_you_sell: row.what_you_sell || '',
-            icp: row.icp || '',
-            region: row.region || '',
-            top_personas: Array.isArray(row.top_personas) ? row.top_personas : [],
-            common_deal_killer: row.common_deal_killer || '',
-          })
         } else {
           setHadProfile(false)
         }
@@ -160,6 +187,41 @@ export default function TrainKloPage() {
     return false
   }, [user])
 
+  function persistPrefs(next) {
+    setPrefs(next)
+    try {
+      window.localStorage.setItem(prefsKey(user?.id), JSON.stringify(next))
+      setPrefSavedFlash(true)
+      window.clearTimeout(persistPrefs._t)
+      persistPrefs._t = window.setTimeout(() => setPrefSavedFlash(false), 1500)
+    } catch {
+      // Storage quota or private mode — silently ignore.
+    }
+  }
+
+  function updatePrefs(next) {
+    persistPrefs(next)
+  }
+
+  function handleAvatarPick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setSecurityInfo('Avatar must be an image file.')
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setSecurityInfo('Avatar must be under 1.5 MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : ''
+      if (dataUrl) updatePrefs({ ...prefs, avatarUrl: dataUrl })
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function handleResendVerification() {
     if (!user?.email || resendBusy) return
     setResendBusy(true)
@@ -172,6 +234,18 @@ export default function TrainKloPage() {
     setResendBusy(false)
   }
 
+  async function sendPasswordReset() {
+    if (!user?.email || securityBusy) return
+    setSecurityBusy(true)
+    setSecurityInfo('')
+    const redirectTo = `${window.location.origin}/settings/password`
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo })
+    setSecurityInfo(
+      error ? (error.message || 'Could not send reset email.') : 'Password reset email sent.'
+    )
+    setSecurityBusy(false)
+  }
+
   function validate() {
     const next = {}
     const checkText = (key, value) => {
@@ -180,7 +254,7 @@ export default function TrainKloPage() {
       else if (v.length < FIELD_MIN) next[key] = `Too short (min ${FIELD_MIN})`
       else if (v.length > FIELD_MAX) next[key] = `Too long (max ${FIELD_MAX})`
     }
-    checkText('sellerCompany', fields.seller_company)
+    checkText('sellerCompany', profileBasics.companyName)
     checkText('firstName', profileBasics.firstName)
     checkText('lastName', profileBasics.lastName)
     checkText('role', fields.role)
@@ -210,8 +284,9 @@ export default function TrainKloPage() {
     try {
       const fullName = `${profileBasics.firstName.trim()} ${profileBasics.lastName.trim()}`.trim()
       await supabase.from('users').update({ name: fullName }).eq('id', user.id)
+      const trimmedCompany = profileBasics.companyName.trim()
       const row = await upsertSellerProfile(user.id, {
-        seller_company: profileBasics.companyName.trim(),
+        seller_company: trimmedCompany,
         role: fields.role.trim(),
         what_you_sell: fields.what_you_sell.trim(),
         icp: fields.icp.trim(),
@@ -220,12 +295,13 @@ export default function TrainKloPage() {
         common_deal_killer: fields.common_deal_killer.trim(),
       })
       setUpdatedAt(row?.updated_at || new Date().toISOString())
-      setFields((prev) => ({ ...prev, seller_company: profileBasics.companyName.trim() }))
-      setInitialFields((prev) => ({ ...prev, ...fields, seller_company: profileBasics.companyName.trim() }))
+      const savedFields = { ...fields, seller_company: trimmedCompany }
+      setFields(savedFields)
+      setInitialFields(savedFields)
       initialBasicsRef.current = {
         firstName: profileBasics.firstName.trim(),
         lastName: profileBasics.lastName.trim(),
-        companyName: profileBasics.companyName.trim(),
+        companyName: trimmedCompany,
       }
       await refresh?.()
       setHadProfile(true)
@@ -243,6 +319,17 @@ export default function TrainKloPage() {
     setProfileBasics({ ...initialBasicsRef.current })
     setErrors({})
     setServerError('')
+  }
+
+  async function handleSignOut() {
+    if (securityBusy) return
+    setSecurityBusy(true)
+    try {
+      await signOut()
+      navigate('/login')
+    } finally {
+      setSecurityBusy(false)
+    }
   }
 
   if (loading) {
@@ -372,7 +459,7 @@ export default function TrainKloPage() {
 
       <section className="mt-10 rounded-2xl border border-navy/10 bg-white p-5">
         <h2 className="text-lg font-semibold text-navy">Profile preferences (optional)</h2>
-        <p className="text-sm text-navy/60 mt-1">Personalize how Klosure appears for you.</p>
+        <p className="text-sm text-navy/60 mt-1">Personalize how Klosure appears for you. Saved on this device.</p>
 
         <div className="mt-5 grid gap-4">
           <div>
@@ -385,13 +472,23 @@ export default function TrainKloPage() {
                 Upload
                 <input type="file" accept="image/*" className="hidden" onChange={handleAvatarPick} />
               </label>
-              <button type="button" onClick={() => updatePrefs({ ...prefs, avatarUrl: '' })} className="text-sm text-navy/70 hover:text-navy">Remove</button>
+              <button
+                type="button"
+                onClick={() => updatePrefs({ ...prefs, avatarUrl: '' })}
+                className="text-sm text-navy/70 hover:text-navy"
+              >
+                Remove
+              </button>
             </div>
           </div>
 
           <label className="block">
             <span className="block text-xs font-medium text-navy/70 mb-1">Preferred display name format</span>
-            <select value={prefs.displayNameFormat} onChange={(e) => updatePrefs({ ...prefs, displayNameFormat: e.target.value })} className="w-full border border-navy/15 rounded-lg px-3 py-2.5">
+            <select
+              value={prefs.displayNameFormat}
+              onChange={(e) => updatePrefs({ ...prefs, displayNameFormat: e.target.value })}
+              className="w-full border border-navy/15 rounded-lg px-3 py-2.5 text-sm"
+            >
               <option value="first-name">First name only</option>
               <option value="full-name">Full name</option>
               <option value="first-last-initial">First name + last initial</option>
@@ -399,16 +496,38 @@ export default function TrainKloPage() {
           </label>
 
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Time zone" type="text" value={prefs.timezone} onChange={(v) => updatePrefs({ ...prefs, timezone: v })} placeholder="America/Los_Angeles" />
-            <Field label="Locale" type="text" value={prefs.locale} onChange={(v) => updatePrefs({ ...prefs, locale: v })} placeholder="en-US" />
+            <PrefField
+              label="Time zone"
+              value={prefs.timezone}
+              onChange={(v) => updatePrefs({ ...prefs, timezone: v })}
+              placeholder="America/Los_Angeles"
+            />
+            <PrefField
+              label="Locale"
+              value={prefs.locale}
+              onChange={(v) => updatePrefs({ ...prefs, locale: v })}
+              placeholder="en-US"
+            />
           </div>
 
           <div>
             <p className="text-xs font-medium text-navy/70 mb-2">Notification preferences</p>
             <div className="space-y-2 text-sm text-navy/80">
-              <Checkbox label="Email me when a buyer replies" checked={prefs.emailNotifications} onChange={(v) => updatePrefs({ ...prefs, emailNotifications: v })} />
-              <Checkbox label="Weekly deal digest" checked={prefs.dealDigest} onChange={(v) => updatePrefs({ ...prefs, dealDigest: v })} />
-              <Checkbox label="In-app mentions and reminders" checked={prefs.inAppMentions} onChange={(v) => updatePrefs({ ...prefs, inAppMentions: v })} />
+              <Checkbox
+                label="Email me when a buyer replies"
+                checked={prefs.emailNotifications}
+                onChange={(v) => updatePrefs({ ...prefs, emailNotifications: v })}
+              />
+              <Checkbox
+                label="Weekly deal digest"
+                checked={prefs.dealDigest}
+                onChange={(v) => updatePrefs({ ...prefs, dealDigest: v })}
+              />
+              <Checkbox
+                label="In-app mentions and reminders"
+                checked={prefs.inAppMentions}
+                onChange={(v) => updatePrefs({ ...prefs, inAppMentions: v })}
+              />
             </div>
           </div>
           {prefSavedFlash && <p className="text-xs text-emerald-700">Preferences saved.</p>}
@@ -419,8 +538,34 @@ export default function TrainKloPage() {
         <h2 className="text-lg font-semibold text-navy">Security actions</h2>
         <p className="text-sm text-navy/60 mt-1">Manage password and active access separately from profile preferences.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={sendPasswordReset} className="text-sm px-3 py-2 rounded-lg border border-navy/15 hover:bg-white">Send password reset email</button>
-          <button type="button" onClick={async () => { await signOut(); navigate('/login') }} className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50">Sign out</button>
+          <Link
+            to="/settings/password"
+            className="text-sm px-3 py-2 rounded-lg border border-navy/15 hover:bg-white"
+          >
+            Change password
+          </Link>
+          <button
+            type="button"
+            onClick={sendPasswordReset}
+            disabled={securityBusy || !user?.email}
+            className="text-sm px-3 py-2 rounded-lg border border-navy/15 hover:bg-white disabled:opacity-50"
+          >
+            Send password reset email
+          </button>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={securityBusy}
+            className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            Sign out
+          </button>
+          <Link
+            to="/billing"
+            className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+          >
+            Delete account
+          </Link>
         </div>
         {securityInfo && <p className="text-xs text-navy/70 mt-2">{securityInfo}</p>}
       </section>
@@ -431,6 +576,21 @@ export default function TrainKloPage() {
         </Link>
       </div>
     </div>
+  )
+}
+
+function PrefField({ label, value, onChange, placeholder }) {
+  return (
+    <label className="block">
+      <span className="block text-xs font-medium text-navy/70 mb-1">{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full border border-navy/15 rounded-lg px-3 py-2.5 text-sm"
+      />
+    </label>
   )
 }
 
