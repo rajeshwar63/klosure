@@ -7,6 +7,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
+import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { useShellDeals } from '../hooks/useShellDeals.jsx'
 import { greetingForRole } from '../services/klo.js'
 import { canShareWithBuyer } from '../lib/plans.js'
@@ -67,6 +68,7 @@ export default function DealRoomPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { profile, plan } = useProfile()
+  const { isReadOnly } = useAccountStatus()
   const { reload: reloadShellDeals } = useShellDeals()
 
   const [deal, setDeal] = useState(null)
@@ -435,6 +437,7 @@ export default function DealRoomPage() {
               kloThinking={kloThinking}
               setKloThinking={setKloThinking}
               locked={deal.locked}
+              readOnly={isReadOnly}
             />
           </div>
         )}

@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar.jsx'
 import MobileTopBar from './MobileTopBar.jsx'
 import MobileDrawer from './MobileDrawer.jsx'
+import ReadOnlyBanner from '../billing/ReadOnlyBanner.jsx'
 
 const STORAGE_KEY_COLLAPSED = 'klosure:sidebarCollapsed'
 
@@ -119,6 +120,7 @@ export default function AppShell({
       </div>
 
       <main className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#f5f6f8]">
+        <ReadOnlyBanner />
         <MobileTopBar
           pageTitle={pageTitle}
           onMenuOpen={() => setMobileOpen(true)}

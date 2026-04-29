@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { requestKloCoaching } from '../services/klo.js'
 import { formatTime } from '../lib/format.js'
@@ -28,6 +29,7 @@ export default function ChatView({
   kloThinking,
   setKloThinking,
   locked = false,
+  readOnly = false,
 }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -144,7 +146,28 @@ export default function ChatView({
         </div>
       </main>
 
-      {locked ? (
+      {readOnly && role === 'seller' ? (
+        <div
+          className="safe-bottom shrink-0"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            borderTop: '1px solid var(--klo-line)',
+          }}
+        >
+          <div className="max-w-2xl mx-auto px-4 py-6 text-center">
+            <p className="text-sm mb-3" style={{ color: 'var(--klo-text-dim)' }}>
+              Klo coaching paused — your account is read-only.
+            </p>
+            <Link
+              to="/billing"
+              className="inline-block px-4 py-2 rounded-lg text-sm font-medium"
+              style={{ background: 'var(--klo-accent)', color: 'white' }}
+            >
+              Upgrade to resume
+            </Link>
+          </div>
+        </div>
+      ) : locked ? (
         <div
           className="safe-bottom shrink-0"
           style={{

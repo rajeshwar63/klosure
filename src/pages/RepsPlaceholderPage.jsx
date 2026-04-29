@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
+import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import {
   buildInviteLink,
   inviteMember,
@@ -142,6 +143,11 @@ export default function RepsPlaceholderPage() {
 }
 
 function InvitePanel({ teamId, invitedBy, onInvited }) {
+  const { status, planDef, seatsAvailable } = useAccountStatus()
+  const seatsUsed = status?.seats_used ?? 0
+  const seatCap = status?.seat_cap ?? 1
+  const atCapacity = seatsAvailable === 0
+
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -169,6 +175,22 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
       className="rounded-2xl p-5 mb-6"
       style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line)' }}
     >
+      <div className="text-[13px] mb-3" style={{ color: 'var(--klo-text-dim)' }}>
+        Seats:{' '}
+        <span style={{ color: 'var(--klo-text)' }}>
+          {seatsUsed} of {seatCap}
+        </span>{' '}
+        used on {planDef.label}
+        {atCapacity && (
+          <>
+            {' '}
+            ·{' '}
+            <Link to="/billing" style={{ color: 'var(--klo-danger)' }}>
+              Upgrade to add more
+            </Link>
+          </>
+        )}
+      </div>
       <div className="flex items-center justify-between gap-3">
         <div>
           <MonoKicker>Grow the team</MonoKicker>
@@ -183,7 +205,9 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="px-3 py-2 rounded-lg text-sm font-medium"
+            disabled={atCapacity}
+            title={atCapacity ? 'Seat cap reached — upgrade to add more.' : undefined}
+            className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: 'var(--klo-accent)', color: 'white' }}
           >
             Invite teammate
@@ -208,8 +232,9 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
           />
           <button
             type="submit"
-            disabled={busy}
-            className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+            disabled={busy || atCapacity}
+            title={atCapacity ? 'Seat cap reached — upgrade to add more.' : undefined}
+            className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: 'var(--klo-accent)', color: 'white' }}
           >
             {busy ? 'Sending…' : 'Send invite'}

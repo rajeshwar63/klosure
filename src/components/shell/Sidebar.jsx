@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react'
 import SidebarNavItem from './SidebarNavItem.jsx'
 import SidebarDealRow from './SidebarDealRow.jsx'
 import TeamContextBadge from './TeamContextBadge.jsx'
+import TrialCountdownBadge from '../billing/TrialCountdownBadge.jsx'
 
 const REP_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
@@ -229,6 +230,13 @@ export default function Sidebar({
               />
             ))}
           </nav>
+        </div>
+      )}
+
+      {/* Trial countdown — only renders while user is in trial_active */}
+      {!collapsed && (
+        <div className="px-3 pt-2 shrink-0">
+          <TrialCountdownBadge />
         </div>
       )}
 
