@@ -347,6 +347,10 @@ function StatusBanner({ status, planSlug, isTrialing, daysLeftInTrial, isReadOnl
       ? `Renews on ${new Date(status.current_period_end).toLocaleDateString()}.`
       : 'Active license.'
     tone = 'success'
+  } else if (status.status === 'paid_grace') {
+    title = `${planLabel} — payment retry in progress.`
+    body = "Razorpay is retrying your last charge. Update your card or cancel from Manage subscription if you'd rather not continue."
+    tone = 'warning'
   } else {
     title = `Plan: ${planLabel}`
     body = ''
@@ -357,6 +361,10 @@ function StatusBanner({ status, planSlug, isTrialing, daysLeftInTrial, isReadOnl
     tone === 'danger' ? 'var(--klo-danger-soft)' :
     tone === 'warning' ? 'var(--klo-warning-soft)' :
     'var(--klo-bg-elev)'
+
+  // Manage link: only for real paid subs (not overridden — those are admin-
+  // granted and have no Razorpay subscription to cancel).
+  const showManage = status.status === 'paid_active' || status.status === 'paid_grace'
 
   return (
     <div
@@ -369,6 +377,17 @@ function StatusBanner({ status, planSlug, isTrialing, daysLeftInTrial, isReadOnl
       {body && (
         <p className="mt-1 text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
           {body}
+        </p>
+      )}
+      {showManage && (
+        <p className="mt-3 text-[13px]">
+          <Link
+            to="/billing/manage"
+            className="hover:underline"
+            style={{ color: 'var(--klo-accent)' }}
+          >
+            Manage subscription →
+          </Link>
         </p>
       )}
     </div>

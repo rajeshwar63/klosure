@@ -1,8 +1,9 @@
-# Manual onboarding — Phase 12.1 / 12.2
+# Manual onboarding — Phase 12.1 / 12.2 / 12.3
 
-Until Razorpay ships in Phase 12.3, plans are granted by hand. This is the
-cheat sheet. Run everything from the Supabase SQL Editor against project
-`azpdsgnvqkrfdvqxacqw` (klosure).
+Razorpay self-serve upgrade ships in Phase 12.3, but the manual grant path
+below is still the right tool for design partners, refunds, and anything
+that doesn't want to flow through Razorpay. Run everything from the Supabase
+SQL Editor against project `azpdsgnvqkrfdvqxacqw` (klosure).
 
 The SQL helper `public.admin_grant_plan(email, plan, period_end)` is the
 primary tool. It is **not** granted to `authenticated` — only the postgres
@@ -198,6 +199,208 @@ Trigger the cron manually after each, then verify:
 
 ---
 
+## Razorpay webhook — `razorpay-webhook` (Phase 12.3 Chunk 3)
+
+The Razorpay edge functions split work into three halves:
+
+- `razorpay-create-subscription` — called from the Billing page when a user
+  clicks Upgrade. Creates the subscription on Razorpay's side, opens the
+  Checkout JS modal, and stores `razorpay_subscription_id` on `users` or
+  `teams`. **Does not** flip the account to paid.
+- `razorpay-webhook` — receives subscription lifecycle events from Razorpay
+  and is the only thing that mutates `plan` / `current_period_end` /
+  `read_only_since` for paid users.
+- `razorpay-cancel-subscription` — called from `/billing/manage` when a
+  paid user clicks "Cancel my subscription". Schedules cancellation at
+  cycle end on Razorpay; the webhook does the actual read-only flip when
+  Razorpay fires `subscription.cancelled` at period end.
+
+Treat the webhook as the source of truth for paid state. The frontend polls
+`get_my_account_status` after the modal closes and only unblocks the user
+once the webhook has updated their row.
+
+### One-time setup
+
+```powershell
+# 1. Deploy the function (no-verify-jwt because Razorpay doesn't send a
+#    Supabase JWT).
+supabase functions deploy razorpay-webhook --no-verify-jwt
+
+# 2. Generate a webhook secret (any random string — used to HMAC-verify
+#    incoming events). 32 hex chars is plenty.
+#    PowerShell:
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[Convert]::ToHexString($bytes).ToLower()
+#    Bash / WSL:
+#      openssl rand -hex 32
+
+# 3. Save it on Supabase AND in Razorpay (next step). They must match.
+supabase secrets set RAZORPAY_WEBHOOK_SECRET=<that hex string>
+```
+
+### Register the webhook in Razorpay dashboard
+
+Razorpay Dashboard → **Settings → Webhooks → Add new webhook**:
+
+- **URL:** `https://azpdsgnvqkrfdvqxacqw.supabase.co/functions/v1/razorpay-webhook`
+- **Secret:** the same hex string you stored as `RAZORPAY_WEBHOOK_SECRET`.
+- **Active events** (tick at minimum):
+  - `subscription.activated`
+  - `subscription.charged`
+  - `subscription.pending`
+  - `subscription.halted`
+  - `subscription.cancelled`
+  - `subscription.completed`
+- **Alert email:** rajeshwar63@gmail.com (Razorpay alerts on >24h failure
+  streaks; the inbox is the canary).
+
+Do this **twice** — once on the Razorpay test account (with the test secret)
+and again on the live account (with a separate live secret) at Chunk 5
+cutover. The function reads whichever secret matches the incoming
+signature, so you can't run both at once on the same Supabase project
+without splitting environments.
+
+### Verifying end-to-end
+
+1. From a test user, click Upgrade on `/billing` and complete the test-card
+   flow in the Razorpay modal (use `4111 1111 1111 1111`, any future date,
+   any CVV; OTP `1234` on test).
+2. Watch the function logs:
+
+   ```powershell
+   supabase functions logs razorpay-webhook --follow
+   ```
+
+   You should see `subscription.activated` arrive within a few seconds of the
+   modal closing, followed by `subscription.charged` once Razorpay charges
+   the first cycle (typically immediate on test).
+3. Confirm the row state:
+
+   ```sql
+   select email, plan, current_period_end, read_only_since,
+          razorpay_subscription_id
+     from public.users
+    where email = 'rajeshwar63+test@gmail.com';
+
+   -- And the audit log:
+   select event_type, signature_verified, processed_at, processing_error
+     from public.payment_events
+    where subscription_id = '<sub_…>'
+    order by created_at;
+   ```
+
+   `plan` should be the upgraded slug, `current_period_end` ~30 days out,
+   `read_only_since` null, and every payment_events row should have
+   `signature_verified=true` and a non-null `processed_at` with no
+   `processing_error`.
+4. Cancel from the Razorpay dashboard (Subscriptions → pick the sub →
+   Cancel). `subscription.cancelled` should arrive and flip the user back
+   to `read_only_since = now()`.
+
+### Replaying / debugging events
+
+Razorpay Dashboard → Webhooks → click the URL → **Recent Deliveries**.
+Failed deliveries can be replayed individually. The function is
+idempotent — replaying a successful event short-circuits on the
+`payment_events.event_id` unique constraint and returns
+`{"ok":true,"duplicate":true}`.
+
+If a payload couldn't be processed, look at the row in `payment_events`:
+
+```sql
+select event_id, event_type, processing_error, payload
+  from public.payment_events
+ where processing_error is not null
+ order by created_at desc
+ limit 20;
+```
+
+Common `processing_error` values:
+
+- `subscription_not_found` — Razorpay event for a sub we don't have on our
+  side (e.g. a manual sub created in the dashboard, or a sub created
+  before its `razorpay_subscription_id` was persisted to our DB).
+- `unresolved_plan:<plan_id>` — the active/pending event references a
+  plan_id we don't recognise. Add it to `PLAN_ID_TO_SLUG` in
+  `supabase/functions/razorpay-webhook/index.ts` (and to
+  `src/lib/razorpay-plans.ts`), redeploy, replay the event.
+- `unknown_status:<value>` — Razorpay sent a status we don't map (e.g.
+  `paused`/`resumed`). Decide on the policy and extend `mapStatus`.
+
+---
+
+## Self-service cancel — `razorpay-cancel-subscription` (Phase 12.3 Chunk 4)
+
+Users on a paid plan can cancel themselves from `/billing/manage`. The flow:
+
+1. User clicks **Manage subscription** on the `/billing` status banner →
+   lands on `/billing/manage` (only paid_active and paid_grace users get
+   the link; overridden users are redirected back to `/billing`).
+2. They confirm the cancel → frontend calls
+   `razorpay-cancel-subscription` → edge function POSTs
+   `cancel_at_cycle_end=1` to Razorpay → user keeps paid access until
+   `current_period_end`.
+3. At cycle end Razorpay fires `subscription.cancelled`; the webhook flips
+   `read_only_since = now()` and Klosure goes read-only for that user/team.
+
+### One-time deploy
+
+```powershell
+supabase functions deploy razorpay-cancel-subscription
+# Reuses RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET set in Chunk 2 — no new
+# secrets needed.
+```
+
+JWT verification is on (the function reads the caller's session to find
+their subscription); no `--no-verify-jwt` flag.
+
+### What to expect after a user cancels
+
+- `users.razorpay_subscription_id` (or the team's) stays the same — we
+  don't clear it on cancel-scheduled, only on the cancelled webhook.
+- `users.plan`, `current_period_end`, `read_only_since` are unchanged
+  until the webhook fires `subscription.cancelled` at cycle end. Until
+  then, the account is paid_active.
+- In the Razorpay dashboard the subscription shows `status=active`,
+  `cancel_at_cycle_end=true` until the cycle ends, then `status=cancelled`.
+
+### Reversing a cancellation before cycle end
+
+If a user changes their mind before `current_period_end`, you can
+"un-cancel" via the dashboard (Subscriptions → pick the sub → Resume) or
+the API. There's no UI for this in the app — it's email-rajeshwar; rare
+enough that the friction is fine.
+
+```powershell
+# API form (replace <sub_id> + auth):
+curl -X POST `
+  -H "Authorization: Basic <base64-of-key:secret>" `
+  https://api.razorpay.com/v1/subscriptions/<sub_id>
+# Razorpay's resume API expects no body and re-enables the auto-renew.
+```
+
+### Verifying end-to-end
+
+1. Sign in as a paid test user, go to `/billing/manage`, click cancel,
+   confirm.
+2. Watch the function logs:
+
+   ```powershell
+   supabase functions logs razorpay-cancel-subscription --follow
+   ```
+
+   You should see a 200 response within ~1s and the Razorpay-returned
+   `scheduled_end` timestamp in the function's response body.
+3. Confirm in Razorpay dashboard: subscription shows
+   `cancel_at_cycle_end=true`.
+4. Either wait for cycle end (test mode cycles can be set short) or in
+   the dashboard manually click **Cancel** on the subscription to fire
+   `subscription.cancelled` immediately. The webhook should set
+   `read_only_since=now()` and the user becomes read-only.
+
+---
+
 ## Things to be careful about
 
 1. `purge_expired_users` deletes from `auth.users`. The cascade chain
@@ -215,3 +418,18 @@ Trigger the cron manually after each, then verify:
    Don't change the copy to imply that clicking a link or logging in
    preserves data — only payment does, and saying otherwise would be
    misleading.
+5. The Razorpay webhook is the only writer of paid state. Don't bypass it
+   by editing `users.plan` directly during a paid flow — the next webhook
+   event will overwrite your manual edit anyway. Use `admin_grant_plan` /
+   `plan_override` for manual interventions, both of which the webhook
+   respects.
+6. Keep `PLAN_ID_TO_SLUG` in `supabase/functions/razorpay-webhook/index.ts`
+   in sync with `src/lib/razorpay-plans.ts`. They're separate copies because
+   the edge function can't import frontend modules; whenever you add a new
+   plan or rotate a plan ID, edit both.
+7. Cancel = scheduled, not immediate. A user who cancels at noon today still
+   has paid access until `current_period_end`. They will be confused if you
+   tell them "you're cancelled" — say "cancellation scheduled for &lt;date&gt;",
+   which is what `/billing/manage` actually displays. Don't add a manual
+   `update users set read_only_since = now()` shortcut; it desynchronises
+   from Razorpay and the next charge attempt fails noisily.

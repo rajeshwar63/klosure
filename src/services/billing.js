@@ -39,6 +39,31 @@ export async function startUpgrade({ planSlug, currency }) {
   return res.json()
 }
 
+// Schedules cancellation at cycle end. The webhook is what actually flips the
+// user/team to read-only when subscription.cancelled fires (at period end);
+// this just tells Razorpay to stop renewing.
+export async function cancelSubscription() {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData?.session?.access_token
+  if (!token) return { ok: false, error: 'not_signed_in' }
+
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL
+  const res = await fetch(`${baseUrl}/functions/v1/razorpay-cancel-subscription`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: text || `request failed (${res.status})` }
+  }
+  return res.json()
+}
+
 // --- Stripe (Phase 4, retained but unused) ---------------------------------
 
 export async function startCheckout({ plan, successUrl, cancelUrl }) {
