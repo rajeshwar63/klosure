@@ -113,10 +113,25 @@ Deno.serve(async (req) => {
         name: userName || userEmail,
         email: userEmail,
         contact: userPhone || undefined,
-        fail_existing: 0,   // 0 = return existing customer if email matches; don't error
+        // Razorpay expects fail_existing as a STRING. Numeric 0 is silently
+        // ignored, falling back to the default (1 = throw "Customer already
+        // exists"). With "0" the API returns the existing customer instead.
+        fail_existing: "0",
       })
       if (custRes.status === 200 || custRes.status === 201) {
         razorpayCustomerId = custRes.body.id
+        // Persist customer_id NOW, before we try the subscription. If the
+        // subscription create fails further down, we don't want to orphan
+        // the customer (Razorpay won't let us recreate by email anyway).
+        if (isTeamPlan && teamId) {
+          await sb.from("teams")
+            .update({ razorpay_customer_id: razorpayCustomerId })
+            .eq("id", teamId)
+        } else {
+          await sb.from("users")
+            .update({ razorpay_customer_id: razorpayCustomerId })
+            .eq("id", userId)
+        }
       } else {
         console.error("create customer failed", custRes)
         return json({ ok: false, error: "razorpay_customer_failed", detail: custRes.body }, 500)
