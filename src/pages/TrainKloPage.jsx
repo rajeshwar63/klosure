@@ -11,6 +11,7 @@ import { useProfile } from '../hooks/useProfile.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
 import TrainKloFormFields, { EMPTY_FIELDS } from '../components/onboarding/TrainKloFormFields.jsx'
+import { Eyebrow, MonoKicker, MonoTimestamp } from '../components/shared/index.js'
 
 const FIELD_MIN = 3
 const FIELD_MAX = 200
@@ -333,62 +334,106 @@ export default function TrainKloPage() {
   }
 
   return (
-    <div className="px-4 md:px-8 py-8 md:py-12 max-w-[640px] mx-auto">
+    <div className="px-4 md:px-8 py-8 md:py-12 max-w-[760px] mx-auto">
       <div className="mb-6">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="text-[12px] text-navy/55 hover:text-navy"
+          className="kl-mono text-[12px]"
+          style={{ color: 'var(--klo-text-mute)' }}
         >
           ← Back
         </button>
       </div>
 
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-navy mb-2">Train Klo</h1>
-        <p className="text-sm text-navy/65 leading-relaxed">
-          The more Klo knows about <em>you</em>, the less generic its coaching gets.
-          Six questions. Two minutes. You can change these anytime.
+      <header className="mb-10">
+        <Eyebrow>Train Klo</Eyebrow>
+        <h1
+          className="mt-3"
+          style={{
+            fontSize: 'clamp(32px, 4vw, 44px)',
+            fontWeight: 600,
+            letterSpacing: '-0.03em',
+            lineHeight: 1.1,
+            color: 'var(--klo-text)',
+          }}
+        >
+          What should Klo know about how you sell?
+        </h1>
+        <p className="mt-3 text-[16px] leading-relaxed" style={{ color: 'var(--klo-text-dim)' }}>
+          Six questions. Two minutes. Then Klo stops being generic.
         </p>
       </header>
 
       {!hadProfile && (
-        <div className="mb-6 rounded-xl border border-klo/30 bg-klo/5 px-4 py-3 text-[13px] text-navy/80 leading-relaxed">
-          <span aria-hidden className="mr-1">🎯</span>
+        <div
+          className="mb-6 rounded-2xl px-5 py-4 text-[14px] leading-relaxed"
+          style={{
+            background: 'var(--klo-accent-soft)',
+            border: '1px solid var(--klo-accent-line)',
+            color: 'var(--klo-text)',
+          }}
+        >
           <strong>Klo is currently using generic coaching.</strong>{' '}
           Fill these in to get advice tailored to your role, market, and deal patterns.
         </div>
       )}
 
       {serverError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div
+          className="mb-4 rounded-lg px-3.5 py-2.5 text-[14px]"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            border: '1px solid var(--klo-line)',
+            borderLeft: '3px solid var(--klo-danger)',
+            color: 'var(--klo-danger)',
+          }}
+        >
           {serverError}
         </div>
       )}
 
-      <section className="mb-6 rounded-2xl border border-navy/10 bg-white px-4 py-4 md:px-5">
+      <section
+        className="mb-6 rounded-2xl px-5 py-5"
+        style={{
+          background: 'var(--klo-bg-elev)',
+          border: '1px solid var(--klo-line)',
+        }}
+      >
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-navy">Account</h2>
+          <MonoKicker>Account</MonoKicker>
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-              isVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-            }`}
+            className="kl-mono inline-flex items-center rounded-full px-2.5 py-1 text-[11px] uppercase"
+            style={{
+              color: isVerified ? 'var(--klo-good)' : 'var(--klo-warn)',
+              border: `1px solid ${
+                isVerified ? 'rgba(30,138,82,0.24)' : 'rgba(181,120,30,0.24)'
+              }`,
+              letterSpacing: '0.05em',
+            }}
           >
             {isVerified ? 'Verified' : 'Unverified'}
           </span>
         </div>
-        <div className="text-sm text-navy/80 break-all">{accountIdentifier}</div>
+        <div className="text-[14px] break-all" style={{ color: 'var(--klo-text)' }}>
+          {accountIdentifier}
+        </div>
         {!isVerified && user?.email && (
           <div className="mt-3 flex items-center gap-3">
             <button
               type="button"
               onClick={handleResendVerification}
               disabled={resendBusy}
-              className="text-[12px] font-medium text-klo hover:underline disabled:opacity-50"
+              className="text-[12px] font-medium hover:underline disabled:opacity-50"
+              style={{ color: 'var(--klo-accent)' }}
             >
               {resendBusy ? 'Sending…' : 'Resend verification email'}
             </button>
-            {resendMessage && <span className="text-[12px] text-navy/60">{resendMessage}</span>}
+            {resendMessage && (
+              <span className="text-[12px]" style={{ color: 'var(--klo-text-dim)' }}>
+                {resendMessage}
+              </span>
+            )}
           </div>
         )}
       </section>
@@ -396,62 +441,64 @@ export default function TrainKloPage() {
       <form onSubmit={handleSubmit}>
         <div className="space-y-4 mb-6">
           <div className="grid sm:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="block text-[12px] font-semibold tracking-wide text-navy/75 uppercase mb-1">First Name</span>
-              <input
-                value={profileBasics.firstName}
-                onChange={(e) => setProfileBasics((p) => ({ ...p, firstName: e.target.value }))}
-                className="w-full rounded-xl border border-navy/15 px-3 py-2.5 text-sm text-navy"
-              />
-              {errors.firstName && <span className="text-[12px] text-red-600 mt-1 block">{errors.firstName}</span>}
-            </label>
-            <label className="block">
-              <span className="block text-[12px] font-semibold tracking-wide text-navy/75 uppercase mb-1">Last Name</span>
-              <input
-                value={profileBasics.lastName}
-                onChange={(e) => setProfileBasics((p) => ({ ...p, lastName: e.target.value }))}
-                className="w-full rounded-xl border border-navy/15 px-3 py-2.5 text-sm text-navy"
-              />
-              {errors.lastName && <span className="text-[12px] text-red-600 mt-1 block">{errors.lastName}</span>}
-            </label>
-          </div>
-          <label className="block">
-            <span className="block text-[12px] font-semibold tracking-wide text-navy/75 uppercase mb-1">Company Name</span>
-            <input
-              value={profileBasics.companyName}
-              onChange={(e) => setProfileBasics((p) => ({ ...p, companyName: e.target.value }))}
-              className="w-full rounded-xl border border-navy/15 px-3 py-2.5 text-sm text-navy"
+            <BasicField
+              label="First name"
+              value={profileBasics.firstName}
+              onChange={(v) => setProfileBasics((p) => ({ ...p, firstName: v }))}
+              error={errors.firstName}
             />
-            {errors.sellerCompany && <span className="text-[12px] text-red-600 mt-1 block">{errors.sellerCompany}</span>}
-          </label>
+            <BasicField
+              label="Last name"
+              value={profileBasics.lastName}
+              onChange={(v) => setProfileBasics((p) => ({ ...p, lastName: v }))}
+              error={errors.lastName}
+            />
+          </div>
+          <BasicField
+            label="Company name"
+            value={profileBasics.companyName}
+            onChange={(v) => setProfileBasics((p) => ({ ...p, companyName: v }))}
+            error={errors.sellerCompany}
+          />
         </div>
         <TrainKloFormFields fields={fields} setFields={setFields} errors={errors} />
 
-        <div className="flex items-center justify-end gap-3 pt-7">
+        <div className="flex items-center justify-end gap-3 pt-8 flex-wrap">
           {lastSavedLabel && !savedFlash && (
-            <span className="text-[12px] text-navy/45">{lastSavedLabel}</span>
+            <MonoTimestamp>{lastSavedLabel}</MonoTimestamp>
           )}
           <button
             type="button"
             onClick={handleCancel}
             disabled={!isDirty || saving}
-            className="border border-navy/15 hover:border-navy/30 disabled:opacity-50 text-navy font-semibold text-sm px-5 py-2.5 rounded-xl"
+            className="font-medium text-[14px] px-5 py-2.5 rounded-lg disabled:opacity-50"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--klo-line-strong)',
+              color: 'var(--klo-text)',
+            }}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !isDirty}
-            className="bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold text-sm px-5 py-2.5 rounded-xl"
+            className="font-medium text-[14px] px-5 py-2.5 rounded-lg disabled:opacity-50"
+            style={{ background: 'var(--klo-text)', color: '#fff' }}
           >
             {saving ? 'Saving…' : savedFlash ? 'Saved · Klo updated' : 'Save changes'}
           </button>
         </div>
       </form>
 
-      <section className="mt-10 rounded-2xl border border-navy/10 bg-white p-5">
-        <h2 className="text-lg font-semibold text-navy">Profile preferences (optional)</h2>
-        <p className="text-sm text-navy/60 mt-1">Personalize how Klosure appears for you. Saved on this device.</p>
+      <section
+        className="mt-10 rounded-2xl p-5"
+        style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line)' }}
+      >
+        <Eyebrow dot={false}>Profile preferences · optional</Eyebrow>
+        <p className="text-[14px] mt-2" style={{ color: 'var(--klo-text-dim)' }}>
+          Personalize how Klosure appears for you. Saved on this device.
+        </p>
 
         <div className="mt-5 grid gap-4">
           <div>
@@ -526,13 +573,32 @@ export default function TrainKloPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-2xl border border-navy/10 bg-slate-50 p-5">
-        <h2 className="text-lg font-semibold text-navy">Security actions</h2>
-        <p className="text-sm text-navy/60 mt-1">Manage password and active access separately from profile preferences.</p>
+      <section
+        className="mt-6 rounded-2xl p-5"
+        style={{
+          background: 'var(--klo-bg-elev)',
+          border: '1px solid var(--klo-line)',
+          borderLeft: '3px solid var(--klo-danger)',
+        }}
+      >
+        <MonoKicker>Danger zone</MonoKicker>
+        <h2
+          className="mt-2 text-[18px] font-semibold"
+          style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+        >
+          Security actions
+        </h2>
+        <p className="text-[14px] mt-1" style={{ color: 'var(--klo-text-dim)' }}>
+          Manage password and active access separately from profile preferences.
+        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
             to="/settings/password"
-            className="text-sm px-3 py-2 rounded-lg border border-navy/15 hover:bg-white"
+            className="text-[13px] px-3.5 py-2 rounded-lg"
+            style={{
+              border: '1px solid var(--klo-line-strong)',
+              color: 'var(--klo-text)',
+            }}
           >
             Change password
           </Link>
@@ -540,7 +606,11 @@ export default function TrainKloPage() {
             type="button"
             onClick={sendPasswordReset}
             disabled={securityBusy || !user?.email}
-            className="text-sm px-3 py-2 rounded-lg border border-navy/15 hover:bg-white disabled:opacity-50"
+            className="text-[13px] px-3.5 py-2 rounded-lg disabled:opacity-50"
+            style={{
+              border: '1px solid var(--klo-line-strong)',
+              color: 'var(--klo-text)',
+            }}
           >
             Send password reset email
           </button>
@@ -548,22 +618,38 @@ export default function TrainKloPage() {
             type="button"
             onClick={handleSignOut}
             disabled={securityBusy}
-            className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="text-[13px] px-3.5 py-2 rounded-lg disabled:opacity-50"
+            style={{
+              border: '1px solid var(--klo-danger)',
+              color: 'var(--klo-danger)',
+            }}
           >
             Sign out
           </button>
           <Link
             to="/billing"
-            className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+            className="text-[13px] px-3.5 py-2 rounded-lg"
+            style={{
+              border: '1px solid var(--klo-danger)',
+              color: 'var(--klo-danger)',
+            }}
           >
             Delete account
           </Link>
         </div>
-        {securityInfo && <p className="text-xs text-navy/70 mt-2">{securityInfo}</p>}
+        {securityInfo && (
+          <p className="text-[12px] mt-2" style={{ color: 'var(--klo-text-dim)' }}>
+            {securityInfo}
+          </p>
+        )}
       </section>
 
       <div className="mt-10 text-center">
-        <Link to="/today" className="text-sm text-klo hover:underline">
+        <Link
+          to="/today"
+          className="text-[14px] hover:underline"
+          style={{ color: 'var(--klo-accent)' }}
+        >
           ← Back to Today
         </Link>
       </div>
@@ -571,16 +657,44 @@ export default function TrainKloPage() {
   )
 }
 
+function BasicField({ label, value, onChange, error }) {
+  return (
+    <label className="block">
+      <MonoKicker>{label}</MonoKicker>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-2 w-full rounded-lg px-3 py-2.5 text-[14px]"
+        style={{
+          background: 'var(--klo-bg)',
+          border: '1px solid var(--klo-line-strong)',
+          color: 'var(--klo-text)',
+        }}
+      />
+      {error && (
+        <span className="text-[12px] mt-1 block" style={{ color: 'var(--klo-danger)' }}>
+          {error}
+        </span>
+      )}
+    </label>
+  )
+}
+
 function PrefField({ label, value, onChange, placeholder }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-navy/70 mb-1">{label}</span>
+      <MonoKicker>{label}</MonoKicker>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full border border-navy/15 rounded-lg px-3 py-2.5 text-sm"
+        className="mt-2 w-full rounded-lg px-3 py-2.5 text-[14px]"
+        style={{
+          background: 'var(--klo-bg)',
+          border: '1px solid var(--klo-line-strong)',
+          color: 'var(--klo-text)',
+        }}
       />
     </label>
   )

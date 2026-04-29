@@ -15,6 +15,7 @@ import KloFocusCard from '../components/home/KloFocusCard.jsx'
 import NeedsYouTodayList from '../components/home/NeedsYouTodayList.jsx'
 import PipelineGlanceStrip from '../components/home/PipelineGlanceStrip.jsx'
 import OnboardingModal, { ONBOARDING_SEEN_KEY } from '../components/onboarding/OnboardingModal.jsx'
+import { Eyebrow } from '../components/shared/index.js'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -29,6 +30,15 @@ function formatToday() {
     month: 'long',
     day: 'numeric',
   })
+}
+
+function todayMonoLabel() {
+  // "TODAY · TUE 29 APR" — matches the §5.1 hero spec.
+  const now = new Date()
+  const weekday = now.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
+  const day = now.getDate()
+  const month = now.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+  return `Today · ${weekday} ${day} ${month}`
 }
 
 function dismissalKey(userId) {
@@ -111,16 +121,31 @@ export default function SellerHomePage() {
 
   return (
     <div className="p-6 md:p-8 max-w-[960px] mx-auto">
-      <header className="mb-6">
-        <p className="text-xs text-navy/50 mb-1">{formatToday()}</p>
-        <h1 className="text-2xl font-medium text-navy leading-tight">{greeting}</h1>
+      <header className="mb-8">
+        <Eyebrow>{todayMonoLabel()}</Eyebrow>
+        <h1 className="mt-3 text-[clamp(32px,4vw,44px)] font-semibold tracking-[-0.03em] leading-[1.1] text-[var(--klo-text)]">
+          {greeting}
+        </h1>
+        <p className="mt-2 text-[15px] text-[var(--klo-text-dim)]">
+          {formatToday()}
+        </p>
       </header>
 
       {profileMissing && !bannerDismissed && (
-        <div className="mb-6 rounded-xl border border-klo/30 bg-klo/5 px-4 py-3 flex items-start gap-3">
-          <p className="flex-1 text-[13px] text-navy/80 leading-relaxed">
+        <div
+          className="mb-6 rounded-2xl px-5 py-4 flex items-start gap-3"
+          style={{
+            background: 'var(--klo-accent-soft)',
+            border: '1px solid var(--klo-accent-line)',
+          }}
+        >
+          <p className="flex-1 text-[14px] text-[var(--klo-text)] leading-relaxed">
             Klo is giving you generic advice.{' '}
-            <Link to="/settings/train-klo" className="text-klo font-semibold hover:underline">
+            <Link
+              to="/settings/train-klo"
+              className="font-medium hover:underline"
+              style={{ color: 'var(--klo-accent)' }}
+            >
               Train Klo
             </Link>{' '}
             in 2 minutes for sharper coaching →
@@ -129,7 +154,8 @@ export default function SellerHomePage() {
             type="button"
             onClick={dismissBanner}
             aria-label="Dismiss"
-            className="text-navy/40 hover:text-navy text-lg leading-none"
+            className="text-lg leading-none"
+            style={{ color: 'var(--klo-text-mute)' }}
           >
             ×
           </button>

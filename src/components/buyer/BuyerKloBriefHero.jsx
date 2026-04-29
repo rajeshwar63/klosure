@@ -1,5 +1,8 @@
 // Phase 8 — the centerpiece card. Klo's brief, written TO the buyer.
-// Premium card style; this is the visual anchor of the dashboard.
+// Uses the shared KloBriefCard so the buyer sees the same hero shape as
+// the seller, with a buyer-perspective label.
+
+import { KloBriefCard } from '../shared/index.js'
 
 function relativeTime(iso) {
   if (!iso) return null
@@ -20,22 +23,11 @@ export default function BuyerKloBriefHero({ buyerView }) {
   const updated = relativeTime(buyerView?.generated_at)
 
   return (
-    <div className="relative bg-white border border-navy/10 rounded-2xl px-6 md:px-10 py-6 md:py-8 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="absolute left-0 top-6 bottom-6 w-[3px] rounded-full bg-klo/60" aria-hidden />
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-klo text-base leading-none" aria-hidden>◆</span>
-        <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
-          Klo · Your deal advisor
-        </span>
-      </div>
-      <p className="text-[16px] md:text-[17px] leading-relaxed text-navy">
-        {text}
-      </p>
-      {updated && (
-        <p className="mt-4 text-[11px] text-navy/35 text-right">
-          Updated {updated}
-        </p>
-      )}
-    </div>
+    <KloBriefCard
+      label="Klo · Your deal advisor"
+      updatedAt={updated ? `Updated · ${updated}` : undefined}
+    >
+      {text}
+    </KloBriefCard>
   )
 }

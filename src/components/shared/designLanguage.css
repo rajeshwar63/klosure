@@ -245,6 +245,30 @@
 }
 .kl-ts--dim { color: var(--klo-text-mute); }
 
+/* ─────────── Hairline list rows (for in-table list cells) ─────────── */
+.kl-list {
+  background: var(--klo-bg-elev);
+  border: 1px solid var(--klo-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.kl-list > * + * {
+  border-top: 1px solid var(--klo-line);
+}
+.kl-row {
+  transition: background 0.12s ease;
+}
+.kl-row:hover {
+  background: var(--klo-surface);
+}
+.kl-row-warn {
+  background: rgba(181, 120, 30, 0.06);
+  transition: background 0.12s ease;
+}
+.kl-row-warn:hover {
+  background: rgba(181, 120, 30, 0.1);
+}
+
 /* ─────────── Vertical accent divider ─────────── */
 .kl-divider-line {
   width: 1px;

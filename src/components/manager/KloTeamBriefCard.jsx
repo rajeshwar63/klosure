@@ -1,11 +1,13 @@
-// Phase 6 step 13 — hero card on the manager home. Same shape as
-// KloFocusCard but blue tones (manager perspective vs seller's amber).
+// Page hero on the manager home. Same shape as the seller's KloFocusCard
+// — KloBriefCard + dark primary button — but with a manager-perspective
+// label.
 //
-// Manager briefs are typically longer than seller focus paragraphs, so
-// the headline accommodates 1-2 sentences (whichever fits in ~220 chars)
-// before splitting into the body.
+// Manager briefs are typically longer than seller focus paragraphs, so the
+// headline accommodates 1-2 sentences (whichever fits in ~220 chars) before
+// splitting into the body.
 
 import { useNavigate } from 'react-router-dom'
+import { KloBriefCard } from '../shared/index.js'
 
 function splitManagerBrief(text) {
   const clean = (text ?? '').replace(/\*\*/g, '').trim()
@@ -44,30 +46,22 @@ function pickFocalRep(briefText, members) {
 function BriefSkeleton() {
   return (
     <div
-      className="rounded-xl p-5 md:p-7 mb-6 animate-pulse"
-      style={{ background: '#E6F1FB' }}
-    >
-      <div className="h-3 w-44 rounded mb-3" style={{ background: '#185FA5', opacity: 0.3 }} />
-      <div className="h-5 w-3/4 rounded mb-2" style={{ background: '#185FA5', opacity: 0.3 }} />
-      <div className="h-4 w-full rounded mb-1" style={{ background: '#185FA5', opacity: 0.2 }} />
-      <div className="h-4 w-5/6 rounded mb-4" style={{ background: '#185FA5', opacity: 0.2 }} />
-      <div className="h-9 w-44 rounded" style={{ background: '#042C53', opacity: 0.3 }} />
-    </div>
+      className="rounded-2xl mb-6 animate-pulse"
+      style={{
+        background: 'var(--klo-bg-elev)',
+        border: '1px solid var(--klo-line)',
+        height: 180,
+      }}
+    />
   )
 }
 
 function BriefEmpty() {
   return (
-    <div
-      className="rounded-xl p-5 md:p-7 mb-6 bg-white"
-      style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.12)' }}
-    >
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-navy/45 mb-2">
-        ◆ KLO
-      </div>
-      <h2 className="text-base md:text-lg font-medium text-navy leading-snug">
+    <div className="mb-6">
+      <KloBriefCard label="Klo · Your team right now">
         Once your reps have active deals, Klo will brief you on the team each week.
-      </h2>
+      </KloBriefCard>
     </div>
   )
 }
@@ -82,55 +76,54 @@ export default function KloTeamBriefCard({ brief, loading, pipeline }) {
   const focalName = focalRep?.users?.name?.split(' ')[0] || focalRep?.users?.name
 
   return (
-    <div
-      className="rounded-xl p-5 md:p-7 mb-6"
-      style={{ background: '#E6F1FB' }}
-    >
-      <div
-        className="text-[10px] uppercase tracking-wider font-semibold mb-2"
-        style={{ color: '#185FA5' }}
-      >
-        ◆ KLO · YOUR TEAM RIGHT NOW
-      </div>
-
-      <h2
-        className="text-base md:text-lg font-medium leading-relaxed mb-3"
-        style={{ color: '#042C53' }}
-      >
-        {headline}
-      </h2>
-
-      {body && (
+    <div className="mb-6">
+      <KloBriefCard label="Klo · Your team right now">
         <p
-          className="text-sm leading-relaxed mb-4 whitespace-pre-line"
-          style={{ color: '#0C447C' }}
+          className="font-medium leading-snug"
+          style={{
+            fontSize: 'clamp(18px, 2vw, 21px)',
+            letterSpacing: '-0.01em',
+            color: 'var(--klo-text)',
+            margin: 0,
+          }}
         >
-          {body}
+          {headline}
         </p>
-      )}
 
-      <div className="flex gap-2 flex-wrap">
-        {focalRep && (
+        {body && (
+          <p
+            className="mt-3 leading-relaxed whitespace-pre-line"
+            style={{ color: 'var(--klo-text-dim)', fontSize: 15 }}
+          >
+            {body}
+          </p>
+        )}
+
+        <div className="mt-5 flex gap-2 flex-wrap">
+          {focalRep && (
+            <button
+              type="button"
+              onClick={() => navigate(`/team/reps?focus=${focalRep.user_id}`)}
+              className="inline-flex items-center rounded-lg text-[14px] font-medium px-4 py-2.5"
+              style={{ background: 'var(--klo-text)', color: '#fff' }}
+            >
+              Open {focalName}'s pipeline
+            </button>
+          )}
           <button
             type="button"
-            onClick={() =>
-              navigate(`/team/reps?focus=${focalRep.user_id}`)
-            }
-            className="px-4 py-2 rounded-md text-sm font-medium text-white"
-            style={{ background: '#042C53' }}
+            onClick={() => navigate('/team/askklo')}
+            className="inline-flex items-center rounded-lg text-[14px] px-4 py-2.5"
+            style={{
+              background: 'transparent',
+              color: 'var(--klo-text)',
+              border: '1px solid var(--klo-line-strong)',
+            }}
           >
-            Open {focalName}'s pipeline
+            Ask Klo more
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => navigate('/team/askklo')}
-          className="px-4 py-2 rounded-md text-sm border"
-          style={{ borderColor: '#378ADD', color: '#0C447C' }}
-        >
-          Ask Klo more
-        </button>
-      </div>
+        </div>
+      </KloBriefCard>
     </div>
   )
 }

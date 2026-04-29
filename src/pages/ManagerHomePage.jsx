@@ -9,6 +9,18 @@ import { fetchManagerWeeklyBrief } from '../services/managerBrief.js'
 import KloTeamBriefCard from '../components/manager/KloTeamBriefCard.jsx'
 import DealsSlippingList from '../components/manager/DealsSlippingList.jsx'
 import QuarterGlanceStrip from '../components/manager/QuarterGlanceStrip.jsx'
+import { Eyebrow } from '../components/shared/index.js'
+
+function thisWeekRange() {
+  const now = new Date()
+  const day = now.getDay() || 7 // Sunday → 7
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - day + 1)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const fmt = (d) => `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}`
+  return `This week · ${fmt(monday)} – ${fmt(sunday)}`
+}
 
 function NoTeamPlaceholder() {
   const navigate = useNavigate()
@@ -71,14 +83,24 @@ export default function ManagerHomePage() {
 
   return (
     <div className="p-6 md:p-8 max-w-[960px] mx-auto">
-      <header className="mb-6">
-        <p className="text-xs text-navy/45 mb-1">
+      <header className="mb-8">
+        <Eyebrow>{thisWeekRange()}</Eyebrow>
+        <h1
+          className="mt-3"
+          style={{
+            fontSize: 'clamp(32px, 4vw, 44px)',
+            fontWeight: 600,
+            letterSpacing: '-0.03em',
+            lineHeight: 1.1,
+            color: 'var(--klo-text)',
+          }}
+        >
+          Where the quarter is being made or lost.
+        </h1>
+        <p className="mt-2 text-[15px]" style={{ color: 'var(--klo-text-dim)' }}>
           {team.name || 'Team'} · {memberCount} rep{memberCount === 1 ? '' : 's'} ·{' '}
           {dealsActive.length} active deal{dealsActive.length === 1 ? '' : 's'}
         </p>
-        <h1 className="text-2xl font-medium text-navy leading-tight">
-          This week on your team.
-        </h1>
       </header>
 
       <KloTeamBriefCard

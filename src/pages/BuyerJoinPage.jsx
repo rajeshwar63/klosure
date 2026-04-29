@@ -116,58 +116,112 @@ export default function BuyerJoinPage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-navy/50 text-sm">Opening room…</div>
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center text-sm"
+        style={{ background: 'var(--klo-bg)', color: 'var(--klo-text-mute)' }}
+      >
+        Opening room…
+      </div>
+    )
   }
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[#f5f6f8]">
-        <p className="text-navy font-semibold mb-2">Link not found.</p>
-        <p className="text-navy/60 text-sm">{error}</p>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
+        style={{ background: 'var(--klo-bg)' }}
+      >
+        <p className="font-semibold mb-2" style={{ color: 'var(--klo-text)' }}>
+          Link not found.
+        </p>
+        <p className="text-sm" style={{ color: 'var(--klo-text-dim)' }}>{error}</p>
       </div>
     )
   }
 
   if (!buyerName) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-navy to-[#0f0f1f] text-white flex flex-col">
-        <header className="px-5 py-4 max-w-5xl w-full mx-auto">
-          <span className="font-bold text-xl tracking-tight">
-            klosure<span className="text-klo">.ai</span>
+      <div
+        className="min-h-screen flex flex-col"
+        style={{ background: 'var(--klo-bg)' }}
+      >
+        <header
+          className="px-5 py-4 max-w-5xl w-full mx-auto"
+          style={{ borderBottom: '1px solid var(--klo-line)' }}
+        >
+          <span
+            className="font-semibold text-[16px] tracking-[-0.02em]"
+            style={{ color: 'var(--klo-text)' }}
+          >
+            Klosure
           </span>
         </header>
-        <main className="flex-1 flex items-center justify-center px-5 pb-10">
-          <div className="w-full max-w-sm bg-white text-navy rounded-2xl p-6 shadow-xl">
-            <p className="text-xs uppercase tracking-wider text-klo font-semibold mb-2">
-              Get this deal live faster
-            </p>
-            <h1 className="text-2xl font-bold leading-tight mb-1">{deal.title}</h1>
-            <p className="text-sm text-navy/60 mb-4">
-              Track status in real time, see what's blocking progress, and get Klo guidance to keep this deal moving.
+        <main className="flex-1 flex items-center justify-center px-5 pb-10 pt-10">
+          <div
+            className="w-full max-w-md rounded-2xl px-7 py-7"
+            style={{
+              background: 'var(--klo-bg-elev)',
+              border: '1px solid var(--klo-line)',
+            }}
+          >
+            <span
+              className="kl-mono text-[12px] uppercase"
+              style={{ color: 'var(--klo-accent)', letterSpacing: '0.12em' }}
+            >
+              Your deal with {deal.seller_company || 'the seller'}
+            </span>
+            <h1
+              className="mt-3 mb-3"
+              style={{
+                fontSize: 'clamp(26px, 3.4vw, 32px)',
+                fontWeight: 600,
+                letterSpacing: '-0.03em',
+                lineHeight: 1.1,
+                color: 'var(--klo-text)',
+              }}
+            >
+              {deal.title}
+            </h1>
+            <p className="text-[15px] mb-5" style={{ color: 'var(--klo-text-dim)' }}>
+              Track status in real time, see what's blocking progress, and get Klo guidance
+              to keep this deal moving.
             </p>
             <form onSubmit={handleJoin} className="space-y-3">
               <label className="block">
-                <span className="block text-xs font-medium text-navy/70 mb-1">Your name</span>
+                <span
+                  className="kl-mono block text-[12px] uppercase mb-2"
+                  style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}
+                >
+                  Your name
+                </span>
                 <input
                   autoFocus
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   placeholder="Ahmed"
-                  className="w-full border border-navy/15 rounded-lg px-3 py-2.5 focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+                  className="w-full rounded-lg px-3 py-3 text-[15px] focus:outline-none"
+                  style={{
+                    border: '1px solid var(--klo-line-strong)',
+                    background: 'var(--klo-bg)',
+                    color: 'var(--klo-text)',
+                  }}
                   required
                 />
               </label>
               <button
                 type="submit"
                 disabled={joining || !nameInput.trim()}
-                className="w-full bg-klo hover:bg-klo/90 disabled:opacity-50 text-white font-semibold py-3 rounded-xl"
+                className="w-full font-medium py-3 rounded-lg disabled:opacity-50"
+                style={{ background: 'var(--klo-text)', color: '#fff', fontSize: 14 }}
               >
                 {joining ? 'Opening…' : 'Open my deal workspace'}
               </button>
             </form>
-            <p className="text-[11px] text-navy/40 mt-3 text-center">
-              Private and secure. No signup required — just your name to enter.
-              <br />
-              <span className="text-navy/50">Shared by {deal.seller_company || 'the seller'}.</span>
+            <p
+              className="kl-mono text-[11px] mt-4 text-center uppercase"
+              style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}
+            >
+              Private · No signup · Shared by {deal.seller_company || 'the seller'}
             </p>
           </div>
         </main>
@@ -176,7 +230,7 @@ export default function BuyerJoinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8] flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--klo-bg)' }}>
       <BuyerDealHeader deal={deal} />
       <BuyerDashboardPage deal={deal} embedded />
     </div>

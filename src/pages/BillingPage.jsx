@@ -6,6 +6,7 @@ import { useProfile } from '../hooks/useProfile.jsx'
 import { PLANS } from '../lib/plans.js'
 import { startCheckout, openCustomerPortal } from '../services/billing.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
+import { Eyebrow, MonoKicker, MonoTimestamp } from '../components/shared/index.js'
 
 export default function BillingPage() {
   const { user, signOut } = useAuth()
@@ -101,33 +102,67 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8]">
-      <header className="bg-navy text-white">
+    <div className="min-h-screen" style={{ background: 'var(--klo-bg)' }}>
+      <header style={{ borderBottom: '1px solid var(--klo-line)' }}>
         <div
-          className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3"
-          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+          className="max-w-3xl mx-auto px-4 md:px-6 pt-8 pb-6"
+          style={{ paddingTop: 'max(2rem, calc(env(safe-area-inset-top) + 1rem))' }}
         >
-          <button onClick={() => navigate(-1)} className="text-white/70 hover:text-white text-lg">‹</button>
-          <h1 className="font-bold text-lg">Billing & plans</h1>
+          <button
+            onClick={() => navigate(-1)}
+            className="kl-mono text-[12px] mb-2"
+            style={{ color: 'var(--klo-text-mute)' }}
+          >
+            ← Back
+          </button>
+          <Eyebrow>Settings · Billing</Eyebrow>
+          <h1
+            className="mt-3"
+            style={{
+              fontSize: 'clamp(28px, 3.4vw, 36px)',
+              fontWeight: 600,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.1,
+              color: 'var(--klo-text)',
+            }}
+          >
+            Billing &amp; plans.
+          </h1>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 pt-6 pb-20">
-        <div className="bg-white border border-navy/10 rounded-2xl p-4 mb-6 flex items-center justify-between gap-3">
+      <main className="max-w-3xl mx-auto px-4 md:px-6 pt-8 pb-20">
+        <div
+          className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-3"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            border: '1px solid var(--klo-line)',
+          }}
+        >
           <div>
-            <p className="text-xs uppercase tracking-wider text-navy/50 font-semibold">Current plan</p>
-            <p className="text-lg font-semibold text-navy">{PLANS[currentPlan]?.name || 'Free'}</p>
+            <MonoKicker>Current plan</MonoKicker>
+            <p
+              className="mt-2 text-[20px] font-semibold"
+              style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+            >
+              {PLANS[currentPlan]?.name || 'Free'}
+            </p>
             {periodEnd && (
-              <p className="text-xs text-navy/60">
-                Renews {new Date(periodEnd).toLocaleDateString()}
-              </p>
+              <MonoTimestamp className="mt-1 block">
+                Renews · {new Date(periodEnd).toLocaleDateString()}
+              </MonoTimestamp>
             )}
           </div>
           {hasStripe && (
             <button
               onClick={handleManage}
               disabled={busy === 'manage'}
-              className="text-sm bg-white border border-navy/15 hover:border-klo text-navy/80 hover:text-navy px-4 py-2 rounded-lg"
+              className="text-[13px] rounded-lg px-4 py-2"
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--klo-line-strong)',
+                color: 'var(--klo-text)',
+              }}
             >
               {busy === 'manage' ? 'Opening…' : 'Manage payment'}
             </button>
@@ -152,81 +187,143 @@ export default function BillingPage() {
           ))}
         </div>
 
-        <p className="text-[11px] text-navy/50 mt-6 text-center">
-          Prices in USD. Gulf entities billed via Stripe; VAT applied where required.
-          Cancel anytime — your archived deals stay forever.
+        <p
+          className="kl-mono text-[11px] mt-6 text-center uppercase"
+          style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}
+        >
+          Prices in USD · Gulf entities billed via Stripe · Cancel anytime
         </p>
 
         <div className="mt-8 text-center">
-          <Link to="/deals" className="text-sm text-klo hover:underline">
+          <Link
+            to="/deals"
+            className="text-[14px] hover:underline"
+            style={{ color: 'var(--klo-accent)' }}
+          >
             ← Back to deals
           </Link>
         </div>
 
-        <section className="mt-10 border border-red-200 bg-red-50 rounded-2xl p-5">
-          <h2 className="text-lg font-semibold text-red-900">Danger zone — Delete account</h2>
+        <section
+          className="mt-10 rounded-2xl p-5"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            border: '1px solid var(--klo-line)',
+            borderLeft: '3px solid var(--klo-danger)',
+          }}
+        >
+          <MonoKicker>Danger zone</MonoKicker>
+          <h2
+            className="mt-2 text-[18px] font-semibold"
+            style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+          >
+            Delete account
+          </h2>
           {!deleteDone ? (
             <>
-              <p className="text-sm text-red-900/85 mt-2 leading-relaxed">
-                Deleting your account is permanent and cannot be undone. You will lose access to all deals,
-                messages, team history, and billing records tied to this account.
+              <p
+                className="text-[14px] mt-3 leading-relaxed"
+                style={{ color: 'var(--klo-text-dim)' }}
+              >
+                Deleting your account is permanent and cannot be undone. You will lose access
+                to all deals, messages, team history, and billing records tied to this account.
               </p>
-              <p className="text-sm text-red-900/85 mt-2">
+              <p
+                className="text-[14px] mt-2 leading-relaxed"
+                style={{ color: 'var(--klo-text-dim)' }}
+              >
                 Data deletion starts immediately after confirmation and follows our retention policy.
                 {import.meta.env.VITE_ACCOUNT_DELETION_GRACE_DAYS
                   ? ` If your workspace has a ${import.meta.env.VITE_ACCOUNT_DELETION_GRACE_DAYS}-day grace period, data remains recoverable only during that window.`
                   : ' No grace period is configured for this workspace.'}
               </p>
 
-              <form onSubmit={handleDeleteAccount} className="mt-4 space-y-3">
+              <form onSubmit={handleDeleteAccount} className="mt-5 space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-red-900/80 mb-1">
-                    Re-authenticate (password or MFA)
-                  </label>
+                  <MonoKicker>Re-authenticate · password or MFA</MonoKicker>
                   <input
                     type="password"
                     value={deleteForm.password}
                     onChange={(e) => setDeleteForm((prev) => ({ ...prev, password: e.target.value }))}
                     placeholder="Password"
-                    className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm"
+                    className="mt-2 w-full rounded-lg px-3 py-2.5 text-[14px]"
+                    style={{
+                      background: 'var(--klo-bg)',
+                      border: '1px solid var(--klo-line-strong)',
+                      color: 'var(--klo-text)',
+                    }}
                   />
                   <input
                     type="text"
                     value={deleteForm.mfaCode}
                     onChange={(e) => setDeleteForm((prev) => ({ ...prev, mfaCode: e.target.value }))}
                     placeholder="Or enter MFA code"
-                    className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm mt-2"
+                    className="mt-2 w-full rounded-lg px-3 py-2.5 text-[14px]"
+                    style={{
+                      background: 'var(--klo-bg)',
+                      border: '1px solid var(--klo-line-strong)',
+                      color: 'var(--klo-text)',
+                    }}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-red-900/80 mb-1">
-                    Type <span className="font-bold">{deleteToken}</span> to confirm
-                  </label>
+                  <MonoKicker>Type {deleteToken} to confirm</MonoKicker>
                   <input
                     type="text"
                     value={deleteForm.typed}
                     onChange={(e) => setDeleteForm((prev) => ({ ...prev, typed: e.target.value }))}
-                    className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm"
+                    className="mt-2 w-full rounded-lg px-3 py-2.5 text-[14px]"
+                    style={{
+                      background: 'var(--klo-bg)',
+                      border: '1px solid var(--klo-line-strong)',
+                      color: 'var(--klo-text)',
+                    }}
                   />
                 </div>
-                {deleteError && <p className="text-sm text-red-700">{deleteError}</p>}
+                {deleteError && (
+                  <p className="text-[13px]" style={{ color: 'var(--klo-danger)' }}>
+                    {deleteError}
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={deleteBusy}
-                  className="w-full sm:w-auto rounded-lg bg-red-700 hover:bg-red-800 text-white font-semibold px-4 py-2"
+                  className="w-full sm:w-auto rounded-lg text-[14px] px-5 py-2.5 disabled:opacity-50"
+                  style={{
+                    background: 'transparent',
+                    color: 'var(--klo-danger)',
+                    border: '1px solid var(--klo-danger)',
+                  }}
                 >
                   {deleteBusy ? 'Deleting account…' : 'Delete my account permanently'}
                 </button>
               </form>
             </>
           ) : (
-            <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-              <p className="text-sm font-semibold text-emerald-900">Your deletion request is confirmed.</p>
-              <p className="text-sm text-emerald-900/90 mt-1">
+            <div
+              className="mt-4 rounded-xl p-4"
+              style={{
+                background: 'var(--klo-bg)',
+                border: '1px solid var(--klo-line)',
+                borderLeft: '3px solid var(--klo-good)',
+              }}
+            >
+              <p className="text-[14px] font-medium" style={{ color: 'var(--klo-good)' }}>
+                Your deletion request is confirmed.
+              </p>
+              <p className="text-[14px] mt-1" style={{ color: 'var(--klo-text-dim)' }}>
                 All sessions have been revoked and the account deletion workflow has started.
               </p>
-              <p className="text-sm text-emerald-900/90 mt-1">
-                Need help? Contact support at <a href="mailto:support@klosure.ai" className="underline">support@klosure.ai</a>.
+              <p className="text-[14px] mt-1" style={{ color: 'var(--klo-text-dim)' }}>
+                Need help? Contact support at{' '}
+                <a
+                  href="mailto:support@klosure.ai"
+                  className="underline"
+                  style={{ color: 'var(--klo-accent)' }}
+                >
+                  support@klosure.ai
+                </a>
+                .
               </p>
             </div>
           )}
@@ -240,14 +337,41 @@ function PlanCard({ plan, isCurrent, onUpgrade, busy }) {
   const featured = plan.id === 'pro'
   return (
     <div
-      className={`bg-white border rounded-2xl p-5 flex flex-col ${
-        featured ? 'border-klo shadow-lg' : 'border-navy/10'
-      }`}
+      className="rounded-2xl p-5 flex flex-col"
+      style={{
+        background: featured
+          ? 'linear-gradient(180deg, var(--klo-accent-soft), transparent 200px), var(--klo-bg-elev)'
+          : 'var(--klo-bg-elev)',
+        border: featured ? '1px solid var(--klo-accent-line)' : '1px solid var(--klo-line)',
+      }}
     >
-      <p className="text-xs uppercase tracking-wider font-semibold text-klo">{plan.name}</p>
-      <p className="text-2xl font-bold text-navy mt-1">{plan.priceLabel}</p>
-      <p className="text-sm text-navy/60 mt-2 leading-snug">{plan.description}</p>
-      <ul className="text-sm text-navy/70 mt-3 space-y-1.5 flex-1">
+      <p
+        className="kl-mono text-[12px] uppercase"
+        style={{
+          color: featured ? 'var(--klo-accent)' : 'var(--klo-text-mute)',
+          letterSpacing: '0.12em',
+        }}
+      >
+        {plan.name}
+      </p>
+      <p
+        className="mt-2 tabular-nums"
+        style={{
+          fontSize: 28,
+          fontWeight: 600,
+          letterSpacing: '-0.03em',
+          color: 'var(--klo-text)',
+        }}
+      >
+        {plan.priceLabel}
+      </p>
+      <p className="text-[14px] mt-2 leading-snug" style={{ color: 'var(--klo-text-dim)' }}>
+        {plan.description}
+      </p>
+      <ul
+        className="text-[14px] mt-4 space-y-2 flex-1 pt-4"
+        style={{ borderTop: '1px solid var(--klo-line)' }}
+      >
         <Feature ok={plan.activeDealLimit === Infinity}>
           {plan.activeDealLimit === Infinity ? 'Unlimited deals' : `${plan.activeDealLimit} active deal`}
         </Feature>
@@ -256,18 +380,33 @@ function PlanCard({ plan, isCurrent, onUpgrade, busy }) {
         <Feature ok={plan.canUseManagerKlo}>Klo team-pipeline coaching</Feature>
       </ul>
       {isCurrent ? (
-        <div className="mt-4 text-center text-sm font-semibold text-navy/60 border border-navy/10 rounded-xl py-2.5">
+        <div
+          className="mt-4 text-center kl-mono text-[12px] uppercase rounded-lg py-2.5"
+          style={{
+            color: 'var(--klo-text-mute)',
+            border: '1px solid var(--klo-line)',
+            letterSpacing: '0.12em',
+          }}
+        >
           Your plan
         </div>
       ) : plan.id === 'free' ? (
-        <div className="mt-4 text-center text-sm text-navy/40 py-2.5">—</div>
+        <div
+          className="mt-4 text-center kl-mono text-[12px] py-2.5"
+          style={{ color: 'var(--klo-text-mute)' }}
+        >
+          —
+        </div>
       ) : (
         <button
           onClick={onUpgrade}
           disabled={busy}
-          className={`mt-4 font-semibold py-2.5 rounded-xl ${
-            featured ? 'bg-klo hover:bg-klo/90 text-white' : 'bg-white border border-klo text-klo hover:bg-klo/10'
-          }`}
+          className="mt-4 font-medium text-[14px] py-2.5 rounded-lg disabled:opacity-50"
+          style={{
+            background: featured ? 'var(--klo-text)' : 'transparent',
+            color: featured ? '#fff' : 'var(--klo-text)',
+            border: featured ? '1px solid var(--klo-text)' : '1px solid var(--klo-line-strong)',
+          }}
         >
           {busy ? 'Loading…' : `Upgrade to ${plan.name}`}
         </button>
@@ -278,9 +417,14 @@ function PlanCard({ plan, isCurrent, onUpgrade, busy }) {
 
 function Feature({ ok, children }) {
   return (
-    <li className={`flex items-start gap-2 ${ok ? '' : 'text-navy/30 line-through'}`}>
-      <span className={ok ? 'text-emerald-500' : 'text-navy/30'}>{ok ? '✓' : '·'}</span>
-      <span>{children}</span>
+    <li
+      className="flex items-start gap-2"
+      style={ok ? {} : { color: 'var(--klo-text-mute)', textDecoration: 'line-through' }}
+    >
+      <span style={{ color: ok ? 'var(--klo-good)' : 'var(--klo-text-mute)' }}>
+        {ok ? '✓' : '·'}
+      </span>
+      <span style={{ color: ok ? 'var(--klo-text-dim)' : 'inherit' }}>{children}</span>
     </li>
   )
 }

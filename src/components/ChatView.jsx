@@ -145,14 +145,30 @@ export default function ChatView({
       </main>
 
       {locked ? (
-        <div className="bg-white border-t border-navy/10 safe-bottom shrink-0">
-          <div className="max-w-2xl mx-auto px-3 py-3 text-center text-xs text-navy/60">
+        <div
+          className="safe-bottom shrink-0"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            borderTop: '1px solid var(--klo-line)',
+          }}
+        >
+          <div
+            className="max-w-2xl mx-auto px-3 py-3 text-center text-xs"
+            style={{ color: 'var(--klo-text-dim)' }}
+          >
             This room is read-only. Reopen the deal from the header to chat again.
           </div>
         </div>
       ) : (
-        <form onSubmit={sendMessage} className="bg-white border-t border-navy/10 safe-bottom shrink-0">
-          <div className="max-w-2xl mx-auto px-3 py-2 flex items-end gap-2">
+        <form
+          onSubmit={sendMessage}
+          className="safe-bottom shrink-0"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            borderTop: '1px solid var(--klo-line)',
+          }}
+        >
+          <div className="max-w-2xl mx-auto px-3 py-3 flex items-end gap-2">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -165,13 +181,20 @@ export default function ChatView({
                 }
               }}
               placeholder={placeholderFor(role, deal.mode)}
-              style={{ lineHeight: `${TEXTAREA_LINE_HEIGHT}px`, maxHeight: `${TEXTAREA_MAX_HEIGHT}px` }}
-              className="flex-1 bg-white rounded-2xl px-4 py-2 text-[15px] focus:outline-none focus:ring-2 focus:ring-klo/30 resize-none overflow-y-hidden"
+              style={{
+                lineHeight: `${TEXTAREA_LINE_HEIGHT}px`,
+                maxHeight: `${TEXTAREA_MAX_HEIGHT}px`,
+                border: '1px solid var(--klo-line-strong)',
+                background: 'var(--klo-bg)',
+                color: 'var(--klo-text)',
+              }}
+              className="flex-1 rounded-xl px-4 py-3 text-[15px] focus:outline-none resize-none overflow-y-hidden"
             />
             <button
               type="submit"
               disabled={sending || !input.trim()}
-              className="bg-klo hover:bg-klo/90 disabled:opacity-40 text-white rounded-full w-11 h-11 flex items-center justify-center font-bold shrink-0"
+              className="rounded-lg w-11 h-11 flex items-center justify-center text-[15px] font-medium shrink-0 disabled:opacity-40"
+              style={{ background: 'var(--klo-text)', color: '#fff' }}
               aria-label="Send"
             >
               ›
@@ -187,15 +210,35 @@ function MessageRow({ message }) {
   const { sender_type, sender_name, content, created_at } = message
   const isKlo = sender_type === 'klo'
   const author = isKlo ? 'Klo' : sender_name || (sender_type === 'seller' ? 'You' : 'Buyer')
-  const authorClass = isKlo ? 'text-klo' : 'text-navy'
   return (
-    <article className={`px-4 md:px-6 py-4 border-b border-navy/5 last:border-b-0 ${isKlo ? 'bg-klo/5' : ''}`}>
-      <div className="flex items-baseline gap-2 mb-1">
-        {isKlo && <span className="text-klo leading-none" aria-hidden>◆</span>}
-        <span className={`text-[12px] font-semibold ${authorClass}`}>{author}</span>
-        <span className="text-[11px] text-navy/40 ml-auto">{formatTime(created_at)}</span>
+    <article
+      className="px-4 md:px-6 py-4"
+      style={{
+        background: isKlo ? 'var(--klo-accent-soft)' : 'transparent',
+        borderBottom: '1px solid var(--klo-line)',
+      }}
+    >
+      <div className="flex items-baseline gap-2 mb-1.5">
+        <span
+          className="kl-mono text-[12px] uppercase font-medium"
+          style={{
+            color: isKlo ? 'var(--klo-accent)' : 'var(--klo-text-dim)',
+            letterSpacing: '0.05em',
+          }}
+        >
+          {author}
+        </span>
+        <span
+          className="kl-mono text-[11px] ml-auto"
+          style={{ color: 'var(--klo-text-mute)' }}
+        >
+          · {formatTime(created_at)} ·
+        </span>
       </div>
-      <p className="text-[14px] leading-relaxed text-navy whitespace-pre-wrap break-words">
+      <p
+        className="text-[15px] leading-relaxed whitespace-pre-wrap break-words"
+        style={{ color: 'var(--klo-text)' }}
+      >
         {content}
       </p>
     </article>
@@ -204,9 +247,16 @@ function MessageRow({ message }) {
 
 function KloTyping() {
   return (
-    <div className="px-4 md:px-6 py-3 text-klo text-xs flex items-center gap-1.5 klo-typing border-b border-navy/5">
-      <span aria-hidden>◆</span> Klo is thinking
-      <span>·</span><span>·</span><span>·</span>
+    <div
+      className="px-4 md:px-6 py-3 text-xs flex items-center gap-1.5 klo-typing kl-mono uppercase"
+      style={{
+        color: 'var(--klo-accent)',
+        background: 'var(--klo-accent-soft)',
+        borderBottom: '1px solid var(--klo-line)',
+        letterSpacing: '0.05em',
+      }}
+    >
+      Klo is thinking <span>·</span><span>·</span><span>·</span>
     </div>
   )
 }
