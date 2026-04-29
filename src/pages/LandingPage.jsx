@@ -98,13 +98,10 @@ function NavBar() {
           <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')}>Product</a>
           <a href="#pricing" onClick={(e) => handleAnchorClick(e, 'pricing')}>Pricing</a>
           <a href="#contact" onClick={(e) => handleAnchorClick(e, 'contact')}>Contact</a>
-          <a
-            href="#contact"
-            onClick={(e) => handleAnchorClick(e, 'contact')}
-            className="btn btn-primary"
-          >
-            Book a demo
-          </a>
+          <Link to="/login" className="nav-login">Log in</Link>
+          <Link to="/signup" className="btn btn-primary">
+            Get started
+          </Link>
         </div>
       </div>
     </nav>
@@ -143,21 +140,20 @@ function Hero() {
           stuck, or dead.
         </p>
         <div className="hero-cta">
+          <Link to="/signup" className="btn btn-primary btn-lg">
+            Get started free
+            <ArrowIcon />
+          </Link>
           <a
             href="#contact"
             onClick={(e) => handleAnchorClick(e, 'contact')}
-            className="btn btn-primary btn-lg"
-          >
-            Book a 30-min demo
-            <ArrowIcon />
-          </a>
-          <a
-            href="#features"
-            onClick={(e) => handleAnchorClick(e, 'features')}
             className="btn btn-ghost btn-lg"
           >
-            See how it works
+            Book a 30-min demo
           </a>
+        </div>
+        <div className="hero-signin mono">
+          Already have an account? <Link to="/login">Log in</Link>
         </div>
         <div className="hero-tag mono">No more "this deal looks good" — without proof.</div>
       </div>
@@ -301,13 +297,9 @@ function Pricing() {
               <li>Shared buyer view</li>
               <li>Email + Slack signals</li>
             </ul>
-            <a
-              href="#contact"
-              onClick={(e) => handleAnchorClick(e, 'contact')}
-              className="btn btn-ghost btn-lg"
-            >
-              Book demo
-            </a>
+            <Link to="/signup" className="btn btn-ghost btn-lg">
+              Start free
+            </Link>
           </div>
 
           <div className="price-card featured">
@@ -326,13 +318,9 @@ function Pricing() {
               <li>Forecast you can defend</li>
               <li>Priority support</li>
             </ul>
-            <a
-              href="#contact"
-              onClick={(e) => handleAnchorClick(e, 'contact')}
-              className="btn btn-primary btn-lg"
-            >
-              Book demo
-            </a>
+            <Link to="/signup" className="btn btn-primary btn-lg">
+              Get started
+            </Link>
           </div>
         </div>
       </div>

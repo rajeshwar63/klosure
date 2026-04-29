@@ -131,6 +131,27 @@
   color: var(--text);
 }
 
+.klo-landing .nav-links .nav-login {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.klo-landing .hero-signin {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-mute);
+}
+
+.klo-landing .hero-signin a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.klo-landing .hero-signin a:hover {
+  text-decoration: underline;
+}
+
 /* BUTTONS */
 .klo-landing .btn {
   display: inline-flex;
