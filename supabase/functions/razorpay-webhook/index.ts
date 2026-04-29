@@ -28,48 +28,16 @@
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+import {
+  mapStatus,
+  resolvePlanSlug,
+  periodEndFromSubscription,
+  type SubscriptionEntity,
+} from "../_shared/razorpay.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const WEBHOOK_SECRET = Deno.env.get("RAZORPAY_WEBHOOK_SECRET") ?? ""
-
-// Server-side Razorpay plan_id → klosure plan slug. Mirrors the maps in
-// src/lib/razorpay-plans.ts. Keep them in sync; the webhook prefers the
-// klosure_plan_slug value stored on the subscription's notes (set at create
-// time) and only falls back to this map.
-const PLAN_ID_TO_SLUG: Record<string, string> = {
-  // Test mode
-  "plan_SjJt4hH14l4xTF": "pro",
-  "plan_SjJtU4Ic9gMKQT": "team_starter",
-  "plan_SjJtqGy7KxXBv1": "team_growth",
-  "plan_SjJu9eaMjFv92Y": "team_scale",
-  // Live mode
-  "plan_SjJAkRxX87ZYuz": "pro",
-  "plan_SjJi8s6ORnUzxb": "team_starter",
-  "plan_SjJikkUK5hjVVw": "team_growth",
-  "plan_SjJjCRGcjI8Os1": "team_scale",
-}
-
-// Razorpay subscription statuses → the four buckets update_subscription_state
-// understands. Anything we don't recognise is treated as a no-op state-wise
-// (still logged in payment_events).
-function mapStatus(rzpStatus: string): "active" | "pending" | "halted" | "cancelled" | "completed" | null {
-  switch (rzpStatus) {
-    case "active":
-    case "authenticated":   // mandate authorised, first charge imminent — treat as active so UI unblocks
-      return "active"
-    case "pending":         // payment retry window; not yet read-only
-      return "pending"
-    case "halted":
-      return "halted"
-    case "cancelled":
-      return "cancelled"
-    case "completed":
-      return "completed"
-    default:
-      return null
-  }
-}
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
@@ -157,10 +125,7 @@ Deno.serve(async (req) => {
     // Resolve the klosure plan slug. Prefer notes (set by us at create time);
     // fall back to plan_id lookup; default to whatever is currently on the
     // owner row (handled inside the RPC by leaving plan unchanged).
-    const notes = (subscription.notes ?? {}) as Record<string, unknown>
-    const slugFromNotes = typeof notes.klosure_plan_slug === "string" ? notes.klosure_plan_slug : ""
-    const planSlug =
-      slugFromNotes || PLAN_ID_TO_SLUG[subscription.plan_id ?? ""] || ""
+    const planSlug = resolvePlanSlug(subscription)
 
     const status = mapStatus(subscription.status ?? "")
     if (!status) {
@@ -184,13 +149,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Razorpay sends current_end as a Unix timestamp (seconds). Translate to
-    // ISO; null if absent (RPC keeps existing period_end on null).
-    const periodEnd = subscription.current_end
-      ? new Date(subscription.current_end * 1000).toISOString()
-      : subscription.end_at
-        ? new Date(subscription.end_at * 1000).toISOString()
-        : null
+    const periodEnd = periodEndFromSubscription(subscription)
 
     const { data: rpcResult, error: rpcErr } = await sb.rpc("update_subscription_state", {
       p_subscription_id: subscriptionId,
@@ -264,15 +223,6 @@ async function markProcessed(
 // payment.* events also carry payload.payment.entity but we don't act on
 // them directly — subscription.charged is the canonical "renewal" signal and
 // it includes the updated subscription entity alongside the payment entity.
-type SubscriptionEntity = {
-  id: string
-  plan_id?: string
-  status?: string
-  current_end?: number
-  end_at?: number
-  notes?: Record<string, unknown>
-}
-
 function extractSubscription(event: Record<string, unknown>): SubscriptionEntity | null {
   const payload = event.payload as { subscription?: { entity?: SubscriptionEntity } } | undefined
   return payload?.subscription?.entity ?? null

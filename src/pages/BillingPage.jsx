@@ -13,7 +13,7 @@ import { useProfile } from '../hooks/useProfile.jsx'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { PLANS, formatPrice } from '../lib/plans.ts'
 import { getRazorpayPlanId, RAZORPAY_KEY_ID } from '../lib/razorpay-plans.ts'
-import { startUpgrade } from '../services/billing.js'
+import { startUpgrade, verifySubscription } from '../services/billing.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
@@ -409,6 +409,7 @@ function loadRazorpayCheckout() {
 }
 
 function PlanCard({ plan, currency, isCurrent, user }) {
+  const navigate = useNavigate()
   const isEnterprise = plan.slug === 'enterprise'
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -441,8 +442,10 @@ function PlanCard({ plan, currency, isCurrent, user }) {
     }
 
     // Open the in-app modal. Razorpay handles all UI; on successful mandate
-    // auth, the handler fires and we redirect to /billing/return which
-    // polls until the webhook flips the user to paid_active.
+    // auth, the handler fires. We then call verifySubscription to sync paid
+    // state to Supabase synchronously (so the user lands on paid_active
+    // without depending on the webhook), then route to /billing/return which
+    // also polls as a backup.
     const rzp = new window.Razorpay({
       key: RAZORPAY_KEY_ID,
       subscription_id: res.subscription_id,
@@ -453,8 +456,16 @@ function PlanCard({ plan, currency, isCurrent, user }) {
         name: user?.user_metadata?.name ?? '',
       },
       theme: { color: '#000000' },
-      handler: function () {
-        window.location.href = '/billing/return'
+      handler: async function () {
+        // Best-effort sync. If verify fails (network blip, edge function
+        // cold-start hiccup), still navigate so polling on /billing/return
+        // and the webhook backstop still flip the user.
+        try {
+          await verifySubscription()
+        } catch (e) {
+          console.warn('verify after checkout failed', e)
+        }
+        navigate('/billing/return')
       },
       modal: {
         ondismiss: function () {
