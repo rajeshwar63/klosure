@@ -1,7 +1,7 @@
 {
-  "name": "Klosure — Get closure on every deal",
+  "name": "Klosure — Stop guessing. Start closing.",
   "short_name": "Klosure",
-  "description": "Klosure.ai — AI-powered deal room. Klo coaches both sides so deals never go silent.",
+  "description": "Klosure — Stop guessing. Start closing. An AI deal coach that shows what's actually happening in every deal.",
   "start_url": "/deals",
   "scope": "/",
   "display": "standalone",

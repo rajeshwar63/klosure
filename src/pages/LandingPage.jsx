@@ -17,13 +17,13 @@ function handleAnchorClick(e, id) {
 export default function LandingPage() {
   useEffect(() => {
     const prevTitle = document.title
-    document.title = "Klosure — The truth behind every deal"
+    document.title = "Klosure — Stop guessing. Start closing."
     const desc = document.querySelector('meta[name="description"]')
     const prevDesc = desc?.getAttribute('content')
     if (desc) {
       desc.setAttribute(
         'content',
-        "Klosure is an AI deal coach for B2B sales teams. Real signals, not rep updates — so you know what's actually moving, stuck, or dead."
+        "Klosure — Stop guessing. Start closing. An AI deal coach for B2B sales teams. Real signals, not rep updates — so you know what's actually moving, stuck, or dead."
       )
     }
     return () => {
@@ -126,7 +126,7 @@ function Hero() {
   return (
     <section className="hero">
       <div className="container hero-inner">
-        <span className="eyebrow">Get closure on every deal</span>
+        <span className="eyebrow">Stop guessing. Start closing.</span>
         <h1>
           Your reps don't know why deals are stuck.
           <br />

@@ -44,8 +44,13 @@ export default function AuthPage({ mode = 'login' }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-navy to-[#0f0f1f] text-white flex flex-col">
       <header className="px-5 py-4 max-w-5xl w-full mx-auto">
-        <Link to="/" className="font-bold text-xl tracking-tight">
-          klosure<span className="text-klo">.ai</span>
+        <Link to="/" className="inline-flex flex-col leading-tight">
+          <span className="font-bold text-xl tracking-tight">
+            klosure<span className="text-klo">.ai</span>
+          </span>
+          <span className="text-[11px] text-white/55 tracking-wide mt-0.5">
+            Stop guessing. Start closing.
+          </span>
         </Link>
       </header>
       <main className="flex-1 flex items-center justify-center px-5 pb-10">
