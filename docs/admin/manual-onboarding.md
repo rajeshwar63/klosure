@@ -201,7 +201,7 @@ Trigger the cron manually after each, then verify:
 
 ## Razorpay webhook — `razorpay-webhook` (Phase 12.3 Chunk 3)
 
-The Razorpay edge functions split work into two halves:
+The Razorpay edge functions split work into three halves:
 
 - `razorpay-create-subscription` — called from the Billing page when a user
   clicks Upgrade. Creates the subscription on Razorpay's side, opens the
@@ -210,6 +210,10 @@ The Razorpay edge functions split work into two halves:
 - `razorpay-webhook` — receives subscription lifecycle events from Razorpay
   and is the only thing that mutates `plan` / `current_period_end` /
   `read_only_since` for paid users.
+- `razorpay-cancel-subscription` — called from `/billing/manage` when a
+  paid user clicks "Cancel my subscription". Schedules cancellation at
+  cycle end on Razorpay; the webhook does the actual read-only flip when
+  Razorpay fires `subscription.cancelled` at period end.
 
 Treat the webhook as the source of truth for paid state. The frontend polls
 `get_my_account_status` after the modal closes and only unblocks the user
@@ -326,6 +330,77 @@ Common `processing_error` values:
 
 ---
 
+## Self-service cancel — `razorpay-cancel-subscription` (Phase 12.3 Chunk 4)
+
+Users on a paid plan can cancel themselves from `/billing/manage`. The flow:
+
+1. User clicks **Manage subscription** on the `/billing` status banner →
+   lands on `/billing/manage` (only paid_active and paid_grace users get
+   the link; overridden users are redirected back to `/billing`).
+2. They confirm the cancel → frontend calls
+   `razorpay-cancel-subscription` → edge function POSTs
+   `cancel_at_cycle_end=1` to Razorpay → user keeps paid access until
+   `current_period_end`.
+3. At cycle end Razorpay fires `subscription.cancelled`; the webhook flips
+   `read_only_since = now()` and Klosure goes read-only for that user/team.
+
+### One-time deploy
+
+```powershell
+supabase functions deploy razorpay-cancel-subscription
+# Reuses RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET set in Chunk 2 — no new
+# secrets needed.
+```
+
+JWT verification is on (the function reads the caller's session to find
+their subscription); no `--no-verify-jwt` flag.
+
+### What to expect after a user cancels
+
+- `users.razorpay_subscription_id` (or the team's) stays the same — we
+  don't clear it on cancel-scheduled, only on the cancelled webhook.
+- `users.plan`, `current_period_end`, `read_only_since` are unchanged
+  until the webhook fires `subscription.cancelled` at cycle end. Until
+  then, the account is paid_active.
+- In the Razorpay dashboard the subscription shows `status=active`,
+  `cancel_at_cycle_end=true` until the cycle ends, then `status=cancelled`.
+
+### Reversing a cancellation before cycle end
+
+If a user changes their mind before `current_period_end`, you can
+"un-cancel" via the dashboard (Subscriptions → pick the sub → Resume) or
+the API. There's no UI for this in the app — it's email-rajeshwar; rare
+enough that the friction is fine.
+
+```powershell
+# API form (replace <sub_id> + auth):
+curl -X POST `
+  -H "Authorization: Basic <base64-of-key:secret>" `
+  https://api.razorpay.com/v1/subscriptions/<sub_id>
+# Razorpay's resume API expects no body and re-enables the auto-renew.
+```
+
+### Verifying end-to-end
+
+1. Sign in as a paid test user, go to `/billing/manage`, click cancel,
+   confirm.
+2. Watch the function logs:
+
+   ```powershell
+   supabase functions logs razorpay-cancel-subscription --follow
+   ```
+
+   You should see a 200 response within ~1s and the Razorpay-returned
+   `scheduled_end` timestamp in the function's response body.
+3. Confirm in Razorpay dashboard: subscription shows
+   `cancel_at_cycle_end=true`.
+4. Either wait for cycle end (test mode cycles can be set short) or in
+   the dashboard manually click **Cancel** on the subscription to fire
+   `subscription.cancelled` immediately. The webhook should set
+   `read_only_since=now()` and the user becomes read-only.
+
+---
+
 ## Things to be careful about
 
 1. `purge_expired_users` deletes from `auth.users`. The cascade chain
@@ -352,3 +427,9 @@ Common `processing_error` values:
    in sync with `src/lib/razorpay-plans.ts`. They're separate copies because
    the edge function can't import frontend modules; whenever you add a new
    plan or rotate a plan ID, edit both.
+7. Cancel = scheduled, not immediate. A user who cancels at noon today still
+   has paid access until `current_period_end`. They will be confused if you
+   tell them "you're cancelled" — say "cancellation scheduled for &lt;date&gt;",
+   which is what `/billing/manage` actually displays. Don't add a manual
+   `update users set read_only_since = now()` shortcut; it desynchronises
+   from Razorpay and the next charge attempt fails noisily.
