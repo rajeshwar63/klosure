@@ -1,0 +1,68 @@
+/*
+ * Klosure design language — tokens.
+ *
+ * The 9 tokens below are the entire palette. Do not add `--info`,
+ * `--success-light`, `--warn-bg`, or any new color without a written
+ * justification. Hierarchy comes from type weight, mono labels, and
+ * hairlines — not from new colors.
+ *
+ * Imported once from src/styles.css so every app surface inherits the
+ * same constitution as the landing page.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Surface */
+  --klo-bg:        #FAFAF7;
+  --klo-bg-elev:   #FFFFFF;
+  --klo-surface:   #F2F2EE;
+  --klo-surface-2: #EBEBE6;
+
+  /* Lines */
+  --klo-line:        rgba(15, 17, 28, 0.08);
+  --klo-line-strong: rgba(15, 17, 28, 0.16);
+
+  /* Text */
+  --klo-text:      #0F111C;
+  --klo-text-dim:  #5C5F6E;
+  --klo-text-mute: #8A8D99;
+
+  /* Klo accent — used sparingly. Blue means Klo is talking. */
+  --klo-accent:      #2F5BD9;
+  --klo-accent-soft: rgba(47, 91, 217, 0.08);
+  --klo-accent-line: rgba(47, 91, 217, 0.24);
+
+  /* Semantic tones — these ARE the confidence/state colors. */
+  --klo-good:   #1E8A52;
+  --klo-warn:   #B5781E;
+  --klo-danger: #C4452F;
+
+  /* Type stacks */
+  --klo-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  --klo-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Geist OpenType variants make numerals and the lowercase 'a' read better. */
+.klo-app {
+  font-family: var(--klo-font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  background: var(--klo-bg);
+  color: var(--klo-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.klo-app ::selection {
+  background: var(--klo-accent);
+  color: #fff;
+}
+
+/* The mono utility — used everywhere a label, kicker, number, or timestamp lives. */
+.klo-mono {
+  font-family: var(--klo-font-mono);
+  font-feature-settings: normal;
+  letter-spacing: 0;
+}

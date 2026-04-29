@@ -4,6 +4,14 @@ import { daysUntil, formatCurrency } from '../../lib/format.js'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
 import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
+import {
+  Eyebrow,
+  HairlineGrid,
+  KloBriefCard,
+  MonoKicker,
+  MonoTimestamp,
+  ConfidencePill,
+} from '../shared/index.js'
 import SellerTimelineStrip from './SellerTimelineStrip.jsx'
 
 const MIN_CONFIDENCE_TREND_POINTS = 3
@@ -73,23 +81,12 @@ function snapshotPlaceholders(field) {
 function KloBriefSeller({ klo_take_seller, computed_at }) {
   if (!klo_take_seller) return null
   return (
-    <div className="relative bg-white border border-navy/10 rounded-2xl px-6 md:px-10 py-6 md:py-8 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="absolute left-0 top-6 bottom-6 w-[3px] rounded-full bg-klo/60" aria-hidden />
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-klo text-base leading-none" aria-hidden>◆</span>
-        <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
-          Klo · Your deal coach
-        </span>
-      </div>
-      <p className="text-[16px] md:text-[17px] leading-relaxed text-navy">
-        {klo_take_seller}
-      </p>
-      {computed_at && (
-        <p className="mt-4 text-[11px] text-navy/35 text-right">
-          Updated {relativeTime(computed_at)}
-        </p>
-      )}
-    </div>
+    <KloBriefCard
+      label="Klo · Your deal coach"
+      updatedAt={computed_at ? `Updated · ${relativeTime(computed_at)}` : undefined}
+    >
+      {klo_take_seller}
+    </KloBriefCard>
   )
 }
 
@@ -167,71 +164,89 @@ function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
     setSaving(false)
   }
 
-  const stageChipTone = stage === 'closed' ? 'bg-emerald-100 text-emerald-800' : 'bg-klo/10 text-klo'
-
   return (
-    <section className="bg-white border border-navy/10 rounded-2xl p-4 md:p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-navy">Deal snapshot</h2>
-        <div className="flex items-center gap-2">
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${stageChipTone}`}>
-            {stageMeta ? `${stageMeta.label} · ${stageMeta.idx}/5` : snapshotPlaceholders('stage')}
-          </span>
-          <span className="text-[11px] text-navy/55">
-            {daysInStage == null ? 'SLA: add stage history' : `${daysInStage} day${daysInStage === 1 ? '' : 's'} in stage`}
-          </span>
+    <section className="bg-white border border-navy/10 rounded-2xl p-4 md:p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div className="flex flex-col gap-2">
+          <Eyebrow>Deal snapshot</Eyebrow>
+          <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[var(--klo-text)]">
+            {stageMeta ? `${stageMeta.label} · ${stageMeta.idx}/5` : 'Set stage'}
+          </h2>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <MonoTimestamp>
+            {daysInStage == null ? 'SLA · add stage history' : `${daysInStage}d in stage`}
+          </MonoTimestamp>
+          <MonoTimestamp dim>
+            {lastUpdated ? `Updated · ${lastUpdated}` : 'Updated recently'}
+          </MonoTimestamp>
         </div>
       </div>
 
-      <p className="mt-2 text-[11px] text-navy/45">
-        Last updated {lastUpdated || 'recently'}
-      </p>
-
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <FieldCard label="Deal stage" value={stageMeta?.label || snapshotPlaceholders('stage')} hint={!stageMeta ? 'Prompt: choose current stage' : null} />
-        <FieldCard
+      <HairlineGrid cols={4}>
+        <SnapshotCell
+          index="01"
           label="Deal value"
           value={valueAmount != null ? formatCurrency(valueAmount) : snapshotPlaceholders('value')}
           hint={
             valueConfidence === 'tentative'
-              ? 'Confidence range: tentative'
+              ? 'Confidence range · tentative'
               : valueConfidence
-                ? `Confidence range: ${valueConfidence}`
+                ? `Confidence range · ${valueConfidence}`
                 : valueAmount == null
-                  ? 'Prompt: add expected contract value'
+                  ? 'Add expected contract value'
                   : null
           }
         />
-        <FieldCard
+        <SnapshotCell
+          index="02"
           label="Target close"
           value={formatShortDate(deadline) || snapshotPlaceholders('deadline')}
           hint={
             daysToDeadline == null
-              ? 'Prompt: set expected close deadline'
+              ? 'Set expected close deadline'
               : daysToDeadline < 0
                 ? `${Math.abs(daysToDeadline)}d overdue`
                 : daysToDeadline === 0
-                  ? 'due today'
+                  ? 'Due today'
                   : `${daysToDeadline} days left`
           }
+          hintTone={
+            daysToDeadline == null
+              ? null
+              : daysToDeadline < 0
+                ? 'bad'
+                : daysToDeadline <= 7
+                  ? 'warn'
+                  : null
+          }
         />
-        <FieldCard
+        <SnapshotCell
+          index="03"
           label="Klo rating"
-          value={confidence == null ? snapshotPlaceholders('rating') : `${confidence}% ${trendArrow}`}
-          hint={confidence == null ? 'Prompt: ask Klo for an updated read' : `Trend: ${ratingTrend}`}
+          value={
+            confidence == null ? (
+              snapshotPlaceholders('rating')
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <ConfidencePill value={confidence} />
+                <span className="text-[var(--klo-text-mute)] text-sm">{trendArrow}</span>
+              </span>
+            )
+          }
+          hint={confidence == null ? 'Ask Klo for an updated read' : `Trend · ${ratingTrend}`}
         />
-        <FieldCard
-          label="Probability to close"
-          value={confidence == null ? snapshotPlaceholders('probability') : `${confidence}%`}
-          hint={confidence == null ? 'Prompt: capture more deal signals in chat' : null}
+        <SnapshotCell
+          index="04"
+          label="Open work"
+          value={
+            <span className="tabular-nums">
+              {risksCount} risks · {blockersCount} blockers · {openActionsCount} actions
+            </span>
+          }
+          hint="Counts come from Klo's read of this deal"
         />
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <MiniHealth label="Risks" count={risksCount} tone="risk" />
-        <MiniHealth label="Blockers" count={blockersCount} tone="blocker" />
-        <MiniHealth label="Open actions" count={openActionsCount} tone="action" />
-      </div>
+      </HairlineGrid>
 
       {isSeller && (
         <div className="mt-4 border-t border-navy/10 pt-3">
@@ -307,27 +322,27 @@ function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
   )
 }
 
-function FieldCard({ label, value, hint }) {
+function SnapshotCell({ index, label, value, hint, hintTone }) {
+  const hintToneClass =
+    hintTone === 'bad'
+      ? 'text-[var(--klo-danger)]'
+      : hintTone === 'warn'
+        ? 'text-[var(--klo-warn)]'
+        : hintTone === 'good'
+          ? 'text-[var(--klo-good)]'
+          : 'text-[var(--klo-text-mute)]'
   return (
-    <div className="rounded-xl border border-navy/10 px-3 py-2.5 bg-[#fbfcfe] min-h-[76px]">
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-navy">{value}</p>
-      {hint && <p className="mt-1 text-[11px] text-navy/50">{hint}</p>}
-    </div>
-  )
-}
-
-function MiniHealth({ label, count, tone }) {
-  const toneClass = {
-    risk: 'bg-amber-50 text-amber-800 border-amber-200',
-    blocker: 'bg-red-50 text-red-700 border-red-200',
-    action: 'bg-sky-50 text-sky-800 border-sky-200',
-  }
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${toneClass[tone] || 'bg-white text-navy border-navy/15'}`}>
-      <span>{label}</span>
-      <span className="font-semibold">{count}</span>
-    </span>
+    <HairlineGrid.Cell>
+      <MonoKicker>
+        {index} / {label}
+      </MonoKicker>
+      <p className="mt-3 text-[18px] font-semibold tracking-[-0.02em] text-[var(--klo-text)] leading-tight">
+        {value}
+      </p>
+      {hint && (
+        <p className={`mt-2 text-[12px] leading-snug ${hintToneClass}`}>{hint}</p>
+      )}
+    </HairlineGrid.Cell>
   )
 }
 
