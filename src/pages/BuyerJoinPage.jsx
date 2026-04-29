@@ -149,11 +149,19 @@ export default function BuyerJoinPage() {
           className="px-5 py-4 max-w-5xl w-full mx-auto"
           style={{ borderBottom: '1px solid var(--klo-line)' }}
         >
-          <span
-            className="font-semibold text-[16px] tracking-[-0.02em]"
-            style={{ color: 'var(--klo-text)' }}
-          >
-            Klosure
+          <span className="inline-flex flex-col leading-tight">
+            <span
+              className="font-semibold text-[16px] tracking-[-0.02em]"
+              style={{ color: 'var(--klo-text)' }}
+            >
+              Klosure
+            </span>
+            <span
+              className="text-[11px] mt-0.5"
+              style={{ color: 'var(--klo-muted)', letterSpacing: '0.01em' }}
+            >
+              Stop guessing. Start closing.
+            </span>
           </span>
         </header>
         <main className="flex-1 flex items-center justify-center px-5 pb-10 pt-10">

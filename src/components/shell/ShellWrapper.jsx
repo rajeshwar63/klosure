@@ -2,7 +2,7 @@
 // and feeds them into the shell. Used as a layout route so every page below
 // renders inside the same shell.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.jsx'
 import { useProfile } from '../../hooks/useProfile.jsx'
@@ -58,6 +58,11 @@ export default function ShellWrapper() {
   const role = isManager ? 'manager' : 'seller'
   const activeView = resolveActiveView(location.pathname)
   const pageTitle = resolvePageTitle(location.pathname, deals)
+
+  useEffect(() => {
+    const tagline = 'Klosure — Stop guessing. Start closing.'
+    document.title = pageTitle && pageTitle !== 'Klosure' ? `${pageTitle} · ${tagline}` : tagline
+  }, [pageTitle])
 
   const userForShell = {
     name: profile?.name || user?.email?.split('@')[0] || 'You',
