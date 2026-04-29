@@ -1,10 +1,23 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { hasSupabaseConfig } from '../lib/supabase.js'
 
+const PENDING_INVITE_KEY = 'klo.pendingInviteToken'
+
+function readPendingInvite(searchParams) {
+  const fromUrl = searchParams.get('invite')
+  if (fromUrl) return fromUrl
+  try {
+    return localStorage.getItem(PENDING_INVITE_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function AuthPage({ mode = 'login' }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { signIn, signUp } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,6 +27,7 @@ export default function AuthPage({ mode = 'login' }) {
   const [submitting, setSubmitting] = useState(false)
 
   const isSignup = mode === 'signup'
+  const inviteToken = readPendingInvite(searchParams)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -25,14 +39,14 @@ export default function AuthPage({ mode = 'login' }) {
         const { data, error } = await signUp({ email, password, name })
         if (error) throw error
         if (data?.session) {
-          navigate('/onboarding', { replace: true })
+          navigate(postAuthDestination(inviteToken, '/onboarding'), { replace: true })
         } else {
           setInfo('Check your email to confirm your account, then log in.')
         }
       } else {
         const { error } = await signIn({ email, password })
         if (error) throw error
-        navigate('/deals', { replace: true })
+        navigate(postAuthDestination(inviteToken, '/deals'), { replace: true })
       }
     } catch (err) {
       setError(err?.message ?? 'Something went wrong.')
@@ -61,6 +75,12 @@ export default function AuthPage({ mode = 'login' }) {
           <p className="text-navy/60 text-sm mb-6">
             {isSignup ? 'Start running deals with Klo.' : 'Log in to your deal rooms.'}
           </p>
+
+          {inviteToken && (
+            <div className="mb-4 text-xs p-3 rounded-lg bg-klo/10 border border-klo/30 text-navy">
+              You're joining a team on Klosure. {isSignup ? 'Sign up' : 'Log in'} with the email that received the invite.
+            </div>
+          )}
 
           {!hasSupabaseConfig && (
             <div className="mb-4 text-xs p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
@@ -140,6 +160,16 @@ export default function AuthPage({ mode = 'login' }) {
       </main>
     </div>
   )
+}
+
+function postAuthDestination(inviteToken, fallback) {
+  if (!inviteToken) return fallback
+  try {
+    localStorage.removeItem(PENDING_INVITE_KEY)
+  } catch {
+    // ignore
+  }
+  return `/join-team/${inviteToken}`
 }
 
 function Field({ label, value, onChange, ...props }) {

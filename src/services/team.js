@@ -131,3 +131,19 @@ export async function removeMember({ memberRowId }) {
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
+
+// Invitee redeems a pending invite. Server-side `accept_team_invite` validates
+// that the token matches and the signed-in user's email is the one invited,
+// then inserts the team_members row and tags users.team_id.
+export async function acceptInvite({ token }) {
+  if (!token) return { ok: false, error: 'no token' }
+  const { data, error } = await supabase.rpc('accept_team_invite', { p_token: token })
+  if (error) return { ok: false, error: error.message }
+  return data || { ok: false, error: 'no_response' }
+}
+
+export function buildInviteLink(token) {
+  if (!token) return ''
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/join-team/${token}`
+}
