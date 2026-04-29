@@ -14,6 +14,7 @@ import { loadSellerProfile, type SellerProfile } from "../_shared/seller-profile
 import { detectMaterialChange } from "../_shared/material-change-detector.ts"
 import { buildBuyerViewPrompt } from "../_shared/prompts/buyer-view-prompt.ts"
 import { BUYER_VIEW_TOOL } from "../_shared/buyer-view-tool.ts"
+import { canWrite } from "../_shared/can-write.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -316,6 +317,31 @@ Deno.serve(async (req) => {
 
     // 1. Load context
     const ctx = await loadDealContext(deal_id)
+
+    // Phase 12.1 — server-side licensing gate. Block Klo coaching for
+    // read-only / cancelled / pending-deletion accounts so a stale client
+    // (or a direct API call) can't burn tokens on a non-paying seller.
+    // The seller_id comes from the deal row, not the JWT — this function
+    // runs as service role and never verifies the caller's token.
+    const sellerId = ctx.deal.seller_id as string
+    if (sellerId) {
+      const writeCheck = await canWrite(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, sellerId)
+      if (!writeCheck.ok) {
+        console.log(JSON.stringify({
+          event: "klo_respond_blocked_read_only",
+          deal_id,
+          seller_id: sellerId,
+          status: writeCheck.status,
+          reason: writeCheck.reason,
+        }))
+        return json({
+          ok: false,
+          error: "account_read_only",
+          status: writeCheck.status,
+          message: "This account is read-only. Upgrade to continue using Klo coaching.",
+        }, 402)
+      }
+    }
 
     // Phase 8 — manual buyer-view refresh path. Skip the main extraction;
     // just rerun the buyer-view generation against the current klo_state.

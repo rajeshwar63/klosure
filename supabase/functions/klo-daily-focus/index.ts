@@ -23,6 +23,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { callLlm } from "../_shared/llm-client.ts"
 import { loadSellerProfile } from "../_shared/seller-profile-loader.ts"
 import { buildSellerProfileSection } from "../_shared/prompts/sections.ts"
+import { canWrite } from "../_shared/can-write.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -89,6 +90,24 @@ Deno.serve(async (req) => {
       return json({ error: "not authorized" }, 401)
     }
     const sellerId = userData.user.id
+
+    // Phase 12.1 — server-side licensing gate. Block daily-focus generation
+    // for read-only sellers so we don't burn LLM tokens on a non-paying user.
+    const writeCheck = await canWrite(SUPABASE_URL, SERVICE_ROLE_KEY, sellerId)
+    if (!writeCheck.ok) {
+      console.log(JSON.stringify({
+        event: "klo_daily_focus_blocked_read_only",
+        seller_id: sellerId,
+        status: writeCheck.status,
+        reason: writeCheck.reason,
+      }))
+      return json({
+        ok: false,
+        error: "account_read_only",
+        status: writeCheck.status,
+        message: "This account is read-only. Upgrade to continue using Klo coaching.",
+      }, 402)
+    }
 
     // Service role for the deal read so we don't depend on a per-row RLS path.
     const service = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {

@@ -38,6 +38,12 @@
   --klo-warn:   #B5781E;
   --klo-danger: #C4452F;
 
+  /* Phase 12 — soft semantic backgrounds for licensing surfaces (trial
+     countdown, read-only banner). Kept narrow: amber for warning, red for
+     danger. Solid tones above remain the source of truth for fg/icons. */
+  --klo-warning-soft: #FEF3C7;
+  --klo-danger-soft:  #FEE2E2;
+
   /* Type stacks */
   --klo-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
   --klo-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;

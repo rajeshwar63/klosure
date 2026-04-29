@@ -1,57 +1,51 @@
+// Phase 12.1 — real billing page with plan cards.
+// All "Upgrade" buttons disabled in this phase — Razorpay arrives in 12.3.
+// Danger zone (account deletion) is preserved from the previous billing page;
+// the spec doesn't address it but removing it would regress an existing
+// shipped feature.
+
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
-import { PLANS } from '../lib/plans.js'
-import { startCheckout, openCustomerPortal } from '../services/billing.js'
+import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
+import { PLANS, formatPrice } from '../lib/plans.ts'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
-import { Eyebrow, MonoKicker, MonoTimestamp } from '../components/shared/index.js'
+import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
+
+const SHOWN_PLANS = ['pro', 'team_starter', 'team_growth', 'team_scale', 'enterprise']
+const CURRENCIES = ['INR', 'AED']
 
 export default function BillingPage() {
   const { user, signOut } = useAuth()
-  const { plan, profile, team } = useProfile()
+  const { team } = useProfile()
+  const { status, planSlug, isTrialing, daysLeftInTrial, isReadOnly, loading } = useAccountStatus()
   const navigate = useNavigate()
-  const [busy, setBusy] = useState(null)
-  const [error, setError] = useState('')
+
+  const [currency, setCurrency] = useState(status?.currency || 'INR')
+
+  // Account-deletion form state (preserved from previous BillingPage).
   const [deleteForm, setDeleteForm] = useState({ password: '', mfaCode: '', typed: '' })
   const [deleteError, setDeleteError] = useState('')
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteDone, setDeleteDone] = useState(null)
-
-  async function handleUpgrade(targetPlan) {
-    setError('')
-    setBusy(targetPlan)
-    const res = await startCheckout({
-      plan: targetPlan,
-      successUrl: window.location.origin + '/deals?billing=ok',
-      cancelUrl: window.location.origin + '/billing',
-    })
-    setBusy(null)
-    if (!res.ok) {
-      setError(res.error)
-      return
-    }
-    window.location.href = res.url
-  }
-
-  async function handleManage() {
-    setError('')
-    setBusy('manage')
-    const res = await openCustomerPortal({ returnUrl: window.location.origin + '/billing' })
-    setBusy(null)
-    if (!res.ok) {
-      setError(res.error)
-      return
-    }
-    window.location.href = res.url
-  }
-
-  const currentPlan = plan || 'free'
-  const periodEnd = team?.current_period_end || profile?.current_period_end
-  const hasStripe = Boolean(profile?.stripe_customer_id)
   const deleteToken = user?.email || 'DELETE'
+
+  // Effective plan: prefer the team's plan if the user is on a paid team,
+  // otherwise fall back to whatever get_account_status returned.
+  const currentTeamPlan = team?.plan
+  const effectivePlan =
+    currentTeamPlan && currentTeamPlan !== 'trial' ? currentTeamPlan : planSlug
+
+  if (loading) {
+    return (
+      <div className="p-6 text-sm" style={{ color: 'var(--klo-text-mute)' }}>
+        Loading…
+      </div>
+    )
+  }
 
   async function handleDeleteAccount(e) {
     e.preventDefault()
@@ -106,7 +100,7 @@ export default function BillingPage() {
     <div className="min-h-screen" style={{ background: 'var(--klo-bg)' }}>
       <header style={{ borderBottom: '1px solid var(--klo-line)' }}>
         <div
-          className="max-w-3xl mx-auto px-4 md:px-6 pt-8 pb-6"
+          className="max-w-[1100px] mx-auto px-4 md:px-6 pt-8 pb-6"
           style={{ paddingTop: 'max(2rem, calc(env(safe-area-inset-top) + 1rem))' }}
         >
           <button
@@ -116,85 +110,75 @@ export default function BillingPage() {
           >
             ← Back
           </button>
-          <Eyebrow>Settings · Billing</Eyebrow>
+          <Eyebrow>Billing</Eyebrow>
           <h1
             className="mt-3"
             style={{
               fontSize: 'clamp(28px, 3.4vw, 36px)',
               fontWeight: 600,
-              letterSpacing: '-0.03em',
+              letterSpacing: '-0.02em',
               lineHeight: 1.1,
               color: 'var(--klo-text)',
             }}
           >
-            Billing &amp; plans.
+            Plans &amp; licenses
           </h1>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 md:px-6 pt-8 pb-20">
-        <div
-          className="rounded-2xl p-5 mb-6 flex items-center justify-between gap-3"
-          style={{
-            background: 'var(--klo-bg-elev)',
-            border: '1px solid var(--klo-line)',
-          }}
-        >
-          <div>
-            <MonoKicker>Current plan</MonoKicker>
-            <p
-              className="mt-2 text-[20px] font-semibold"
-              style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
-            >
-              {PLANS[currentPlan]?.name || 'Free'}
-            </p>
-            {periodEnd && (
-              <MonoTimestamp className="mt-1 block">
-                Renews · {new Date(periodEnd).toLocaleDateString()}
-              </MonoTimestamp>
-            )}
-          </div>
-          {hasStripe && (
-            <button
-              onClick={handleManage}
-              disabled={busy === 'manage'}
-              className="text-[13px] rounded-lg px-4 py-2"
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--klo-line-strong)',
-                color: 'var(--klo-text)',
-              }}
-            >
-              {busy === 'manage' ? 'Opening…' : 'Manage payment'}
-            </button>
-          )}
-        </div>
-
-        {error && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-            {error}
-          </div>
-        )}
+      <main className="max-w-[1100px] mx-auto px-4 md:px-6 pt-8 pb-20">
+        <StatusBanner
+          status={status}
+          planSlug={effectivePlan}
+          isTrialing={isTrialing}
+          daysLeftInTrial={daysLeftInTrial}
+          isReadOnly={isReadOnly}
+        />
 
         <CreateTeamSection />
 
-        <div className="grid sm:grid-cols-3 gap-3">
-          {Object.values(PLANS).map((p) => (
+        <div className="mt-8 flex items-center justify-between flex-wrap gap-3">
+          <p className="text-[14px]" style={{ color: 'var(--klo-text-dim)' }}>
+            Prices shown in {currency === 'INR' ? 'Indian Rupees' : 'UAE Dirhams'}.
+          </p>
+          <div
+            className="inline-flex rounded-lg p-1"
+            style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line)' }}
+          >
+            {CURRENCIES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCurrency(c)}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold"
+                style={{
+                  background: currency === c ? 'var(--klo-accent)' : 'transparent',
+                  color: currency === c ? 'white' : 'var(--klo-text-dim)',
+                }}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {SHOWN_PLANS.map((slug) => (
             <PlanCard
-              key={p.id}
-              plan={p}
-              isCurrent={currentPlan === p.id}
-              onUpgrade={() => handleUpgrade(p.id)}
-              busy={busy === p.id}
+              key={slug}
+              plan={PLANS[slug]}
+              currency={currency}
+              isCurrent={slug === effectivePlan}
             />
           ))}
         </div>
 
-        <p
-          className="kl-mono text-[11px] mt-6 text-center uppercase"
-          style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}
-        >
-          Prices in USD · Gulf entities billed via Stripe · Cancel anytime
+        <p className="mt-8 text-[12px]" style={{ color: 'var(--klo-text-mute)' }}>
+          Upgrade flow ships next. Until then, contact{' '}
+          <a href="mailto:rajeshwar63@gmail.com" style={{ color: 'var(--klo-accent)' }}>
+            rajeshwar63@gmail.com
+          </a>{' '}
+          for early access pricing.
         </p>
 
         <div className="mt-8 text-center">
@@ -336,98 +320,119 @@ export default function BillingPage() {
   )
 }
 
-function PlanCard({ plan, isCurrent, onUpgrade, busy }) {
-  const featured = plan.id === 'pro'
+function StatusBanner({ status, planSlug, isTrialing, daysLeftInTrial, isReadOnly }) {
+  if (!status) return null
+  const planLabel = PLANS[planSlug]?.label ?? 'Trial'
+
+  let title
+  let body
+  let tone
+  if (isReadOnly) {
+    title = 'Your account is read-only.'
+    body = 'Klosure is paused — upgrade to resume coaching deals. Data is preserved for 90 days.'
+    tone = 'danger'
+  } else if (isTrialing) {
+    const days = Math.max(0, Math.ceil(daysLeftInTrial ?? 0))
+    title = `${days} day${days === 1 ? '' : 's'} left in your trial.`
+    body =
+      "You're on the full Pro experience until your trial ends. Pick a plan now to keep going without interruption."
+    tone = days <= 3 ? 'warning' : 'info'
+  } else if (status.status === 'paid_active' || status.status === 'overridden') {
+    title = `You're on ${planLabel}.`
+    body = status.current_period_end
+      ? `Renews on ${new Date(status.current_period_end).toLocaleDateString()}.`
+      : 'Active license.'
+    tone = 'success'
+  } else {
+    title = `Plan: ${planLabel}`
+    body = ''
+    tone = 'info'
+  }
+
+  const bg =
+    tone === 'danger' ? 'var(--klo-danger-soft)' :
+    tone === 'warning' ? 'var(--klo-warning-soft)' :
+    'var(--klo-bg-elev)'
+
   return (
     <div
-      className="rounded-2xl p-5 flex flex-col"
-      style={{
-        background: featured
-          ? 'linear-gradient(180deg, var(--klo-accent-soft), transparent 200px), var(--klo-bg-elev)'
-          : 'var(--klo-bg-elev)',
-        border: featured ? '1px solid var(--klo-accent-line)' : '1px solid var(--klo-line)',
-      }}
+      className="rounded-2xl p-5 mt-5"
+      style={{ background: bg, border: '1px solid var(--klo-line)' }}
     >
-      <p
-        className="kl-mono text-[12px] uppercase"
-        style={{
-          color: featured ? 'var(--klo-accent)' : 'var(--klo-text-mute)',
-          letterSpacing: '0.12em',
-        }}
-      >
-        {plan.name}
+      <p className="text-[15px] font-semibold" style={{ color: 'var(--klo-text)' }}>
+        {title}
       </p>
-      <p
-        className="mt-2 tabular-nums"
-        style={{
-          fontSize: 28,
-          fontWeight: 600,
-          letterSpacing: '-0.03em',
-          color: 'var(--klo-text)',
-        }}
-      >
-        {plan.priceLabel}
-      </p>
-      <p className="text-[14px] mt-2 leading-snug" style={{ color: 'var(--klo-text-dim)' }}>
-        {plan.description}
-      </p>
-      <ul
-        className="text-[14px] mt-4 space-y-2 flex-1 pt-4"
-        style={{ borderTop: '1px solid var(--klo-line)' }}
-      >
-        <Feature ok={plan.activeDealLimit === Infinity}>
-          {plan.activeDealLimit === Infinity ? 'Unlimited deals' : `${plan.activeDealLimit} active deal`}
-        </Feature>
-        <Feature ok={plan.canShare}>Shared rooms with buyers</Feature>
-        <Feature ok={plan.canUseManagerView}>Manager view across reps</Feature>
-        <Feature ok={plan.canUseManagerKlo}>Klo team-pipeline coaching</Feature>
-      </ul>
-      {isCurrent ? (
-        <div
-          className="mt-4 text-center kl-mono text-[12px] uppercase rounded-lg py-2.5"
-          style={{
-            color: 'var(--klo-text-mute)',
-            border: '1px solid var(--klo-line)',
-            letterSpacing: '0.12em',
-          }}
-        >
-          Your plan
-        </div>
-      ) : plan.id === 'free' ? (
-        <div
-          className="mt-4 text-center kl-mono text-[12px] py-2.5"
-          style={{ color: 'var(--klo-text-mute)' }}
-        >
-          —
-        </div>
-      ) : (
-        <button
-          onClick={onUpgrade}
-          disabled={busy}
-          className="mt-4 font-medium text-[14px] py-2.5 rounded-lg disabled:opacity-50"
-          style={{
-            background: featured ? 'var(--klo-text)' : 'transparent',
-            color: featured ? '#fff' : 'var(--klo-text)',
-            border: featured ? '1px solid var(--klo-text)' : '1px solid var(--klo-line-strong)',
-          }}
-        >
-          {busy ? 'Loading…' : `Upgrade to ${plan.name}`}
-        </button>
+      {body && (
+        <p className="mt-1 text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+          {body}
+        </p>
       )}
     </div>
   )
 }
 
-function Feature({ ok, children }) {
+function PlanCard({ plan, currency, isCurrent }) {
+  const isEnterprise = plan.slug === 'enterprise'
   return (
-    <li
-      className="flex items-start gap-2"
-      style={ok ? {} : { color: 'var(--klo-text-mute)', textDecoration: 'line-through' }}
+    <div
+      className="rounded-2xl p-5 flex flex-col"
+      style={{
+        background: isCurrent ? 'var(--klo-accent-soft)' : 'var(--klo-bg-elev)',
+        border: isCurrent ? '2px solid var(--klo-accent)' : '1px solid var(--klo-line)',
+      }}
     >
-      <span style={{ color: ok ? 'var(--klo-good)' : 'var(--klo-text-mute)' }}>
-        {ok ? '✓' : '·'}
-      </span>
-      <span style={{ color: ok ? 'var(--klo-text-dim)' : 'inherit' }}>{children}</span>
-    </li>
+      <MonoKicker>{plan.shortLabel}</MonoKicker>
+      <h3
+        className="mt-2 text-[20px] font-semibold"
+        style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+      >
+        {plan.label}
+      </h3>
+      <p className="mt-1 text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+        {plan.description}
+      </p>
+
+      <div className="mt-4 flex items-baseline gap-1">
+        <span
+          className="text-[28px] font-bold tabular-nums"
+          style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+        >
+          {formatPrice(plan.slug, currency)}
+        </span>
+        {!isEnterprise && (
+          <span className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+            /mo
+          </span>
+        )}
+      </div>
+      {!isEnterprise && plan.seatCap > 1 && (
+        <p className="text-[12px] kl-mono mt-1" style={{ color: 'var(--klo-text-mute)' }}>
+          Up to {plan.seatCap} seats
+        </p>
+      )}
+
+      <ul className="mt-4 space-y-1.5 flex-1">
+        {plan.highlights.map((h, i) => (
+          <li key={i} className="text-[13px] flex gap-2" style={{ color: 'var(--klo-text)' }}>
+            <span style={{ color: 'var(--klo-accent)' }}>✓</span>
+            <span>{h}</span>
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        disabled
+        title="Payment integration ships in Phase 12.3"
+        className="mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          background: isCurrent ? 'transparent' : 'var(--klo-text)',
+          color: isCurrent ? 'var(--klo-text)' : 'white',
+          border: isCurrent ? '1px solid var(--klo-line-strong)' : 'none',
+        }}
+      >
+        {isCurrent ? 'Current plan' : isEnterprise ? 'Talk to sales' : 'Upgrade'}
+      </button>
+    </div>
   )
 }
