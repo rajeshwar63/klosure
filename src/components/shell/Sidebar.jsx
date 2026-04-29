@@ -78,6 +78,8 @@ export default function Sidebar({
   onNavigate,
   onNewDeal,
   onLogout,
+  onLogoutAllDevices,
+  canLogoutAllDevices = false,
   collapsed = false,
   onCollapseToggle,
 }) {
@@ -236,7 +238,16 @@ export default function Sidebar({
               onClick={onLogout}
               className="text-[11px] text-navy/55 hover:text-klo hover:underline"
             >
-              Logout
+              Log out
+            </button>
+          )}
+          {canLogoutAllDevices && onLogoutAllDevices && (
+            <button
+              type="button"
+              onClick={onLogoutAllDevices}
+              className="text-[11px] text-navy/55 hover:text-red-600 hover:underline"
+            >
+              Log out of all devices
             </button>
           )}
         </div>
