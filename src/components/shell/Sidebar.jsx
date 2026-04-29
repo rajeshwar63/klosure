@@ -13,6 +13,7 @@ import SidebarNavItem from './SidebarNavItem.jsx'
 import SidebarDealRow from './SidebarDealRow.jsx'
 import TeamContextBadge from './TeamContextBadge.jsx'
 import TrialCountdownBadge from '../billing/TrialCountdownBadge.jsx'
+import ManageBillingBadge from '../billing/ManageBillingBadge.jsx'
 
 const REP_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
@@ -233,10 +234,12 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Trial countdown — only renders while user is in trial_active */}
+      {/* Trial countdown / manage billing — render conditions are mutually
+          exclusive (trial vs. paid), so at most one pill is shown here. */}
       {!collapsed && (
-        <div className="px-3 pt-2 shrink-0">
+        <div className="px-3 pt-2 shrink-0 flex flex-wrap gap-1.5">
           <TrialCountdownBadge />
+          <ManageBillingBadge />
         </div>
       )}
 
