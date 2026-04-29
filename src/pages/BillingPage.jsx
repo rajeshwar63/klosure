@@ -12,7 +12,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { PLANS, formatPrice } from '../lib/plans.ts'
-import { getRazorpayPlanId } from '../lib/razorpay-plans.ts'
+import { getRazorpayPlanId, RAZORPAY_KEY_ID } from '../lib/razorpay-plans.ts'
 import { startUpgrade } from '../services/billing.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
@@ -172,6 +172,7 @@ export default function BillingPage() {
               plan={PLANS[slug]}
               currency={currency}
               isCurrent={slug === effectivePlan}
+              user={user}
             />
           ))}
         </div>
@@ -374,7 +375,21 @@ function StatusBanner({ status, planSlug, isTrialing, daysLeftInTrial, isReadOnl
   )
 }
 
-function PlanCard({ plan, currency, isCurrent }) {
+// Razorpay Checkout JS — loaded on demand on the first Upgrade click.
+// Returns a promise that resolves once window.Razorpay is available.
+function loadRazorpayCheckout() {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && window.Razorpay) return resolve()
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('checkout_script_load_failed'))
+    document.head.appendChild(script)
+  })
+}
+
+function PlanCard({ plan, currency, isCurrent, user }) {
   const isEnterprise = plan.slug === 'enterprise'
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -386,13 +401,49 @@ function PlanCard({ plan, currency, isCurrent }) {
   async function handleUpgrade() {
     setErr('')
     setBusy(true)
-    const res = await startUpgrade({ planSlug: plan.slug, currency })
-    setBusy(false)
-    if (res.ok && res.short_url) {
-      window.location.href = res.short_url
-    } else {
-      setErr(res.error || 'Upgrade failed. Please try again.')
+
+    // Load Razorpay's checkout script first — small (~50KB) and CDN-cached.
+    try {
+      await loadRazorpayCheckout()
+    } catch {
+      setBusy(false)
+      setErr('Could not load the payment widget. Please reload and try again.')
+      return
     }
+
+    // Create the subscription on Razorpay (via our edge function). This
+    // returns a subscription_id; Razorpay's checkout modal authenticates
+    // the mandate against that id.
+    const res = await startUpgrade({ planSlug: plan.slug, currency })
+    if (!res.ok || !res.subscription_id) {
+      setBusy(false)
+      setErr(res.error || 'Upgrade failed. Please try again.')
+      return
+    }
+
+    // Open the in-app modal. Razorpay handles all UI; on successful mandate
+    // auth, the handler fires and we redirect to /billing/return which
+    // polls until the webhook flips the user to paid_active.
+    const rzp = new window.Razorpay({
+      key: RAZORPAY_KEY_ID,
+      subscription_id: res.subscription_id,
+      name: 'Klosure',
+      description: `${plan.label} subscription`,
+      prefill: {
+        email: user?.email ?? '',
+        name: user?.user_metadata?.name ?? '',
+      },
+      theme: { color: '#000000' },
+      handler: function () {
+        window.location.href = '/billing/return'
+      },
+      modal: {
+        ondismiss: function () {
+          setBusy(false)
+        },
+      },
+    })
+    rzp.open()
   }
 
   let buttonLabel
@@ -403,7 +454,7 @@ function PlanCard({ plan, currency, isCurrent }) {
   } else if (!planAvailable) {
     buttonLabel = currency === 'AED' ? 'Contact sales — AED billing soon' : 'Talk to sales'
   } else if (busy) {
-    buttonLabel = 'Redirecting…'
+    buttonLabel = 'Opening checkout…'
   } else {
     buttonLabel = 'Upgrade'
   }
