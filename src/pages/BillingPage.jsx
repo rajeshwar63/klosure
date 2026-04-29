@@ -1,5 +1,6 @@
 // Phase 12.1 — real billing page with plan cards.
-// All "Upgrade" buttons disabled in this phase — Razorpay arrives in 12.3.
+// Phase 12.3 — INR upgrade buttons go live via Razorpay. AED still says
+// "Contact sales — AED billing soon" (Phase 12.3.1).
 // Danger zone (account deletion) is preserved from the previous billing page;
 // the spec doesn't address it but removing it would regress an existing
 // shipped feature.
@@ -11,6 +12,8 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { PLANS, formatPrice } from '../lib/plans.ts'
+import { getRazorpayPlanId } from '../lib/razorpay-plans.ts'
+import { startUpgrade } from '../services/billing.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
@@ -373,6 +376,38 @@ function StatusBanner({ status, planSlug, isTrialing, daysLeftInTrial, isReadOnl
 
 function PlanCard({ plan, currency, isCurrent }) {
   const isEnterprise = plan.slug === 'enterprise'
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  // null Razorpay plan ID means: not buyable in this currency yet (AED) or
+  // not a paid tier (trial/enterprise). Enterprise routes to a sales conversation.
+  const planAvailable = !isEnterprise && !!getRazorpayPlanId(plan.slug, currency)
+
+  async function handleUpgrade() {
+    setErr('')
+    setBusy(true)
+    const res = await startUpgrade({ planSlug: plan.slug, currency })
+    setBusy(false)
+    if (res.ok && res.short_url) {
+      window.location.href = res.short_url
+    } else {
+      setErr(res.error || 'Upgrade failed. Please try again.')
+    }
+  }
+
+  let buttonLabel
+  if (isCurrent) {
+    buttonLabel = 'Current plan'
+  } else if (isEnterprise) {
+    buttonLabel = 'Talk to sales'
+  } else if (!planAvailable) {
+    buttonLabel = currency === 'AED' ? 'Contact sales — AED billing soon' : 'Talk to sales'
+  } else if (busy) {
+    buttonLabel = 'Redirecting…'
+  } else {
+    buttonLabel = 'Upgrade'
+  }
+
   return (
     <div
       className="rounded-2xl p-5 flex flex-col"
@@ -422,8 +457,8 @@ function PlanCard({ plan, currency, isCurrent }) {
 
       <button
         type="button"
-        disabled
-        title="Payment integration ships in Phase 12.3"
+        onClick={planAvailable && !isCurrent ? handleUpgrade : undefined}
+        disabled={busy || isCurrent || !planAvailable}
         className="mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
           background: isCurrent ? 'transparent' : 'var(--klo-text)',
@@ -431,8 +466,22 @@ function PlanCard({ plan, currency, isCurrent }) {
           border: isCurrent ? '1px solid var(--klo-line-strong)' : 'none',
         }}
       >
-        {isCurrent ? 'Current plan' : isEnterprise ? 'Talk to sales' : 'Upgrade'}
+        {buttonLabel}
       </button>
+      {err && (
+        <p className="mt-2 text-[12px]" style={{ color: 'var(--klo-danger)' }}>
+          {err}
+        </p>
+      )}
+      {!planAvailable && !isCurrent && !isEnterprise && currency === 'AED' && (
+        <p className="mt-2 text-[11px]" style={{ color: 'var(--klo-text-mute)' }}>
+          Email{' '}
+          <a href="mailto:rajeshwar63@gmail.com" style={{ color: 'var(--klo-accent)' }}>
+            rajeshwar63@gmail.com
+          </a>{' '}
+          for AED billing.
+        </p>
+      )}
     </div>
   )
 }
