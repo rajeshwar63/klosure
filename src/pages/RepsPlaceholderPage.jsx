@@ -1,14 +1,21 @@
-// Phase 6 step 03 — placeholder for the per-rep view. The "by rep" rollup
-// already exists inside the legacy TeamPage; future work will surface it
-// here as a dedicated page with rep filters.
+// Phase 6 step 03 — per-rep view + Phase 10 team invites surface.
+// The "by rep" rollup already exists in loadTeamPipeline; we render the
+// hairline grid of seller cards plus an invite form and pending-invite list
+// so a manager can grow the team without leaving the page.
 //
 // Per §5.4: design is "your team's deal coach" — a hairline grid of
 // seller cards, mono-numbered counts, no leaderboard ranking.
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
-import { loadTeamPipeline } from '../services/team.js'
+import {
+  buildInviteLink,
+  inviteMember,
+  loadTeamPipeline,
+  revokeInvite,
+} from '../services/team.js'
 import { formatCurrency } from '../lib/format.js'
 import {
   Eyebrow,
@@ -18,6 +25,7 @@ import {
 } from '../components/shared/index.js'
 
 export default function RepsPlaceholderPage() {
+  const { user } = useAuth()
   const { team, loading: profileLoading } = useProfile()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,6 +45,12 @@ export default function RepsPlaceholderPage() {
       mounted = false
     }
   }, [team, profileLoading])
+
+  async function refresh() {
+    if (!team) return
+    const res = await loadTeamPipeline({ teamId: team.id })
+    setData(res)
+  }
 
   if (profileLoading || loading) {
     return (
@@ -63,6 +77,7 @@ export default function RepsPlaceholderPage() {
   }
 
   const rollUp = data?.rollUp ?? []
+  const invites = data?.invites ?? []
 
   return (
     <div className="p-6 md:p-8 max-w-[960px] mx-auto">
@@ -85,16 +100,22 @@ export default function RepsPlaceholderPage() {
         </p>
       </header>
 
+      <InvitePanel
+        teamId={team.id}
+        invitedBy={user?.id}
+        onInvited={refresh}
+      />
+
       {rollUp.length === 0 ? (
         <div
-          className="rounded-2xl p-10 text-center"
+          className="rounded-2xl p-10 text-center mt-6"
           style={{
             background: 'var(--klo-bg-elev)',
             border: '1px solid var(--klo-line)',
           }}
         >
           <p className="text-[15px]" style={{ color: 'var(--klo-text-dim)' }}>
-            No reps yet.
+            No reps yet. Invite a teammate above to fill the team.
           </p>
         </div>
       ) : (
@@ -105,6 +126,10 @@ export default function RepsPlaceholderPage() {
         </HairlineGrid>
       )}
 
+      {invites.length > 0 && (
+        <PendingInvitesList invites={invites} onChange={refresh} />
+      )}
+
       <p className="kl-mono uppercase mt-5 text-[11px]" style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}>
         Per-rep filters come in a future phase. For now, open a deal from the{' '}
         <Link to="/deals" className="underline" style={{ color: 'var(--klo-accent)' }}>
@@ -112,6 +137,241 @@ export default function RepsPlaceholderPage() {
         </Link>
         .
       </p>
+    </div>
+  )
+}
+
+function InvitePanel({ teamId, invitedBy, onInvited }) {
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [lastInvite, setLastInvite] = useState(null)
+
+  async function submit(e) {
+    e.preventDefault()
+    setError('')
+    if (!email.trim()) return
+    setBusy(true)
+    const res = await inviteMember({ teamId, email, invitedBy })
+    setBusy(false)
+    if (!res.ok) {
+      setError(res.error || 'Could not send invite.')
+      return
+    }
+    setLastInvite(res.invite)
+    setEmail('')
+    onInvited?.()
+  }
+
+  return (
+    <section
+      className="rounded-2xl p-5 mb-6"
+      style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <MonoKicker>Grow the team</MonoKicker>
+          <p className="mt-1 text-[15px] font-medium" style={{ color: 'var(--klo-text)' }}>
+            Invite a teammate
+          </p>
+          <p className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+            They join as a seller. Their deals roll up here automatically.
+          </p>
+        </div>
+        {!open && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="px-3 py-2 rounded-lg text-sm font-medium"
+            style={{ background: 'var(--klo-accent)', color: 'white' }}
+          >
+            Invite teammate
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="teammate@company.com"
+            className="flex-1 px-3 py-2 rounded-lg text-sm"
+            style={{
+              background: 'var(--klo-bg)',
+              border: '1px solid var(--klo-line-strong)',
+              color: 'var(--klo-text)',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+            style={{ background: 'var(--klo-accent)', color: 'white' }}
+          >
+            {busy ? 'Sending…' : 'Send invite'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              setError('')
+            }}
+            className="px-3 py-2 rounded-lg text-sm"
+            style={{ color: 'var(--klo-text-dim)' }}
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+
+      {error && (
+        <p className="mt-3 text-[13px]" style={{ color: 'var(--klo-danger)' }}>
+          {error}
+        </p>
+      )}
+
+      {lastInvite && (
+        <InviteLinkChip
+          invite={lastInvite}
+          onDismiss={() => setLastInvite(null)}
+        />
+      )}
+    </section>
+  )
+}
+
+function InviteLinkChip({ invite, onDismiss }) {
+  const link = buildInviteLink(invite.token)
+  const [copied, setCopied] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard may be blocked; the link is visible in the UI as a fallback.
+    }
+  }
+
+  return (
+    <div
+      className="mt-4 p-3 rounded-lg flex flex-col sm:flex-row gap-2 sm:items-center"
+      style={{ background: 'var(--klo-bg)', border: '1px dashed var(--klo-line-strong)' }}
+    >
+      <div className="flex-1 min-w-0">
+        <MonoKicker>Invite ready · {invite.email}</MonoKicker>
+        <p
+          className="mt-1 text-[12px] truncate kl-mono"
+          style={{ color: 'var(--klo-text-dim)' }}
+          title={link}
+        >
+          {link}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={copy}
+          className="px-3 py-1.5 rounded-md text-xs font-medium"
+          style={{ background: 'var(--klo-accent)', color: 'white' }}
+        >
+          {copied ? 'Copied!' : 'Copy link'}
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs"
+          style={{ color: 'var(--klo-text-mute)' }}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PendingInvitesList({ invites, onChange }) {
+  return (
+    <section className="mt-8">
+      <MonoKicker>Pending invites · {invites.length}</MonoKicker>
+      <div
+        className="mt-3 rounded-2xl overflow-hidden"
+        style={{ border: '1px solid var(--klo-line)' }}
+      >
+        {invites.map((inv, idx) => (
+          <PendingInviteRow
+            key={inv.id}
+            invite={inv}
+            isLast={idx === invites.length - 1}
+            onChange={onChange}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PendingInviteRow({ invite, isLast, onChange }) {
+  const link = buildInviteLink(invite.token)
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // ignore
+    }
+  }
+
+  async function revoke() {
+    if (!window.confirm(`Revoke invite for ${invite.email}?`)) return
+    setBusy(true)
+    await revokeInvite({ inviteId: invite.id })
+    setBusy(false)
+    onChange?.()
+  }
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3"
+      style={{
+        background: 'var(--klo-bg-elev)',
+        borderBottom: isLast ? 'none' : '1px solid var(--klo-line)',
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-medium truncate" style={{ color: 'var(--klo-text)' }}>
+          {invite.email}
+        </p>
+        <MonoTimestamp className="block">
+          Sent {new Date(invite.created_at).toLocaleDateString()}
+        </MonoTimestamp>
+      </div>
+      <button
+        type="button"
+        onClick={copy}
+        className="px-2.5 py-1.5 rounded-md text-xs font-medium"
+        style={{ background: 'var(--klo-bg)', border: '1px solid var(--klo-line-strong)', color: 'var(--klo-text)' }}
+      >
+        {copied ? 'Copied!' : 'Copy link'}
+      </button>
+      <button
+        type="button"
+        onClick={revoke}
+        disabled={busy}
+        className="px-2.5 py-1.5 rounded-md text-xs font-medium disabled:opacity-50"
+        style={{ color: 'var(--klo-danger)' }}
+      >
+        {busy ? '…' : 'Revoke'}
+      </button>
     </div>
   )
 }

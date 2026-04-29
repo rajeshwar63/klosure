@@ -22,6 +22,7 @@ const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
 const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
 const TrainKloPage = lazy(() => import('./pages/TrainKloPage.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
+const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -85,6 +86,7 @@ export default function App() {
 
         {/* Buyer flow stays outside the shell. */}
         <Route path="/join/:token" element={<BuyerJoinPage />} />
+        <Route path="/join-team/:token" element={<JoinTeamPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
