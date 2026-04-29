@@ -7,6 +7,7 @@ import { PLANS } from '../lib/plans.js'
 import { startCheckout, openCustomerPortal } from '../services/billing.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker, MonoTimestamp } from '../components/shared/index.js'
+import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
 
 export default function BillingPage() {
   const { user, signOut } = useAuth()
@@ -174,6 +175,8 @@ export default function BillingPage() {
             {error}
           </div>
         )}
+
+        <CreateTeamSection />
 
         <div className="grid sm:grid-cols-3 gap-3">
           {Object.values(PLANS).map((p) => (

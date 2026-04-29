@@ -147,3 +147,54 @@ export function buildInviteLink(token) {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   return `${origin}/join-team/${token}`
 }
+
+// =============================================================================
+// Phase 11 additions
+// =============================================================================
+
+// Anonymous-friendly invite preview. Calls the get_invite_preview RPC which is
+// granted to both `anon` and `authenticated` — a visitor with the token can
+// see what they'd be accepting before signing in.
+export async function getInvitePreview({ token }) {
+  if (!token) return { ok: false, error: 'no token' }
+  const { data, error } = await supabase.rpc('get_invite_preview', { p_token: token })
+  if (error) return { ok: false, error: error.message }
+  return data || { ok: false, error: 'no_response' }
+}
+
+// Self-service team creation: the signed-in user becomes the team owner
+// (manager). Used from /billing → "Create a team". Idempotent-ish — if the
+// user already owns a team, returns that team instead of creating a new one.
+export async function createTeamForCurrentUser({ teamName }) {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData?.session?.user?.id
+  if (!userId) return { ok: false, error: 'not signed in' }
+
+  const { data: existing } = await supabase
+    .from('teams')
+    .select('*')
+    .eq('owner_id', userId)
+    .maybeSingle()
+  if (existing) return { ok: true, team: existing, alreadyExists: true }
+
+  const { data: team, error: teamErr } = await supabase
+    .from('teams')
+    .insert({ name: teamName?.trim() || 'My team', owner_id: userId, plan: 'team' })
+    .select()
+    .single()
+  if (teamErr) return { ok: false, error: teamErr.message }
+
+  const { error: linkErr } = await supabase
+    .from('team_members')
+    .insert({ team_id: team.id, user_id: userId, role: 'manager' })
+  if (linkErr) {
+    console.warn('[team] add owner as member', linkErr)
+  }
+
+  await supabase
+    .from('users')
+    .update({ team_id: team.id, plan: 'team' })
+    .eq('id', userId)
+
+  return { ok: true, team }
+}
