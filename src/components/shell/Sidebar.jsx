@@ -12,19 +12,18 @@ import { useMemo, useState } from 'react'
 import SidebarNavItem from './SidebarNavItem.jsx'
 import SidebarDealRow from './SidebarDealRow.jsx'
 
-const SELLER_NAV = [
+const REP_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
   { id: 'deals', icon: '≡', label: 'Deals' },
-  { id: 'team', icon: '◇', label: 'Team' },
   { id: 'train-klo', icon: '✦', label: 'Train Klo' },
 ]
 
 const MANAGER_NAV = [
-  { id: 'today', icon: '◆', label: 'This week' },
+  { id: 'this-week', icon: '◆', label: 'This week' },
   { id: 'forecast', icon: '↗', label: 'Forecast' },
   { id: 'reps', icon: '◎', label: 'Reps' },
   { id: 'askklo', icon: '✦', label: 'Ask Klo' },
-  { id: 'train-klo', icon: '⚙', label: 'Settings' },
+  { id: 'settings', icon: '⚙', label: 'Settings' },
 ]
 
 function sortDealsForSidebar(deals) {
@@ -84,7 +83,6 @@ export default function Sidebar({
   onCollapseToggle,
 }) {
   const [query, setQuery] = useState('')
-  const navItems = role === 'manager' ? MANAGER_NAV : SELLER_NAV
   const sorted = sortDealsForSidebar(deals)
   const filteredDeals = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -131,10 +129,10 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Top nav — hidden in collapsed mode per spec */}
+      {/* Top nav — rep-level destinations, always visible regardless of role */}
       {!collapsed && (
         <nav className="px-2 pt-3 pb-2 flex flex-col gap-0.5">
-          {navItems.map((item) => (
+          {REP_NAV.map((item) => (
             <SidebarNavItem
               key={item.id}
               icon={item.icon}
@@ -146,12 +144,22 @@ export default function Sidebar({
         </nav>
       )}
 
-      {/* My deals header */}
+      {/* My deals header — "+" creates a new deal */}
       {!collapsed && (
         <div className="px-3 pt-2 pb-1 flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
             My deals
           </span>
+          {onNewDeal && (
+            <button
+              type="button"
+              onClick={onNewDeal}
+              aria-label="New deal"
+              className="text-klo hover:bg-klo/10 rounded w-5 h-5 flex items-center justify-center text-[14px] font-semibold leading-none"
+            >
+              +
+            </button>
+          )}
         </div>
       )}
       {!collapsed && (
@@ -200,16 +208,25 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Phase 9 — "+ New deal" sits below the deal list as a quiet CTA. */}
-      {!collapsed && onNewDeal && (
-        <div className="px-2 pt-2 pb-3 border-t border-navy/5 shrink-0">
-          <button
-            type="button"
-            onClick={onNewDeal}
-            className="w-full text-left text-[13px] font-medium text-klo hover:bg-klo/5 rounded-md px-3 py-2 transition-colors"
-          >
-            <span className="font-semibold mr-1">+</span> New deal
-          </button>
+      {/* Manager nav — pinned above the user profile, only when acting as manager */}
+      {!collapsed && role === 'manager' && (
+        <div className="border-t border-navy/5 px-2 pt-2 pb-2 shrink-0">
+          <div className="px-1.5 pb-1">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
+              Manager
+            </span>
+          </div>
+          <nav className="flex flex-col gap-0.5">
+            {MANAGER_NAV.map((item) => (
+              <SidebarNavItem
+                key={item.id}
+                icon={item.icon}
+                label={item.label}
+                active={activeView === item.id}
+                onClick={handle(item.id)}
+              />
+            ))}
+          </nav>
         </div>
       )}
 
