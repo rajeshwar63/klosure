@@ -9,9 +9,11 @@ import type { PlanSlug, Currency } from './plans'
 
 const RAZORPAY_MODE = (import.meta.env.VITE_RAZORPAY_MODE ?? 'test') as 'test' | 'live'
 
-// Test-mode plan IDs (default for dev + preview)
+// Test-mode plan IDs (default for dev + preview).
+// Verified against /v1/plans on the test account 2026-04-29 — the Pro INR
+// id has a lowercase 'l' (not a '1'); the spec misread it.
 const TEST_PLANS: Record<string, string | null> = {
-  'pro:INR':           'plan_SjJt4hH1414xTF',
+  'pro:INR':           'plan_SjJt4hH14l4xTF',
   'team_starter:INR':  'plan_SjJtU4Ic9gMKQT',
   'team_growth:INR':   'plan_SjJtqGy7KxXBv1',
   'team_scale:INR':    'plan_SjJu9eaMjFv92Y',
