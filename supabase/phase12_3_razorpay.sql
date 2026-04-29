@@ -72,15 +72,17 @@ security definer
 stable
 set search_path = public
 as $$
-  select u.id as user_id, null::uuid as team_id, false as is_team
-    from public.users u
-   where u.razorpay_subscription_id = p_subscription_id
-   limit 1
+  -- Each leg parenthesised so the inner LIMIT 1 binds to that SELECT, not the
+  -- whole UNION ALL — Postgres rejects bare LIMIT inside a union without parens.
+  (select u.id as user_id, null::uuid as team_id, false as is_team
+     from public.users u
+    where u.razorpay_subscription_id = p_subscription_id
+    limit 1)
   union all
-  select null::uuid, t.id as team_id, true as is_team
-    from public.teams t
-   where t.razorpay_subscription_id = p_subscription_id
-   limit 1;
+  (select null::uuid as user_id, t.id as team_id, true as is_team
+     from public.teams t
+    where t.razorpay_subscription_id = p_subscription_id
+    limit 1);
 $$;
 
 -- ----- update_subscription_state helper ------------------------------------
