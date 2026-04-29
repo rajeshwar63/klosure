@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AuthProvider } from './hooks/useAuth.jsx'
 import { ProfileProvider } from './hooks/useProfile.jsx'
+import { AccountStatusProvider } from './hooks/useAccountStatus.jsx'
 import { ShellDealsProvider } from './hooks/useShellDeals.jsx'
 import { registerServiceWorker } from './lib/pwa.js'
 import './styles.css'
@@ -15,9 +16,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <ProfileProvider>
-          <ShellDealsProvider>
-            <App />
-          </ShellDealsProvider>
+          <AccountStatusProvider>
+            <ShellDealsProvider>
+              <App />
+            </ShellDealsProvider>
+          </AccountStatusProvider>
         </ProfileProvider>
       </AuthProvider>
     </BrowserRouter>
