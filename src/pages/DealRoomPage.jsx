@@ -10,7 +10,6 @@ import { useProfile } from '../hooks/useProfile.jsx'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { useShellDeals } from '../hooks/useShellDeals.jsx'
 import { greetingForRole } from '../services/klo.js'
-import { canShareWithBuyer } from '../lib/plans.js'
 import {
   markDealWon,
   markDealLost,
@@ -68,8 +67,9 @@ export default function DealRoomPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { profile, plan } = useProfile()
-  const { isReadOnly } = useAccountStatus()
+  const { profile } = useProfile()
+  const { isReadOnly, can } = useAccountStatus()
+  const canShare = can('realtime_buyer_link')
   const { reload: reloadShellDeals } = useShellDeals()
 
   const [deal, setDeal] = useState(null)
@@ -331,10 +331,10 @@ export default function DealRoomPage() {
   const messageCount = messages?.length ?? 0
   // Honor onboarding's ?share=1 hint by prompting share immediately.
   useEffect(() => {
-    if (params.get('share') === '1' && deal && canShareWithBuyer(plan)) {
+    if (params.get('share') === '1' && deal && canShare) {
       handleShare()
     }
-  }, [params, deal, plan, handleShare])
+  }, [params, deal, canShare, handleShare])
 
   if (loading) return <DealPageSkeleton />
   if (error || !deal) return <DealNotFound error={error} />
@@ -401,7 +401,7 @@ export default function DealRoomPage() {
       <DealHeader
         deal={deal}
         viewerRole="seller"
-        canShare={canShareWithBuyer(plan)}
+        canShare={canShare}
         onShare={handleShare}
         onWin={handleWin}
         onLost={handleLost}
