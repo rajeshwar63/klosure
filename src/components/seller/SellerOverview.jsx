@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../../lib/supabase.js'
 import { daysUntil, formatCurrency } from '../../lib/format.js'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
@@ -90,8 +89,7 @@ function KloBriefSeller({ klo_take_seller, computed_at }) {
   )
 }
 
-function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
-  const isSeller = viewerRole === 'seller'
+function DealSnapshotPanel({ deal, klo }) {
   const stage = klo?.stage ?? deal?.stage ?? null
   const stageMeta = STAGE_OPTIONS.find((s) => s.value === stage) ?? null
   const deadline = klo?.deadline?.date ?? deal?.deadline ?? null
@@ -113,56 +111,6 @@ function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
     return Number.isNaN(diff) ? null : Math.max(0, diff)
   })()
   const daysToDeadline = daysUntil(deadline)
-
-  const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [draft, setDraft] = useState({ stage: stage ?? '', value: valueAmount ?? '', deadline: deadline ?? '' })
-
-  useEffect(() => {
-    setDraft({
-      stage: stage ?? '',
-      value: valueAmount ?? '',
-      deadline: deadline ?? '',
-    })
-  }, [stage, valueAmount, deadline])
-
-  async function saveQuickEdit() {
-    if (!isSeller || !deal?.id || saving) return
-    setSaving(true)
-    setError('')
-
-    const valueNumber = draft.value === '' ? null : Number(draft.value)
-    if (draft.value !== '' && Number.isNaN(valueNumber)) {
-      setError('Deal value must be a number.')
-      setSaving(false)
-      return
-    }
-
-    const updates = {
-      stage: draft.stage || null,
-      value: valueNumber,
-      deadline: draft.deadline || null,
-      updated_at: new Date().toISOString(),
-    }
-
-    const { data, error: updateError } = await supabase
-      .from('deals')
-      .update(updates)
-      .eq('id', deal.id)
-      .select('*')
-      .single()
-
-    if (updateError) {
-      setError(updateError.message || 'Could not save changes.')
-      setSaving(false)
-      return
-    }
-
-    onDealUpdate?.(data)
-    setEditing(false)
-    setSaving(false)
-  }
 
   return (
     <section className="bg-white border border-navy/10 rounded-2xl p-4 md:p-5">
@@ -247,77 +195,6 @@ function DealSnapshotPanel({ deal, klo, viewerRole, onDealUpdate }) {
           hint="Counts come from Klo's read of this deal"
         />
       </HairlineGrid>
-
-      {isSeller && (
-        <div className="mt-4 border-t border-navy/10 pt-3">
-          {!editing ? (
-            <button
-              type="button"
-              className="text-xs font-semibold text-klo hover:underline"
-              onClick={() => setEditing(true)}
-            >
-              Quick edit stage / value / deadline
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <label className="text-xs text-navy/70">
-                  Stage
-                  <select
-                    value={draft.stage}
-                    onChange={(e) => setDraft((p) => ({ ...p, stage: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm"
-                  >
-                    <option value="">Select stage</option>
-                    {STAGE_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs text-navy/70">
-                  Value (USD)
-                  <input
-                    type="number"
-                    min="0"
-                    value={draft.value}
-                    onChange={(e) => setDraft((p) => ({ ...p, value: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm"
-                    placeholder="120000"
-                  />
-                </label>
-                <label className="text-xs text-navy/70">
-                  Close date
-                  <input
-                    type="date"
-                    value={draft.deadline}
-                    onChange={(e) => setDraft((p) => ({ ...p, deadline: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm"
-                  />
-                </label>
-              </div>
-              {error && <p className="text-xs text-red-600">{error}</p>}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={saveQuickEdit}
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold bg-klo text-white hover:bg-klo/90 disabled:opacity-60"
-                >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setEditing(false)}
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold border border-navy/15 text-navy"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </section>
   )
 }
@@ -779,7 +656,7 @@ function deriveActions(klo) {
   }))
 }
 
-export default function SellerOverview({ deal, viewerRole = 'seller', onDealUpdate }) {
+export default function SellerOverview({ deal }) {
   const klo = deal?.klo_state ?? null
 
   const stakeholders = useMemo(() => deriveStakeholdersForSeller(klo), [klo])
@@ -802,7 +679,7 @@ export default function SellerOverview({ deal, viewerRole = 'seller', onDealUpda
 
   return (
     <div className="p-4 md:p-6 max-w-[1080px] mx-auto space-y-5">
-      <DealSnapshotPanel deal={deal} klo={klo} viewerRole={viewerRole} onDealUpdate={onDealUpdate} />
+      <DealSnapshotPanel deal={deal} klo={klo} />
 
       <KloBriefSeller
         klo_take_seller={klo.klo_take_seller}
