@@ -132,6 +132,19 @@ export interface BuyerRecentMoment {
   text: string;                // ≤ 16 words. "Vendor sent SOC 2 report"
 }
 
+export type BuyerViewOutcome =
+  | 'success'
+  | 'tool_not_called'
+  | 'missing_input'
+  | 'persist_failed'
+  | 'thrown_error';
+
+export interface BuyerViewStatus {
+  last_attempt_at: string;       // ISO timestamp of the most recent generation attempt
+  last_outcome: BuyerViewOutcome;
+  last_error?: string | null;    // short human-readable detail (truncated)
+}
+
 export interface BuyerView {
   // The buyer-facing brief — the hero card on the dashboard.
   // Written TO the buyer, not about them. 3-5 sentences. Klo's voice.
@@ -196,6 +209,11 @@ export interface KloState {
   // gated LLM call (see klo-respond → buyer-view extraction). Optional
   // because existing rows do not have it; the UI must handle the missing case.
   buyer_view?: BuyerView | null;
+
+  // Generation telemetry for buyer_view. Set on every regeneration attempt —
+  // success OR failure — so the UI can stop saying "Building…" forever when
+  // an attempt has actually failed and tell the seller they can retry.
+  buyer_view_status?: BuyerViewStatus | null;
 
   // Phase 9 — pending tasks extracted from chat. Single source of truth for
   // who owes what, with seller-side and buyer-side splits. Both arrays are

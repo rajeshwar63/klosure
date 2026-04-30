@@ -66,6 +66,7 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
   if (!deal) return <BuyerEmptyState />
 
   const buyerView = deal?.klo_state?.buyer_view ?? null
+  const buyerViewStatus = deal?.klo_state?.buyer_view_status ?? null
   const klo = deal?.klo_state ?? {}
 
   const wrapperClass = embedded
@@ -77,7 +78,7 @@ export default function BuyerDashboardPage({ deal: dealProp, embedded = false })
       {!embedded && <BuyerDealHeader deal={deal} />}
       <div className="max-w-[1080px] mx-auto px-4 md:px-6 py-6 md:py-8 space-y-5">
         {!buyerView ? (
-          <BuyerEmptyState />
+          <BuyerEmptyState status={buyerViewStatus} />
         ) : (
           <>
             <section className="space-y-4">
