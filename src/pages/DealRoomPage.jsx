@@ -29,6 +29,7 @@ import BuyerViewPreview from '../components/seller/BuyerViewPreview.jsx'
 import DangerZoneFooter from '../components/deal/DangerZoneFooter.jsx'
 import AppPromptModal from '../components/ui/AppPromptModal.jsx'
 import AppToast from '../components/ui/AppToast.jsx'
+import ShareDealModal from '../components/deal/ShareDealModal.jsx'
 
 function DealPageSkeleton() {
   return (
@@ -79,6 +80,7 @@ export default function DealRoomPage() {
   const [error, setError] = useState('')
 
   const [activeTab, setActiveTab] = useState(() => loadDealTab(id))
+  const [shareOpen, setShareOpen] = useState(false)
   const [toast, setToast] = useState({ open: false, tone: 'info', message: '' })
   const [dialog, setDialog] = useState({
     open: false,
@@ -205,18 +207,17 @@ export default function DealRoomPage() {
     reloadShellDeals()
   }, [deal?.klo_state?.confidence?.value, deal?.health, reloadShellDeals, deal?.id])
 
+  const buyerLink = useMemo(() => {
+    if (!deal?.buyer_token) return ''
+    const base = import.meta.env.VITE_APP_URL || window.location.origin
+    return `${base.replace(/\/$/, '')}/join/${deal.buyer_token}`
+  }, [deal?.buyer_token])
+
+  // Share opens the email/link modal. Old behaviour (copy link silently) is
+  // preserved as the secondary action inside the modal.
   const handleShare = useCallback(() => {
     if (!deal?.buyer_token) return
-    const base = import.meta.env.VITE_APP_URL || window.location.origin
-    const url = `${base.replace(/\/$/, '')}/join/${deal.buyer_token}`
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(url).catch(() => {})
-    }
-    setToast({
-      open: true,
-      tone: 'success',
-      message: `Share link copied.\n${url}`,
-    })
+    setShareOpen(true)
   }, [deal?.buyer_token])
 
   const handleWin = useCallback(async () => {
@@ -464,6 +465,12 @@ export default function DealRoomPage() {
         message={toast.message}
         actionLabel="Close"
         onAction={() => setToast((prev) => ({ ...prev, open: false }))}
+      />
+      <ShareDealModal
+        open={shareOpen}
+        deal={deal}
+        buyerLink={buyerLink}
+        onClose={() => setShareOpen(false)}
       />
     </div>
   )

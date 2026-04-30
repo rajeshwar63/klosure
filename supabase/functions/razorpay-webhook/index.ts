@@ -34,6 +34,21 @@ import {
   periodEndFromSubscription,
   type SubscriptionEntity,
 } from "../_shared/razorpay.ts"
+import { sendEmail } from "../_shared/send-email.ts"
+import {
+  subscriptionStartedEmail,
+  subscriptionCancelledEmail,
+  subscriptionHaltedEmail,
+} from "../_shared/email-templates.ts"
+
+const APP_URL = Deno.env.get("APP_URL") ?? "https://klosure.ai"
+const PLAN_LABELS: Record<string, string> = {
+  pro: "Pro",
+  team_starter: "Team Starter",
+  team_growth: "Team Growth",
+  team_scale: "Team Scale",
+  enterprise: "Enterprise",
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -190,6 +205,15 @@ Deno.serve(async (req) => {
       })
       .eq("id", eventRowId)
 
+    // Fire transactional emails based on the event type. Best-effort — never
+    // block the 200 ack on email send failures (Razorpay would otherwise
+    // retry the whole event chain).
+    try {
+      await dispatchLifecycleEmails(sb, eventType, event, subscription, ownerRow)
+    } catch (err) {
+      console.warn("razorpay-webhook: email dispatch failed", err)
+    }
+
     return new Response(
       JSON.stringify({ ok: true, subscription_id: subscriptionId, status, plan: planSlug }),
       { status: 200 },
@@ -252,4 +276,189 @@ function timingSafeEqual(a: string, b: string) {
   let result = 0
   for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return result === 0
+}
+
+// Map a Razorpay subscription event to the right transactional email. Each
+// arm is best-effort; failures are logged but never thrown out.
+async function dispatchLifecycleEmails(
+  sb: ReturnType<typeof createClient>,
+  eventType: string,
+  rawEvent: Record<string, unknown>,
+  subscription: SubscriptionEntity,
+  ownerRow: { user_id?: string | null; team_id?: string | null } | null,
+) {
+  // Resolve recipient email + name from the owner row.
+  const recipient = await resolveOwnerRecipient(sb, ownerRow)
+  if (!recipient?.email) return
+
+  const planSlug = resolvePlanSlug(subscription)
+  const planLabel = PLAN_LABELS[planSlug] ?? "Klosure subscription"
+
+  switch (eventType) {
+    case "subscription.activated": {
+      // First mandate auth completed — celebratory email. Use the user row
+      // flag so the customer doesn't receive this twice if Razorpay replays
+      // the event after the same subscription is cancelled and resubscribed
+      // (rare, but possible in test mode).
+      const alreadySent = await checkActivatedAlreadySent(sb, subscription.id)
+      if (alreadySent) return
+      const { subject, html } = subscriptionStartedEmail({
+        userEmail: recipient.email,
+        userName: recipient.name ?? "",
+        planLabel,
+        appUrl: APP_URL,
+      })
+      const res = await sendEmail({
+        to: recipient.email,
+        subject,
+        html,
+        tags: [
+          { name: "type", value: "subscription_activated" },
+          { name: "subscription_id", value: subscription.id },
+        ],
+      })
+      if (res.ok && !res.skipped) {
+        await markActivatedSent(sb, subscription.id)
+      }
+      return
+    }
+
+    case "subscription.charged": {
+      // Each successful charge → invoice email. send-invoice is idempotent
+      // by payment_id so retries on this event are safe.
+      const payment = (rawEvent.payload as
+        | { payment?: { entity?: { id?: string } } }
+        | undefined)?.payment?.entity
+      if (!payment?.id) return
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-invoice`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          payment_id: payment.id,
+          subscription_id: subscription.id,
+        }),
+      })
+      return
+    }
+
+    case "subscription.halted": {
+      const { subject, html } = subscriptionHaltedEmail({
+        userEmail: recipient.email,
+        userName: recipient.name ?? "",
+        planLabel,
+        appUrl: APP_URL,
+      })
+      await sendEmail({
+        to: recipient.email,
+        subject,
+        html,
+        tags: [
+          { name: "type", value: "subscription_halted" },
+          { name: "subscription_id", value: subscription.id },
+        ],
+      })
+      return
+    }
+
+    case "subscription.cancelled": {
+      const periodEnd = periodEndFromSubscription(subscription)
+      const endsAtLabel = periodEnd
+        ? new Date(periodEnd).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+        : null
+      const { subject, html } = subscriptionCancelledEmail({
+        userEmail: recipient.email,
+        userName: recipient.name ?? "",
+        planLabel,
+        endsAt: endsAtLabel,
+        appUrl: APP_URL,
+      })
+      await sendEmail({
+        to: recipient.email,
+        subject,
+        html,
+        tags: [
+          { name: "type", value: "subscription_cancelled" },
+          { name: "subscription_id", value: subscription.id },
+        ],
+      })
+      return
+    }
+
+    default:
+      // Other events (e.g. subscription.pending, completed) are silent —
+      // we already write read-only state; an email there would be noise.
+      return
+  }
+}
+
+async function resolveOwnerRecipient(
+  sb: ReturnType<typeof createClient>,
+  ownerRow: { user_id?: string | null; team_id?: string | null } | null,
+): Promise<{ email: string; name: string | null } | null> {
+  if (!ownerRow) return null
+  if (ownerRow.user_id) {
+    const { data } = await sb
+      .from("users")
+      .select("email, name")
+      .eq("id", ownerRow.user_id)
+      .maybeSingle()
+    if (data?.email) return { email: data.email, name: data.name }
+  }
+  if (ownerRow.team_id) {
+    const { data: team } = await sb
+      .from("teams")
+      .select("owner_id")
+      .eq("id", ownerRow.team_id)
+      .maybeSingle()
+    if (team?.owner_id) {
+      const { data: ownerUser } = await sb
+        .from("users")
+        .select("email, name")
+        .eq("id", team.owner_id)
+        .maybeSingle()
+      if (ownerUser?.email) return { email: ownerUser.email, name: ownerUser.name }
+    }
+  }
+  return null
+}
+
+// We piggy-back on the payment_events log to gate the activation email so we
+// don't send it twice for a single subscription. A row tagged
+// type="activation_email" with subscription_id acts as the sentinel.
+async function checkActivatedAlreadySent(
+  sb: ReturnType<typeof createClient>,
+  subscriptionId: string,
+): Promise<boolean> {
+  const { data } = await sb
+    .from("payment_events")
+    .select("id")
+    .eq("subscription_id", subscriptionId)
+    .eq("event_type", "klosure.activation_email")
+    .limit(1)
+  return !!(data && data.length > 0)
+}
+
+async function markActivatedSent(
+  sb: ReturnType<typeof createClient>,
+  subscriptionId: string,
+) {
+  // Insert a synthetic row. The (provider, event_id) unique constraint forces
+  // us to vary event_id per insert — use the subscription id as the suffix.
+  await sb.from("payment_events").insert({
+    provider: "klosure",
+    event_id: `activation_email:${subscriptionId}`,
+    event_type: "klosure.activation_email",
+    payload: { subscription_id: subscriptionId },
+    signature: null,
+    signature_verified: false,
+    subscription_id: subscriptionId,
+    processed_at: new Date().toISOString(),
+  })
 }
