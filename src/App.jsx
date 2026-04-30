@@ -10,6 +10,7 @@ import BuyerJoinPage from './pages/BuyerJoinPage.jsx'
 import SellerHomePage from './pages/SellerHomePage.jsx'
 import ManagerHomePage from './pages/ManagerHomePage.jsx'
 import RepsPlaceholderPage from './pages/RepsPlaceholderPage.jsx'
+import TeamDealsPage from './pages/TeamDealsPage.jsx'
 import ShellWrapper from './components/shell/ShellWrapper.jsx'
 
 // Lazy-load the heavier flows so the dashboard ships in a smaller initial
@@ -22,7 +23,6 @@ const BillingManagePage = lazy(() => import('./pages/BillingManagePage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage.jsx'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
 const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
-const TeamDealsPage = lazy(() => import('./pages/TeamDealsPage.jsx'))
 const TrainKloPage = lazy(() => import('./pages/TrainKloPage.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))

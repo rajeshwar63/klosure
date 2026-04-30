@@ -1,8 +1,10 @@
-// Phase 6 step 14 — list of deals that need manager attention this week.
+// "Klo flagged this morning" — the slipping deals on the manager home,
+// styled to match the landing-page mock (coloured dot, who · what, click-
+// through to the deal).
 //
 // A deal counts as "slipping" if any of these are true:
 //   - confidence trend is down with delta <= -5
-//   - health is amber
+//   - health is amber/red
 //   - the deal has been at the same stage for >= 4 weeks
 // Items sort by composite severity score; cap at 5.
 
@@ -31,6 +33,14 @@ function severityScore(deal) {
   return score
 }
 
+function flagToneFor(deal) {
+  if (deal?.health === 'red') return 'bad'
+  if (deal?.health === 'amber') return 'warn'
+  const c = deal?.klo_state?.confidence
+  if (c?.value != null && c.value < 30) return 'bad'
+  return 'warn'
+}
+
 function buildSummary(deal) {
   const parts = []
   const w = weeksAtStage(deal)
@@ -38,9 +48,14 @@ function buildSummary(deal) {
   const topBlocker = deal?.klo_state?.blockers?.[0]?.text
   if (topBlocker && parts.length < 3) {
     parts.push(
-      topBlocker.length > 30 ? `${topBlocker.slice(0, 27)}…` : topBlocker,
+      topBlocker.length > 60 ? `${topBlocker.slice(0, 57)}…` : topBlocker,
     )
   }
+  const c = deal?.klo_state?.confidence
+  if (c?.trend === 'down' && c?.delta != null && parts.length < 3) {
+    parts.push(`confidence ↓ ${Math.abs(c.delta)}`)
+  }
+  if (parts.length === 0) parts.push('Needs a manager nudge')
   return parts.join(' · ')
 }
 
@@ -53,63 +68,52 @@ export function computeDealsSlipping(deals) {
     .slice(0, 5)
 }
 
-function toneFor(value) {
-  if (value == null) return 'muted'
-  if (value < 30) return 'risk'
-  if (value < 60) return 'caution'
-  return 'good'
+const DOT_COLOR = {
+  bad: 'var(--klo-danger)',
+  warn: 'var(--klo-warn)',
 }
 
-const TONE_COLOR = {
-  good: '#3B6D11',
-  caution: '#BA7517',
-  risk: '#A32D2D',
-  muted: '#6B6A64',
-}
-
-function DealSlippingRow({ deal, onOpen }) {
-  const c = deal.klo_state?.confidence
-  const value = c?.value
-  const tone = toneFor(value)
-  const toneColor = TONE_COLOR[tone]
-  const summary = buildSummary(deal)
+function FlagRow({ deal, onOpen }) {
+  const tone = flagToneFor(deal)
   const repName = deal.seller_name || '—'
+  const buyer = deal.buyer_company || deal.title
+  const who = `${repName} · ${buyer}`
+  const what = buildSummary(deal)
 
   return (
-    <div
-      className="bg-white rounded-md px-4 py-3 flex items-center gap-3"
-      style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.12)' }}
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left rounded-lg px-4 py-3 flex items-center gap-3 transition-colors hover:bg-navy/[0.03]"
+      style={{
+        background: 'var(--klo-bg-elev)',
+        border: '1px solid var(--klo-line)',
+      }}
     >
-      <div className="flex flex-col items-center min-w-[40px] shrink-0">
-        <span
-          className="text-sm font-medium tabular-nums"
-          style={{ color: toneColor }}
-        >
-          {value != null ? Math.round(value) : '—'}
-        </span>
-        {c?.trend === 'down' && c?.delta != null && (
-          <span className="text-[9px]" style={{ color: '#A32D2D' }}>
-            ↓ {Math.abs(c.delta)}
-          </span>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-navy truncate">
-          {deal.title} · {repName}
-        </div>
-        {summary && (
-          <div className="text-xs text-navy/55 truncate">{summary}</div>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="px-3 py-1 rounded-md text-xs text-navy/80 shrink-0"
-        style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.18)' }}
+      <span
+        className="w-2 h-2 rounded-full shrink-0"
+        style={{ background: DOT_COLOR[tone] || DOT_COLOR.warn }}
+        aria-hidden
+      />
+      <span
+        className="text-[13px] font-semibold shrink-0"
+        style={{ color: 'var(--klo-text)' }}
       >
-        Open
-      </button>
-    </div>
+        {who}
+      </span>
+      <span className="text-[13px]" style={{ color: 'var(--klo-text-mute)' }}>
+        ·
+      </span>
+      <span
+        className="text-[13px] flex-1 min-w-0 truncate"
+        style={{ color: 'var(--klo-text-dim)' }}
+      >
+        {what}
+      </span>
+      <span className="text-navy/30 shrink-0" aria-hidden>
+        ›
+      </span>
+    </button>
   )
 }
 
@@ -120,12 +124,19 @@ export default function DealsSlippingList({ deals }) {
   if (items.length === 0) {
     return (
       <section className="mb-6">
-        <div className="text-[10px] font-semibold tracking-wider text-navy/45 mb-2">
-          DEALS SLIPPING THIS WEEK · 0
+        <div
+          className="text-[11px] font-semibold uppercase mb-2 kl-mono"
+          style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.1em' }}
+        >
+          Klo flagged this morning · 0
         </div>
         <div
-          className="bg-white rounded-md px-4 py-3 text-sm text-navy/60"
-          style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.10)' }}
+          className="rounded-lg px-4 py-3 text-[13px]"
+          style={{
+            background: 'var(--klo-bg-elev)',
+            border: '1px solid var(--klo-line)',
+            color: 'var(--klo-text-dim)',
+          }}
         >
           No deals slipping this week. The team's pipeline is healthy.
         </div>
@@ -135,12 +146,15 @@ export default function DealsSlippingList({ deals }) {
 
   return (
     <section className="mb-6">
-      <div className="text-[10px] font-semibold tracking-wider text-navy/45 mb-2">
-        DEALS SLIPPING THIS WEEK · {items.length}
+      <div
+        className="text-[11px] font-semibold uppercase mb-2 kl-mono"
+        style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.1em' }}
+      >
+        Klo flagged this morning · {items.length}
       </div>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {items.map(({ deal }) => (
-          <DealSlippingRow
+          <FlagRow
             key={deal.id}
             deal={deal}
             onOpen={() => navigate(`/deals/${deal.id}`)}

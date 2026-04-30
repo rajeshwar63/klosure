@@ -2,7 +2,7 @@
 // rep that owns it. Optional ?rep=<user_id> filter scopes the list to a
 // single rep — used by the per-rep links on /team/reps.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { loadTeamPipeline } from '../services/team.js'
@@ -138,7 +138,7 @@ export default function TeamDealsPage() {
   }
 
   return (
-    <div className="min-h-full" style={{ background: 'var(--klo-bg)' }}>
+    <div className="min-h-screen" style={{ background: 'var(--klo-bg)' }}>
       <header
         style={{
           background: 'var(--klo-bg)',

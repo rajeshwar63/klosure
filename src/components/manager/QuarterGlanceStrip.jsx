@@ -1,6 +1,5 @@
-// Phase 6 step 14 — compact bucket strip on the manager home. Reuses the
-// Phase 5 bucketDeals math; mirrors the seller PipelineGlanceStrip but with
-// commit / stretch numbers in the header (managers think in commits).
+// Manager-home quarter buckets — three colourful cards, mirroring the
+// landing-page hero so the in-app surface feels like the marketing demo.
 
 import { useMemo } from 'react'
 import {
@@ -23,29 +22,32 @@ function compactCurrency(amount) {
   return `$${Math.round(n)}`
 }
 
-const TONE = {
-  good: { bg: '#EAF3DE', label: '#3B6D11', text: '#173404' },
-  caution: { bg: '#FAEEDA', label: '#854F0B', text: '#412402' },
-  muted: { bg: '#F1F0EC', label: '#6B6A64', text: '#3A3A36' },
+const TONES = {
+  good: { bg: '#EAF3DE', label: '#3B6D11', amount: '#173404', deals: '#3B6D11' },
+  caution: { bg: '#FAEEDA', label: '#854F0B', amount: '#412402', deals: '#854F0B' },
+  muted: { bg: '#F1F0EC', label: '#6B6A64', amount: '#3A3A36', deals: '#6B6A64' },
 }
 
 function BucketCard({ label, amount, count, tone }) {
-  const c = TONE[tone] || TONE.muted
+  const c = TONES[tone] || TONES.muted
   return (
-    <div className="rounded-md p-3" style={{ background: c.bg }}>
+    <div className="rounded-xl px-5 py-4" style={{ background: c.bg }}>
       <div
-        className="text-[10px] uppercase tracking-wider mb-1"
-        style={{ color: c.label }}
+        className="text-[10px] font-semibold uppercase tracking-wider mb-2"
+        style={{ color: c.label, letterSpacing: '0.1em' }}
       >
         {label}
       </div>
       <div
-        className="text-lg font-medium leading-tight"
-        style={{ color: c.text }}
+        className="text-[26px] font-semibold leading-none tabular-nums"
+        style={{ color: c.amount, letterSpacing: '-0.02em' }}
       >
         {compactCurrency(amount)}
       </div>
-      <div className="text-[10px] mt-0.5" style={{ color: c.label }}>
+      <div
+        className="text-[11px] mt-2 kl-mono"
+        style={{ color: c.deals, letterSpacing: '0.04em' }}
+      >
         {count} deal{count === 1 ? '' : 's'}
       </div>
     </div>
@@ -64,27 +66,8 @@ export default function QuarterGlanceStrip({ deals }) {
   if (activeCount === 0) return null
 
   return (
-    <section
-      className="bg-white rounded-xl p-4 md:p-5 mb-6"
-      style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.12)' }}
-    >
-      <div className="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-navy/45">
-          Quarter at a glance
-        </span>
-        <span className="text-[11px] text-navy/55">
-          Commit{' '}
-          <span className="font-medium text-navy/80">
-            {compactCurrency(commit)}
-          </span>{' '}
-          · stretch{' '}
-          <span className="font-medium text-navy/80">
-            {compactCurrency(stretch)}
-          </span>
-        </span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 md:gap-3">
+    <section className="mb-7">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <BucketCard
           label="Likely close"
           amount={buckets.likely.weighted}
@@ -103,6 +86,15 @@ export default function QuarterGlanceStrip({ deals }) {
           count={buckets.long_shot.deals.length}
           tone="muted"
         />
+      </div>
+      <div
+        className="mt-3 text-[11px] kl-mono text-right"
+        style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.04em' }}
+      >
+        Commit{' '}
+        <span style={{ color: 'var(--klo-text-dim)' }}>{compactCurrency(commit)}</span>
+        {' · '}stretch{' '}
+        <span style={{ color: 'var(--klo-text-dim)' }}>{compactCurrency(stretch)}</span>
       </div>
     </section>
   )

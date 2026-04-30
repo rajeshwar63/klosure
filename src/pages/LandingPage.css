@@ -942,10 +942,12 @@
   }
 }
 
-/* NAV CTA — explicit white text on the dark sign-up button. */
-.klo-landing .nav-cta,
-.klo-landing .nav-cta:hover,
-.klo-landing .nav-cta:visited {
+/* NAV CTA — explicit white text on the dark sign-up button.
+   Specificity must beat `.klo-landing .nav-links a` which sets the dim
+   text color for plain links inside the nav. */
+.klo-landing .nav-links a.nav-cta,
+.klo-landing .nav-links a.nav-cta:hover,
+.klo-landing .nav-links a.nav-cta:visited {
   color: #fff;
 }
 
