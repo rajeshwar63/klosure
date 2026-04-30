@@ -157,7 +157,7 @@ export default function RepsPlaceholderPage() {
 }
 
 function InvitePanel({ teamId, invitedBy, onInvited }) {
-  const { status, planDef, seatsAvailable } = useAccountStatus()
+  const { status, planDef, seatsAvailable, baseSeatCap, extraSeats } = useAccountStatus()
   const seatsUsed = status?.seats_used ?? 0
   const seatCap = status?.seat_cap ?? 1
   const atCapacity = seatsAvailable === 0
@@ -203,12 +203,17 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
           {seatsUsed} of {seatCap}
         </span>{' '}
         used on {planDef.label}
+        {extraSeats > 0 && (
+          <span className="kl-mono text-[11px] ml-1" style={{ color: 'var(--klo-text-mute)' }}>
+            ({baseSeatCap} base + {extraSeats} extra)
+          </span>
+        )}
         {atCapacity && (
           <>
             {' '}
             ·{' '}
             <Link to="/billing" style={{ color: 'var(--klo-danger)' }}>
-              Upgrade to add more
+              Add seats or upgrade
             </Link>
           </>
         )}

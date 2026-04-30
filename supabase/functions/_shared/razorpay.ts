@@ -52,6 +52,10 @@ export type SubscriptionEntity = {
   status?: string
   current_end?: number
   end_at?: number
+  // Razorpay sends the seat count as `quantity` on add-on subscriptions.
+  // Always 1 (or absent) on base subscriptions; we only read it when the
+  // matched subscription is the team's add-on.
+  quantity?: number
   notes?: Record<string, unknown>
 }
 

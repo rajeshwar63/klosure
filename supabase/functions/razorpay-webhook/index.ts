@@ -137,6 +137,41 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, ignored: "no_subscription" }), { status: 200 })
     }
 
+    // Add-on subscriptions live alongside the base sub. When Razorpay sends
+    // events for an add-on, we must NOT touch plan/period/read_only on the
+    // team row (that would clobber base-sub state). Instead, set/clear the
+    // team's extra_seats based on the add-on's lifecycle: active → quantity,
+    // halted/cancelled/completed → 0.
+    const { data: addonTeamId } = await sb.rpc("find_addon_subscription_team", {
+      p_subscription_id: subscriptionId,
+    })
+    if (addonTeamId) {
+      const addonStatus = mapStatus(subscription.status ?? "")
+      const quantityRaw = (subscription as { quantity?: unknown }).quantity
+      const quantity = Math.max(0, Math.floor(Number(quantityRaw ?? 0)))
+      const newExtras = addonStatus === "active" || addonStatus === "pending"
+        ? quantity
+        : 0
+      const { error: addonRpcErr } = await sb.rpc("update_addon_seats", {
+        p_team_id: addonTeamId,
+        p_extra_seats: newExtras,
+        p_addon_subscription_id: subscriptionId,
+      })
+      if (addonRpcErr) {
+        await markProcessed(sb, eventRowId, `addon_rpc_error:${addonRpcErr.message}`)
+        console.error("update_addon_seats failed", addonRpcErr)
+        return new Response(
+          JSON.stringify({ error: "addon_rpc_failed", detail: addonRpcErr.message }),
+          { status: 500 },
+        )
+      }
+      await markProcessed(sb, eventRowId, null)
+      return new Response(
+        JSON.stringify({ ok: true, addon: true, extra_seats: newExtras }),
+        { status: 200 },
+      )
+    }
+
     // Resolve the klosure plan slug. Prefer notes (set by us at create time);
     // fall back to plan_id lookup; default to whatever is currently on the
     // owner row (handled inside the RPC by leaving plan unchanged).

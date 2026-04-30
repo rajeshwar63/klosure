@@ -70,6 +70,10 @@ export function AccountStatusProvider({ children }) {
       seatsAvailable: status
         ? Math.max(0, (status.seat_cap ?? 0) - (status.seats_used ?? 0))
         : 0,
+      // Add-on seat breakdown. seat_cap is base + extras; surface both so the
+      // UI can render "5 base + 3 extras = 8 seats".
+      baseSeatCap: status?.base_seat_cap ?? status?.seat_cap ?? 0,
+      extraSeats: status?.extra_seats ?? 0,
       can(featureKey) {
         if (!status) return false
         if (READ_ONLY_STATUSES.has(status.status)) {
@@ -100,6 +104,8 @@ export function useAccountStatus() {
       isTrialing: false,
       daysLeftInTrial: null,
       seatsAvailable: 0,
+      baseSeatCap: 0,
+      extraSeats: 0,
       can: () => false,
     }
   }

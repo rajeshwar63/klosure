@@ -74,14 +74,21 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     let subscriptionId: string | null = userRow?.razorpay_subscription_id ?? null
+    let addonSubscriptionId: string | null = null
+    let addonTeamId: string | null = null
 
     if (!subscriptionId) {
       const { data: team } = await sb
         .from("teams")
-        .select("razorpay_subscription_id")
+        .select("id, razorpay_subscription_id, razorpay_addon_subscription_id")
         .eq("owner_id", userId)
         .maybeSingle()
       subscriptionId = team?.razorpay_subscription_id ?? null
+      addonSubscriptionId = team?.razorpay_addon_subscription_id ?? null
+      addonTeamId = team?.id ?? null
+    } else {
+      // Solo plans don't have add-on seats; nothing to fetch.
+      addonSubscriptionId = null
     }
 
     if (!subscriptionId) {
@@ -191,12 +198,43 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 7. Same trick for the add-on subscription if one exists. Webhook will
+    //    set extra_seats authoritatively, but we don't want the UI showing
+    //    "0 extras" while waiting for it. Best-effort — failures here don't
+    //    affect the base verify response.
+    let addonExtraSeats: number | null = null
+    if (addonSubscriptionId && addonTeamId) {
+      try {
+        const addonRes = await fetch(
+          `https://api.razorpay.com/v1/subscriptions/${addonSubscriptionId}`,
+          { method: "GET", headers: { Authorization: `Basic ${auth}` } },
+        )
+        if (addonRes.ok) {
+          const addonSub = (await addonRes.json()) as SubscriptionEntity & { quantity?: number }
+          const addonStatus = mapStatus(addonSub.status ?? "")
+          const quantity = Math.max(0, Math.floor(Number(addonSub.quantity ?? 0)))
+          const newExtras =
+            addonStatus === "active" || addonStatus === "pending" ? quantity : 0
+          await sb.rpc("update_addon_seats", {
+            p_team_id: addonTeamId,
+            p_extra_seats: newExtras,
+            p_addon_subscription_id: addonSubscriptionId,
+          })
+          addonExtraSeats = newExtras
+        }
+      } catch (err) {
+        console.warn("verify: addon fetch/update failed", err)
+      }
+    }
+
     return json({
       ok: true,
       subscription_id: subscriptionId,
       status,
       plan: planSlug,
       invoice_emailed: invoiceEmailed,
+      addon_subscription_id: addonSubscriptionId,
+      extra_seats: addonExtraSeats,
     })
   } catch (err) {
     console.error("razorpay-verify-subscription error", err)

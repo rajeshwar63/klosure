@@ -24,6 +24,18 @@ export interface PlanDefinition {
   isTeam: boolean
   seatCap: number
   monthly: Record<Currency, number | null>
+  // Per-seat add-on price (matches base per-seat math). null = no add-ons on
+  // this tier (solo / contact-sales / trial). Charged via a separate Razorpay
+  // subscription with quantity = extra_seats.
+  perSeatAddon?: Record<Currency, number | null>
+  // Hard cap on extra seats. Once hit, the upgrade flow forces a tier change
+  // — we never let a tier+addon combo cost more than the next tier's base.
+  // Computed as (next_tier.seatCap - this.seatCap - 1).
+  maxExtraSeats?: number
+  // Slug of the next tier the customer should upgrade to once they hit the
+  // add-on cap. Used by the UI to drive the "you've hit the cap, upgrade
+  // to X" CTA.
+  nextTierSlug?: PlanSlug
   features: {
     klo_coaching: boolean
     manager_view: boolean
@@ -99,6 +111,12 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     isTeam: true,
     seatCap: 5,
     monthly: { INR: 19999, AED: 799 },
+    // Same per-seat math as base (₹19,999 / 5 = ₹4,000; AED 799 / 5 = AED 160).
+    perSeatAddon: { INR: 4000, AED: 160 },
+    // Up to 9 extras (total 14) — at 15 reps, force upgrade to Growth so the
+    // customer doesn't overpay vs. the next tier.
+    maxExtraSeats: 9,
+    nextTierSlug: 'team_growth',
     features: {
       klo_coaching: true,
       manager_view: true,
@@ -111,7 +129,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     },
     description: 'For small teams who want a coach across the whole pipeline',
     highlights: [
-      'Up to 5 reps',
+      'Up to 5 reps · add seats as you grow',
       'Manager view: full team rollup',
       'Ask Klo about any deal across the team',
       'Weekly team brief',
@@ -125,6 +143,11 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     isTeam: true,
     seatCap: 15,
     monthly: { INR: 49999, AED: 1999 },
+    // ₹49,999 / 15 ≈ ₹3,333; AED 1,999 / 15 ≈ AED 133.
+    perSeatAddon: { INR: 3333, AED: 133 },
+    // Up to 14 extras (total 29) — at 30 reps, upgrade to Scale.
+    maxExtraSeats: 14,
+    nextTierSlug: 'team_scale',
     features: {
       klo_coaching: true,
       manager_view: true,
@@ -137,7 +160,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     },
     description: 'For growing sales orgs',
     highlights: [
-      'Up to 15 reps',
+      'Up to 15 reps · add seats as you grow',
       'Everything in Starter',
       'Forecast view for the manager',
       'Pattern detection across reps',
@@ -151,6 +174,11 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     isTeam: true,
     seatCap: 30,
     monthly: { INR: 89999, AED: 3499 },
+    // ₹89,999 / 30 ≈ ₹3,000; AED 3,499 / 30 ≈ AED 117.
+    perSeatAddon: { INR: 3000, AED: 117 },
+    // Up to 69 extras (total 99) — at 100 reps, customer needs Enterprise.
+    maxExtraSeats: 69,
+    nextTierSlug: 'enterprise',
     features: {
       klo_coaching: true,
       manager_view: true,
@@ -163,7 +191,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     },
     description: 'For larger sales orgs',
     highlights: [
-      'Up to 30 reps',
+      'Up to 30 reps · add seats as you grow',
       'Everything in Growth',
       'Priority support',
       'Custom Klo training (Phase 13+)',
@@ -209,7 +237,12 @@ export type AccountStatus =
 export interface EffectivePlan {
   plan: PlanSlug
   status: AccountStatus
+  /** Effective cap = base seatCap + extra_seats. */
   seat_cap: number
+  /** Base seats from the tier (5/15/30). Excludes add-ons. */
+  base_seat_cap?: number
+  /** Number of paid add-on seats currently active on this team. */
+  extra_seats?: number
   seats_used: number
   currency: Currency
   trial_started_at: string | null
@@ -241,6 +274,53 @@ export function effectivePerSeat(slug: PlanSlug, currency: Currency): number | n
   const monthly = def.monthly[currency]
   if (monthly === null || def.seatCap === 0) return null
   return Math.round(monthly / def.seatCap)
+}
+
+// =============================================================================
+// Per-seat add-on helpers
+// =============================================================================
+// Add-ons are billed via a *separate* Razorpay subscription that runs alongside
+// the base subscription. The base subscription pays for `seatCap` reps; the
+// add-on subscription pays for `extra_seats` × `perSeatAddon`. Webhook keeps
+// `teams.extra_seats` in sync with the add-on subscription's quantity.
+// =============================================================================
+
+export function perSeatAddonPrice(slug: PlanSlug, currency: Currency): number | null {
+  const def = PLANS[slug]
+  return def.perSeatAddon?.[currency] ?? null
+}
+
+export function maxExtraSeatsFor(slug: PlanSlug): number {
+  return PLANS[slug].maxExtraSeats ?? 0
+}
+
+/** True if this tier supports paid per-seat add-ons in the given currency. */
+export function supportsAddonSeats(slug: PlanSlug, currency: Currency): boolean {
+  return perSeatAddonPrice(slug, currency) !== null && maxExtraSeatsFor(slug) > 0
+}
+
+/** Format an extra-seat price like "₹4,000 / seat / mo". */
+export function formatPerSeatAddon(slug: PlanSlug, currency: Currency): string {
+  const price = perSeatAddonPrice(slug, currency)
+  if (price === null) return ''
+  return formatAmount(price, currency)
+}
+
+/**
+ * Total monthly cost for a base plan + N extra seats, before any launch
+ * discount. Returns null when either price is unset for this currency.
+ */
+export function totalMonthlyForSeats(
+  slug: PlanSlug,
+  currency: Currency,
+  extraSeats: number,
+): number | null {
+  const base = priceFor(slug, currency)
+  if (base === null) return null
+  if (extraSeats <= 0) return base
+  const perSeat = perSeatAddonPrice(slug, currency)
+  if (perSeat === null) return base // add-ons not available; ignore extras
+  return base + perSeat * extraSeats
 }
 
 // =============================================================================

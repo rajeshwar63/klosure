@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     let subscriptionId: string | null = userRow?.razorpay_subscription_id ?? null
+    let addonSubscriptionId: string | null = null
     let isTeamSub = false
 
     if (!subscriptionId) {
@@ -69,10 +70,11 @@ Deno.serve(async (req) => {
       // member shouldn't be able to cancel the team's subscription.
       const { data: team } = await sb
         .from("teams")
-        .select("razorpay_subscription_id")
+        .select("razorpay_subscription_id, razorpay_addon_subscription_id")
         .eq("owner_id", userId)
         .maybeSingle()
       subscriptionId = team?.razorpay_subscription_id ?? null
+      addonSubscriptionId = team?.razorpay_addon_subscription_id ?? null
       isTeamSub = !!subscriptionId
     }
 
@@ -106,6 +108,29 @@ Deno.serve(async (req) => {
         { ok: false, error: "razorpay_cancel_failed", detail: rzpBody },
         502,
       )
+    }
+
+    // Cancel the add-on subscription on the same cycle-end schedule. Best
+    // effort: a failure here is logged but doesn't break the base cancel —
+    // the user can manually cancel from the Razorpay subscription page if
+    // it lingers. Webhook will zero out extra_seats when subscription.cancelled
+    // arrives for the addon.
+    if (addonSubscriptionId) {
+      try {
+        await fetch(
+          `https://api.razorpay.com/v1/subscriptions/${addonSubscriptionId}/cancel`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${auth}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ cancel_at_cycle_end: 1 }),
+          },
+        )
+      } catch (err) {
+        console.warn("razorpay addon cancel failed", err)
+      }
     }
 
     // We don't update users/teams here — the webhook is the single writer of

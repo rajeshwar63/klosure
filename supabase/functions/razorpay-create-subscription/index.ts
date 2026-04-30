@@ -57,11 +57,32 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const planSlug = String(body.plan_slug ?? "")
     const razorpayPlanId = String(body.razorpay_plan_id ?? "")
+    const extraSeats = Math.max(0, Math.floor(Number(body.extra_seats ?? 0)))
+    const razorpaySeatPlanId = body.razorpay_seat_plan_id
+      ? String(body.razorpay_seat_plan_id)
+      : null
     if (!planSlug || !razorpayPlanId) {
       return json({ ok: false, error: "missing_plan" }, 400)
     }
     if (!razorpayPlanId.startsWith("plan_")) {
       return json({ ok: false, error: "invalid_plan_id" }, 400)
+    }
+    if (razorpaySeatPlanId && !razorpaySeatPlanId.startsWith("plan_")) {
+      return json({ ok: false, error: "invalid_seat_plan_id" }, 400)
+    }
+    // Defence-in-depth cap mirrors the DB constraint (teams_extra_seats_within_tier)
+    // and the UI cap. The single source of truth is src/lib/plans.ts; keep the
+    // numbers below in sync if the cap rules change.
+    const MAX_EXTRA_SEATS_BY_PLAN: Record<string, number> = {
+      team_starter: 9,
+      team_growth: 14,
+      team_scale: 69,
+    }
+    if (extraSeats > 0) {
+      const cap = MAX_EXTRA_SEATS_BY_PLAN[planSlug] ?? 0
+      if (extraSeats > cap) {
+        return json({ ok: false, error: "extra_seats_exceeds_cap", cap }, 400)
+      }
     }
 
     const isTeamPlan = TEAM_PLANS.has(planSlug)
@@ -70,6 +91,7 @@ Deno.serve(async (req) => {
     // 3. For team plans, verify user owns a team. Use that team's data.
     let teamId: string | null = null
     let existingSubscriptionId: string | null = null
+    let existingAddonSubscriptionId: string | null = null
     let razorpayCustomerId: string | null = null
     let userName = ""
     let userPhone: string | null = null
@@ -81,7 +103,12 @@ Deno.serve(async (req) => {
       }
       teamId = team.id
       existingSubscriptionId = team.razorpay_subscription_id
+      existingAddonSubscriptionId = team.razorpay_addon_subscription_id ?? null
       razorpayCustomerId = team.razorpay_customer_id
+    } else if (extraSeats > 0) {
+      // Solo / Pro plans don't carry add-on seats. Reject loudly so the
+      // frontend doesn't silently lose the buyer's intent.
+      return json({ ok: false, error: "addons_not_supported_for_plan" }, 400)
     }
 
     // Always pull the user record for name/phone/customer_id.
@@ -108,6 +135,19 @@ Deno.serve(async (req) => {
       } catch (err) {
         // Log but don't fail — the subscription may already be in a terminal state.
         console.warn("cancel prev sub failed", err)
+      }
+    }
+    // Cancel any prior add-on subscription too. New tier means new seat cap;
+    // the old add-on sub doesn't carry over (different per-seat price).
+    if (existingAddonSubscriptionId) {
+      try {
+        await rzpFetch(
+          `/subscriptions/${existingAddonSubscriptionId}/cancel`,
+          "POST",
+          { cancel_at_cycle_end: 0 },
+        )
+      } catch (err) {
+        console.warn("cancel prev addon sub failed", err)
       }
     }
 
@@ -142,7 +182,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Create the subscription.
+    // 6. Create the base subscription.
     const subRes = await rzpFetch("/subscriptions", "POST", {
       plan_id: razorpayPlanId,
       customer_id: razorpayCustomerId,
@@ -165,11 +205,51 @@ Deno.serve(async (req) => {
     const subscriptionId: string = subscription.id
     const shortUrl: string = subscription.short_url
 
-    // 7. Store subscription_id + customer_id on user/team.
+    // 6b. Create the add-on subscription if extras were requested. We do this
+    // even before the user authenticates the base mandate so both subs exist
+    // up front and can be authenticated back-to-back from the frontend. If the
+    // add-on create fails we still surface the base sub so the upgrade can
+    // proceed without seats — the user can retry the seat purchase later from
+    // the billing page.
+    let addonSubscriptionId: string | null = null
+    let addonShortUrl: string | null = null
+    let addonError: string | null = null
+    if (extraSeats > 0 && razorpaySeatPlanId && isTeamPlan) {
+      const addonRes = await rzpFetch("/subscriptions", "POST", {
+        plan_id: razorpaySeatPlanId,
+        customer_id: razorpayCustomerId,
+        quantity: extraSeats,
+        total_count: 60,
+        customer_notify: 1,
+        ...(RAZORPAY_LAUNCH_OFFER_ID ? { offer_id: RAZORPAY_LAUNCH_OFFER_ID } : {}),
+        notes: {
+          klosure_user_id: userId,
+          klosure_team_id: teamId ?? "",
+          klosure_plan_slug: planSlug,
+          klosure_addon_for: subscriptionId,
+          klosure_extra_seats: String(extraSeats),
+        },
+      })
+      if (addonRes.status === 200 || addonRes.status === 201) {
+        addonSubscriptionId = addonRes.body.id ?? null
+        addonShortUrl = addonRes.body.short_url ?? null
+      } else {
+        // Non-fatal: log + return the base subscription so the user can
+        // continue. Frontend should display addonError as a soft warning.
+        console.error("create addon subscription failed", addonRes)
+        addonError = "razorpay_addon_subscription_failed"
+      }
+    }
+
+    // 7. Store subscription_id(s) + customer_id on user/team.
     if (isTeamPlan && teamId) {
       await sb.from("teams").update({
         razorpay_customer_id: razorpayCustomerId,
         razorpay_subscription_id: subscriptionId,
+        razorpay_addon_subscription_id: addonSubscriptionId,
+        // We persist extras here for UI optimism; the webhook is the source of
+        // truth and will overwrite on subscription.activated for the addon.
+        extra_seats: addonSubscriptionId ? extraSeats : 0,
       }).eq("id", teamId)
     } else {
       await sb.from("users").update({
@@ -182,7 +262,11 @@ Deno.serve(async (req) => {
       ok: true,
       subscription_id: subscriptionId,
       short_url: shortUrl,
-      key_id: RAZORPAY_KEY_ID,    // for client-side checkout SDK if used
+      addon_subscription_id: addonSubscriptionId,
+      addon_short_url: addonShortUrl,
+      addon_error: addonError,
+      extra_seats: extraSeats,
+      key_id: RAZORPAY_KEY_ID,
     })
   } catch (err) {
     console.error("razorpay-create-subscription error", err)

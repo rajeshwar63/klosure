@@ -11,8 +11,20 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
-import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
-import { getRazorpayPlanId, RAZORPAY_KEY_ID } from '../lib/razorpay-plans.ts'
+import {
+  PLANS,
+  priceDisplayFor,
+  LAUNCH_DISCOUNT,
+  perSeatAddonPrice,
+  maxExtraSeatsFor,
+  formatPerSeatAddon,
+  totalMonthlyForSeats,
+} from '../lib/plans.ts'
+import {
+  getRazorpayPlanId,
+  getRazorpaySeatPlanId,
+  RAZORPAY_KEY_ID,
+} from '../lib/razorpay-plans.ts'
 import { startUpgrade, verifySubscription } from '../services/billing.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
@@ -440,10 +452,27 @@ function PlanCard({ plan, currency, isCurrent, user }) {
   const isEnterprise = plan.slug === 'enterprise'
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [extraSeats, setExtraSeats] = useState(0)
 
   // null Razorpay plan ID means: not buyable in this currency yet (AED) or
   // not a paid tier (trial/enterprise). Enterprise routes to a sales conversation.
   const planAvailable = !isEnterprise && !!getRazorpayPlanId(plan.slug, currency)
+
+  // Per-seat add-on availability is independent of base plan availability —
+  // a tier might have its base plan live in INR but the per-seat plan not yet
+  // created in the dashboard. In that case we keep the seat selector hidden
+  // (price still rendered correctly without it).
+  const addonPrice = perSeatAddonPrice(plan.slug, currency)
+  const addonPlanAvailable = !!getRazorpaySeatPlanId(plan.slug, currency)
+  const showSeatSelector =
+    plan.isTeam &&
+    !isEnterprise &&
+    addonPrice !== null &&
+    addonPlanAvailable &&
+    !isCurrent &&
+    planAvailable
+  const maxExtras = maxExtraSeatsFor(plan.slug)
+  const totalSeats = plan.seatCap + extraSeats
 
   async function handleUpgrade() {
     setErr('')
@@ -460,8 +489,10 @@ function PlanCard({ plan, currency, isCurrent, user }) {
 
     // Create the subscription on Razorpay (via our edge function). This
     // returns a subscription_id; Razorpay's checkout modal authenticates
-    // the mandate against that id.
-    const res = await startUpgrade({ planSlug: plan.slug, currency })
+    // the mandate against that id. extraSeats is forwarded to the edge
+    // function which spawns a second (add-on) subscription with quantity =
+    // extraSeats. The two subs share a customer and renew in lockstep.
+    const res = await startUpgrade({ planSlug: plan.slug, currency, extraSeats })
     if (!res.ok || !res.subscription_id) {
       setBusy(false)
       setErr(res.error || 'Upgrade failed. Please try again.')
@@ -473,6 +504,46 @@ function PlanCard({ plan, currency, isCurrent, user }) {
     // state to Supabase synchronously (so the user lands on paid_active
     // without depending on the webhook), then route to /billing/return which
     // also polls as a backup.
+    //
+    // If an add-on subscription was created server-side, we open a *second*
+    // mandate modal back-to-back so both subs are authenticated. The two-modal
+    // flow is unavoidable until Razorpay supports multi-plan subscriptions —
+    // we wrap it so the user only clicks "Upgrade" once.
+    const openAddonModal = () => {
+      if (!res.addon_subscription_id) {
+        navigate('/billing/return')
+        return
+      }
+      const addonRzp = new window.Razorpay({
+        key: RAZORPAY_KEY_ID,
+        subscription_id: res.addon_subscription_id,
+        name: 'Klosure',
+        description: `${extraSeats} extra seat${extraSeats === 1 ? '' : 's'}`,
+        prefill: {
+          email: user?.email ?? '',
+          name: user?.user_metadata?.name ?? '',
+        },
+        theme: { color: '#000000' },
+        handler: async function () {
+          try {
+            await verifySubscription()
+          } catch (e) {
+            console.warn('verify after addon checkout failed', e)
+          }
+          navigate('/billing/return')
+        },
+        modal: {
+          ondismiss: function () {
+            // User dismissed the addon modal but the base sub is already
+            // active. Land them on /billing/return; from the manage page they
+            // can retry the addon if they choose to.
+            navigate('/billing/return')
+          },
+        },
+      })
+      addonRzp.open()
+    }
+
     const rzp = new window.Razorpay({
       key: RAZORPAY_KEY_ID,
       subscription_id: res.subscription_id,
@@ -492,7 +563,7 @@ function PlanCard({ plan, currency, isCurrent, user }) {
         } catch (e) {
           console.warn('verify after checkout failed', e)
         }
-        navigate('/billing/return')
+        openAddonModal()
       },
       modal: {
         ondismiss: function () {
@@ -590,8 +661,21 @@ function PlanCard({ plan, currency, isCurrent, user }) {
       )}
       {!isEnterprise && plan.seatCap > 1 && (
         <p className="text-[12px] kl-mono mt-1" style={{ color: 'var(--klo-text-mute)' }}>
-          Up to {plan.seatCap} seats
+          {extraSeats > 0
+            ? `${plan.seatCap} base + ${extraSeats} extra = ${totalSeats} seats`
+            : `Up to ${plan.seatCap} seats`}
         </p>
+      )}
+
+      {showSeatSelector && (
+        <SeatSelector
+          plan={plan}
+          currency={currency}
+          extraSeats={extraSeats}
+          setExtraSeats={setExtraSeats}
+          maxExtras={maxExtras}
+          totalSeats={totalSeats}
+        />
       )}
 
       <ul className="mt-4 space-y-1.5 flex-1">
@@ -628,6 +712,93 @@ function PlanCard({ plan, currency, isCurrent, user }) {
             support@klosure.ai
           </a>{' '}
           for AED billing.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// SeatSelector — extra-seat picker on a plan card
+// =============================================================================
+// Lets the buyer add 0..maxExtras seats on top of the base tier. The total
+// monthly preview reflects the launch discount when active. At the cap we
+// surface a "you've hit the seat limit — upgrade to {next}" hint so customers
+// don't end up paying more than the next tier's base price.
+// =============================================================================
+function SeatSelector({ plan, currency, extraSeats, setExtraSeats, maxExtras, totalSeats }) {
+  const perSeatLabel = formatPerSeatAddon(plan.slug, currency)
+  const baseTotal = totalMonthlyForSeats(plan.slug, currency, extraSeats) ?? 0
+  const discount = LAUNCH_DISCOUNT.active ? LAUNCH_DISCOUNT.percentOff / 100 : 0
+  const discounted = Math.round(baseTotal * (1 - discount))
+  const totalPrimary = LAUNCH_DISCOUNT.active ? discounted : baseTotal
+  const totalLabel =
+    currency === 'INR'
+      ? `₹${totalPrimary.toLocaleString('en-IN')}`
+      : `AED ${totalPrimary.toLocaleString('en-AE')}`
+
+  const dec = () => setExtraSeats(Math.max(0, extraSeats - 1))
+  const inc = () => setExtraSeats(Math.min(maxExtras, extraSeats + 1))
+  const atCap = extraSeats >= maxExtras
+  const nextTierLabel = plan.nextTierSlug ? PLANS[plan.nextTierSlug]?.label : null
+
+  return (
+    <div
+      className="mt-4 rounded-lg p-3"
+      style={{ background: 'var(--klo-bg)', border: '1px dashed var(--klo-line-strong)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <MonoKicker>Extra seats</MonoKicker>
+          <p className="mt-0.5 text-[12px]" style={{ color: 'var(--klo-text-dim)' }}>
+            {perSeatLabel} /seat /mo
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={dec}
+            disabled={extraSeats === 0}
+            aria-label="Remove a seat"
+            className="w-7 h-7 rounded-md text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line-strong)', color: 'var(--klo-text)' }}
+          >
+            −
+          </button>
+          <span
+            className="kl-mono text-[14px] font-semibold tabular-nums w-8 text-center"
+            style={{ color: 'var(--klo-text)' }}
+            aria-live="polite"
+          >
+            {extraSeats}
+          </span>
+          <button
+            type="button"
+            onClick={inc}
+            disabled={atCap}
+            aria-label="Add a seat"
+            className="w-7 h-7 rounded-md text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line-strong)', color: 'var(--klo-text)' }}
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-baseline justify-between">
+        <span className="text-[11px] kl-mono" style={{ color: 'var(--klo-text-mute)' }}>
+          {totalSeats} seat{totalSeats === 1 ? '' : 's'} total
+        </span>
+        <span className="text-[14px] font-semibold tabular-nums" style={{ color: 'var(--klo-text)' }}>
+          {totalLabel}
+          <span className="text-[11px] font-normal ml-1" style={{ color: 'var(--klo-text-mute)' }}>/mo</span>
+        </span>
+      </div>
+
+      {atCap && nextTierLabel && (
+        <p className="mt-2 text-[11px]" style={{ color: 'var(--klo-text-mute)' }}>
+          Seat cap reached. Need more reps?{' '}
+          <span style={{ color: 'var(--klo-accent)' }}>Upgrade to {nextTierLabel}</span>.
         </p>
       )}
     </div>

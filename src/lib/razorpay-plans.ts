@@ -35,11 +35,50 @@ const LIVE_PLANS: Record<string, string | null> = {
   'team_scale:AED':    null,
 }
 
+// Per-seat add-on plan IDs. These are SEPARATE Razorpay plans created at the
+// per-seat price (e.g. ₹4,000/mo for team_starter); the add-on subscription
+// uses `quantity = extra_seats`. Until the dashboard plans are created these
+// stay null — the UI hides the seat selector when the lookup returns null.
+//
+// To create them: in Razorpay dashboard → Subscriptions → Plans, add a plan
+// per (tier, currency) at the per-seat price defined in `plans.ts`, then
+// paste the plan IDs below.
+const TEST_SEAT_PLANS: Record<string, string | null> = {
+  'team_starter:INR':  null,
+  'team_growth:INR':   null,
+  'team_scale:INR':    null,
+  'team_starter:AED':  null,
+  'team_growth:AED':   null,
+  'team_scale:AED':    null,
+}
+
+const LIVE_SEAT_PLANS: Record<string, string | null> = {
+  'team_starter:INR':  null,
+  'team_growth:INR':   null,
+  'team_scale:INR':    null,
+  'team_starter:AED':  null,
+  'team_growth:AED':   null,
+  'team_scale:AED':    null,
+}
+
 const PLAN_MAP = RAZORPAY_MODE === 'live' ? LIVE_PLANS : TEST_PLANS
+const SEAT_PLAN_MAP = RAZORPAY_MODE === 'live' ? LIVE_SEAT_PLANS : TEST_SEAT_PLANS
 
 export function getRazorpayPlanId(slug: PlanSlug, currency: Currency): string | null {
   if (slug === 'trial' || slug === 'enterprise') return null
   return PLAN_MAP[`${slug}:${currency}`] ?? null
+}
+
+/**
+ * Returns the Razorpay plan ID for the per-seat add-on subscription on this
+ * tier, or null if the add-on isn't available (no plan configured, or tier
+ * doesn't support add-ons). The frontend uses null as the signal to hide the
+ * seat-selector control; until the dashboard plans exist, every call returns
+ * null and the seat selector is invisible.
+ */
+export function getRazorpaySeatPlanId(slug: PlanSlug, currency: Currency): string | null {
+  if (slug === 'trial' || slug === 'enterprise' || slug === 'pro') return null
+  return SEAT_PLAN_MAP[`${slug}:${currency}`] ?? null
 }
 
 // Public Razorpay key ID (safe to bundle — Razorpay's checkout SDK requires it client-side).
