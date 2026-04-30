@@ -213,6 +213,8 @@ export async function getInvitePreview({ token }) {
 // Self-service team creation: the signed-in user becomes the team owner
 // (manager). Used from /billing → "Create a team". Idempotent-ish — if the
 // user already owns a team, returns that team instead of creating a new one.
+// Refuses to run if the caller is already a rep on someone else's team —
+// otherwise the insert below would silently detach them from their manager.
 export async function createTeamForCurrentUser({ teamName }) {
   const { data: sessionData } = await supabase.auth.getSession()
   const userId = sessionData?.session?.user?.id
@@ -224,6 +226,15 @@ export async function createTeamForCurrentUser({ teamName }) {
     .eq('owner_id', userId)
     .maybeSingle()
   if (existing) return { ok: true, team: existing, alreadyExists: true }
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('team_id')
+    .eq('id', userId)
+    .maybeSingle()
+  if (profile?.team_id) {
+    return { ok: false, error: 'already_on_team' }
+  }
 
   const { data: team, error: teamErr } = await supabase
     .from('teams')
