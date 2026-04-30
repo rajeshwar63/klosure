@@ -14,6 +14,7 @@
 //   trialEndingEmail       — trial winding down warning
 //   subscriptionCancelledEmail — confirmation after cancel
 //   subscriptionHaltedEmail    — payment failed → account read-only soon
+//   deletionWarningEmail   — read-only account heading toward purge
 // =============================================================================
 
 const BRAND_COLOR = "#0F172A"
@@ -404,6 +405,46 @@ export function subscriptionHaltedEmail(args: SubscriptionHaltedEmailArgs): {
     subject,
     html: renderEmail(body, {
       preheader: `Card declined. Update payment to keep ${args.planLabel} active.`,
+    }),
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Deletion warning — read-only account heading toward purge at 90 days
+// Sent at 75 days (15-day notice) and 85 days (5-day final). Copy is honest:
+// the only way to preserve data is to upgrade — we never imply that "clicking
+// here" alone will rescue the account.
+// ----------------------------------------------------------------------------
+export interface DeletionWarningEmailArgs {
+  userEmail: string
+  userName?: string
+  daysLeft: number
+  appUrl: string
+}
+
+export function deletionWarningEmail(args: DeletionWarningEmailArgs): {
+  subject: string
+  html: string
+} {
+  const first = args.userName?.split(" ")[0] || firstNameFromEmail(args.userEmail)
+  const days = Math.max(0, Math.floor(args.daysLeft))
+  const subject =
+    days <= 5
+      ? `Last chance: your Klosure account will be deleted in ${days} days`
+      : `Your Klosure account will be deleted in ${days} days`
+
+  const body = `
+    <p>Hi ${escapeHtml(first)},</p>
+    <p>Your Klosure account has been read-only for some time. To preserve your deals and continue using Klosure, please upgrade to a paid plan within the next <strong>${days} day${days === 1 ? "" : "s"}</strong>.</p>
+    ${ctaButton(`${args.appUrl}/billing`, "See plans")}
+    <p>After ${days} day${days === 1 ? "" : "s"}, your account and all associated deals will be permanently deleted. This cannot be undone.</p>
+    <p style="font-size:13px;color:#8a93a6;">If you have any questions, reply to this email — I read every one.</p>
+  `
+
+  return {
+    subject,
+    html: renderEmail(body, {
+      preheader: `${days} day${days === 1 ? "" : "s"} until your Klosure account is purged.`,
     }),
   }
 }
