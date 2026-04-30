@@ -146,11 +146,11 @@ export default function RepsPlaceholderPage() {
       )}
 
       <p className="kl-mono uppercase mt-5 text-[11px]" style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}>
-        Per-rep filters come in a future phase. For now, open a deal from the{' '}
-        <Link to="/deals" className="underline" style={{ color: 'var(--klo-accent)' }}>
-          deals list
-        </Link>
-        .
+        Tap “View deals” on any rep, or open the full{' '}
+        <Link to="/team/deals" className="underline" style={{ color: 'var(--klo-accent)' }}>
+          team deals
+        </Link>{' '}
+        list.
       </p>
     </div>
   )
@@ -508,6 +508,16 @@ function RepCell({ index, rep, teamOwnerId, onRemoved }) {
             </p>
           )}
         </div>
+      </div>
+      <div className="mt-3 flex items-center justify-end">
+        <Link
+          to={`/team/deals?rep=${rep.user_id}`}
+          className="kl-mono text-[11px] uppercase tracking-wider"
+          style={{ color: 'var(--klo-accent)', letterSpacing: '0.05em' }}
+          title={`View ${rep.name}'s deals`}
+        >
+          View deals →
+        </Link>
       </div>
     </HairlineGrid.Cell>
   )

@@ -22,6 +22,7 @@ const BillingManagePage = lazy(() => import('./pages/BillingManagePage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage.jsx'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
 const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
+const TeamDealsPage = lazy(() => import('./pages/TeamDealsPage.jsx'))
 const TrainKloPage = lazy(() => import('./pages/TrainKloPage.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/team" element={<ManagerHomePage />} />
           <Route path="/team/forecast" element={<ForecastPage />} />
           <Route path="/team/reps" element={<RepsPlaceholderPage />} />
+          <Route path="/team/deals" element={<TeamDealsPage />} />
           <Route path="/team/askklo" element={<AskKloPage />} />
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/billing/manage" element={<BillingManagePage />} />
