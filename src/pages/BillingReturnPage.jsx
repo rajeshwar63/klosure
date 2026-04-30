@@ -77,7 +77,7 @@ export default function BillingReturnPage() {
         <p className="text-sm" style={{ color: 'var(--klo-text-dim)' }}>
           {polling
             ? 'Razorpay is processing your subscription. This usually takes a few seconds.'
-            : "Your payment was received but is still being confirmed. You'll get an email when your account is activated. If this takes more than a few minutes, email rajeshwar63@gmail.com."}
+            : "Your payment was received but is still being confirmed. You'll get an email when your account is activated. If this takes more than a few minutes, email support@klosure.ai."}
         </p>
       </div>
     </div>

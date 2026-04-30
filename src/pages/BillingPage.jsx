@@ -179,8 +179,8 @@ export default function BillingPage() {
 
         <p className="mt-8 text-[12px]" style={{ color: 'var(--klo-text-mute)' }}>
           Upgrade flow ships next. Until then, contact{' '}
-          <a href="mailto:rajeshwar63@gmail.com" style={{ color: 'var(--klo-accent)' }}>
-            rajeshwar63@gmail.com
+          <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
+            support@klosure.ai
           </a>{' '}
           for early access pricing.
         </p>
@@ -557,8 +557,8 @@ function PlanCard({ plan, currency, isCurrent, user }) {
       {!planAvailable && !isCurrent && !isEnterprise && currency === 'AED' && (
         <p className="mt-2 text-[11px]" style={{ color: 'var(--klo-text-mute)' }}>
           Email{' '}
-          <a href="mailto:rajeshwar63@gmail.com" style={{ color: 'var(--klo-accent)' }}>
-            rajeshwar63@gmail.com
+          <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
+            support@klosure.ai
           </a>{' '}
           for AED billing.
         </p>

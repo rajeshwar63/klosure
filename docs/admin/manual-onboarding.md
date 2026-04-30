@@ -252,7 +252,7 @@ Razorpay Dashboard → **Settings → Webhooks → Add new webhook**:
   - `subscription.halted`
   - `subscription.cancelled`
   - `subscription.completed`
-- **Alert email:** rajeshwar63@gmail.com (Razorpay alerts on >24h failure
+- **Alert email:** support@klosure.ai (Razorpay alerts on >24h failure
   streaks; the inbox is the canary).
 
 Do this **twice** — once on the Razorpay test account (with the test secret)

@@ -65,7 +65,7 @@ export default function BillingManagePage() {
     setBusy(true)
     const res = await cancelSubscription()
     if (!res.ok) {
-      setErr(res.error || 'Could not cancel. Please email rajeshwar63@gmail.com.')
+      setErr(res.error || 'Could not cancel. Please email support@klosure.ai.')
       setBusy(false)
       return
     }
@@ -220,8 +220,8 @@ export default function BillingManagePage() {
             </p>
             <p className="mt-2 text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
               Changed your mind? Email{' '}
-              <a href="mailto:rajeshwar63@gmail.com" style={{ color: 'var(--klo-accent)' }}>
-                rajeshwar63@gmail.com
+              <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
+                support@klosure.ai
               </a>{' '}
               before your end date and we'll undo it.
             </p>
@@ -244,8 +244,8 @@ export default function BillingManagePage() {
         <p className="mt-8 text-[12px]" style={{ color: 'var(--klo-text-mute)' }}>
           Need to update your card, change plans, get a refund, or pause for a
           month? Email{' '}
-          <a href="mailto:rajeshwar63@gmail.com" style={{ color: 'var(--klo-accent)' }}>
-            rajeshwar63@gmail.com
+          <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
+            support@klosure.ai
           </a>
           .
         </p>
