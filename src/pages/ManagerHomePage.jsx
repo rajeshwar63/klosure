@@ -9,6 +9,7 @@ import { fetchManagerWeeklyBrief } from '../services/managerBrief.js'
 import KloTeamBriefCard from '../components/manager/KloTeamBriefCard.jsx'
 import DealsSlippingList from '../components/manager/DealsSlippingList.jsx'
 import QuarterGlanceStrip from '../components/manager/QuarterGlanceStrip.jsx'
+import ByRepRollup from '../components/manager/ByRepRollup.jsx'
 import { Eyebrow } from '../components/shared/index.js'
 
 function thisWeekRange() {
@@ -104,6 +105,8 @@ export default function ManagerHomePage() {
       </header>
 
       <QuarterGlanceStrip deals={dealsActive} />
+
+      <ByRepRollup rollUp={pipeline?.rollUp ?? []} />
 
       <KloTeamBriefCard
         brief={brief}

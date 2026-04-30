@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PLANS, formatPrice } from '../lib/plans.ts'
 import './LandingPage.css'
@@ -43,6 +43,7 @@ export default function LandingPage() {
       <Problem />
       <Features />
       <Comparison />
+      <ManagerView />
       <Pricing />
       <Contact />
       <Footer />
@@ -103,8 +104,8 @@ function NavBar() {
           <a href="#pricing" onClick={(e) => handleAnchorClick(e, 'pricing')}>Pricing</a>
           <a href="#contact" onClick={(e) => handleAnchorClick(e, 'contact')}>Contact</a>
           <Link to="/login" className="nav-login">Log in</Link>
-          <Link to="/signup" className="btn btn-primary">
-            Get started
+          <Link to="/signup" className="btn btn-primary nav-cta">
+            Sign up
           </Link>
         </div>
       </div>
@@ -276,8 +277,205 @@ function CompareRow({ k, v, tone }) {
   )
 }
 
+function ManagerView() {
+  return (
+    <section id="manager-view" className="manager-view">
+      <div className="container">
+        <div className="section-head">
+          <span className="eyebrow">For sales managers</span>
+          <h2>How managers see their team's deals.</h2>
+          <p>
+            One screen. Every rep. Every deal. Klo flags what's slipping before the
+            forecast call — so you walk in with answers, not surprises.
+          </p>
+        </div>
+
+        <div className="mgr-stage">
+          <div className="mgr-window">
+            <div className="mgr-windowbar">
+              <span className="dot" />
+              <span className="dot" />
+              <span className="dot" />
+              <span className="mgr-windowbar-title mono">/team — Acme Sales</span>
+            </div>
+
+            <div className="mgr-screen">
+              <div className="mgr-header">
+                <div className="mono mgr-eyebrow">This week · 27 APR – 03 MAY</div>
+                <h3>Where the quarter is being made or lost.</h3>
+                <p className="mgr-sub">Acme Sales · 6 reps · 23 active deals</p>
+              </div>
+
+              <div className="mgr-glance">
+                <MgrBucket label="Likely close" amount="$412k" deals="7 deals" tone="good" />
+                <MgrBucket label="In play" amount="$298k" deals="9 deals" tone="caution" />
+                <MgrBucket label="Long shot" amount="$145k" deals="7 deals" tone="muted" />
+              </div>
+
+              <div className="mgr-row-eyebrow mono">By rep · this quarter</div>
+              <div className="mgr-rollup">
+                <RepRow
+                  initial="P"
+                  name="Priya"
+                  active={6}
+                  red={2}
+                  pipeline="$182k"
+                  risk="$48k at risk"
+                />
+                <RepRow
+                  initial="A"
+                  name="Arjun"
+                  active={5}
+                  red={0}
+                  pipeline="$155k"
+                  risk={null}
+                />
+                <RepRow
+                  initial="M"
+                  name="Meera"
+                  active={4}
+                  red={3}
+                  pipeline="$210k"
+                  risk="$120k at risk"
+                  warn
+                />
+                <RepRow
+                  initial="R"
+                  name="Rohit"
+                  active={5}
+                  red={1}
+                  pipeline="$98k"
+                  risk="$22k at risk"
+                />
+              </div>
+
+              <div className="mgr-row-eyebrow mono mgr-row-eyebrow-2">
+                Klo flagged this morning
+              </div>
+              <div className="mgr-flags">
+                <FlagRow
+                  who="Meera · Vertex Corp"
+                  what="Champion silent 11 days · CFO never invited"
+                  tone="bad"
+                />
+                <FlagRow
+                  who="Priya · Northwind"
+                  what="Close date slipping +18 days vs. last forecast"
+                  tone="warn"
+                />
+                <FlagRow
+                  who="Rohit · Globex"
+                  what="Buyer view unread for 6 days — nudge sent"
+                  tone="warn"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mgr-bullets">
+          <div className="mgr-bullet">
+            <div className="mgr-bullet-num mono">01</div>
+            <h4>One rollup, every rep</h4>
+            <p>
+              See active deals, pipeline, and what's at risk per rep — without
+              chasing them on Slack.
+            </p>
+          </div>
+          <div className="mgr-bullet">
+            <div className="mgr-bullet-num mono">02</div>
+            <h4>Klo flags slippage early</h4>
+            <p>
+              Stalled champions, missing CFOs, slipping close dates — surfaced
+              before pipe review, not after the quarter.
+            </p>
+          </div>
+          <div className="mgr-bullet">
+            <div className="mgr-bullet-num mono">03</div>
+            <h4>Ask Klo any question</h4>
+            <p>
+              "Which deals should I escalate this week?" Klo answers across the
+              team with real signals, not gut feel.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function MgrBucket({ label, amount, deals, tone }) {
+  return (
+    <div className={`mgr-bucket mgr-bucket-${tone}`}>
+      <div className="mgr-bucket-label mono">{label}</div>
+      <div className="mgr-bucket-amount">{amount}</div>
+      <div className="mgr-bucket-deals mono">{deals}</div>
+    </div>
+  )
+}
+
+function RepRow({ initial, name, active, red, pipeline, risk, warn }) {
+  return (
+    <div className={`rep-row${warn ? ' rep-row-warn' : ''}`}>
+      <div className="rep-avatar">{initial}</div>
+      <div className="rep-meta">
+        <div className="rep-name">{name}</div>
+        <div className="rep-counts mono">
+          Active · {active}  ·  Red · {red}
+        </div>
+      </div>
+      <div className="rep-numbers">
+        <div className="rep-pipeline">{pipeline}</div>
+        {risk && <div className="rep-risk mono">{risk}</div>}
+      </div>
+    </div>
+  )
+}
+
+function FlagRow({ who, what, tone }) {
+  return (
+    <div className={`mgr-flag mgr-flag-${tone}`}>
+      <span className={`flag-dot flag-dot-${tone}`} />
+      <span className="flag-who">{who}</span>
+      <span className="flag-sep">·</span>
+      <span className="flag-what">{what}</span>
+    </div>
+  )
+}
+
 function Pricing() {
   const [currency, setCurrency] = useState('INR')
+  const trackRef = useRef(null)
+  const [canPrev, setCanPrev] = useState(false)
+  const [canNext, setCanNext] = useState(true)
+
+  function updateEdges() {
+    const el = trackRef.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    setCanPrev(el.scrollLeft > 4)
+    setCanNext(el.scrollLeft < max - 4)
+  }
+
+  useEffect(() => {
+    updateEdges()
+    const el = trackRef.current
+    if (!el) return
+    el.addEventListener('scroll', updateEdges, { passive: true })
+    window.addEventListener('resize', updateEdges)
+    return () => {
+      el.removeEventListener('scroll', updateEdges)
+      window.removeEventListener('resize', updateEdges)
+    }
+  }, [])
+
+  function slide(dir) {
+    const el = trackRef.current
+    if (!el) return
+    const card = el.querySelector('.price-card')
+    const step = card ? card.offsetWidth + 20 : el.clientWidth * 0.9
+    el.scrollBy({ left: dir * step, behavior: 'smooth' })
+  }
 
   return (
     <section id="pricing" className="pricing">
@@ -308,13 +506,48 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="price-grid">
-          {SHOWN_PLANS.map((slug) => (
-            <PricingCard key={slug} plan={PLANS[slug]} currency={currency} />
-          ))}
+        <div className="price-slider">
+          <button
+            type="button"
+            aria-label="Previous plans"
+            className="slide-btn slide-prev"
+            onClick={() => slide(-1)}
+            disabled={!canPrev}
+          >
+            <SlideArrow dir="left" />
+          </button>
+          <div className="price-track" ref={trackRef}>
+            {SHOWN_PLANS.map((slug) => (
+              <PricingCard key={slug} plan={PLANS[slug]} currency={currency} />
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-label="Next plans"
+            className="slide-btn slide-next"
+            onClick={() => slide(1)}
+            disabled={!canNext}
+          >
+            <SlideArrow dir="right" />
+          </button>
         </div>
       </div>
     </section>
+  )
+}
+
+function SlideArrow({ dir }) {
+  const d = dir === 'left' ? 'M11 4l-5 6 5 6' : 'M7 4l5 6-5 6'
+  return (
+    <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+      <path
+        d={d}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 

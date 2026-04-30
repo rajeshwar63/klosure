@@ -10,6 +10,7 @@ import BuyerJoinPage from './pages/BuyerJoinPage.jsx'
 import SellerHomePage from './pages/SellerHomePage.jsx'
 import ManagerHomePage from './pages/ManagerHomePage.jsx'
 import RepsPlaceholderPage from './pages/RepsPlaceholderPage.jsx'
+import TeamDealsPage from './pages/TeamDealsPage.jsx'
 import ShellWrapper from './components/shell/ShellWrapper.jsx'
 
 // Lazy-load the heavier flows so the dashboard ships in a smaller initial
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/team" element={<ManagerHomePage />} />
           <Route path="/team/forecast" element={<ForecastPage />} />
           <Route path="/team/reps" element={<RepsPlaceholderPage />} />
+          <Route path="/team/deals" element={<TeamDealsPage />} />
           <Route path="/team/askklo" element={<AskKloPage />} />
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/billing/manage" element={<BillingManagePage />} />

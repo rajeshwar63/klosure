@@ -74,6 +74,10 @@ export default function AppShell({
       navigate('/team/reps')
       return
     }
+    if (view === 'team-deals') {
+      navigate('/team/deals')
+      return
+    }
     if (view === 'askklo') {
       navigate('/team/askklo')
       return

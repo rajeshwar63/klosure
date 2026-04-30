@@ -146,6 +146,18 @@ export default function Sidebar({
         </nav>
       )}
 
+      {/* Team deals — manager-only shortcut to every deal across the team */}
+      {!collapsed && role === 'manager' && (
+        <nav className="px-2 pb-1 flex flex-col gap-0.5">
+          <SidebarNavItem
+            icon="◫"
+            label="Team Deals"
+            active={activeView === 'team-deals'}
+            onClick={handle('team-deals')}
+          />
+        </nav>
+      )}
+
       {/* My deals header — "+" creates a new deal */}
       {!collapsed && (
         <div className="px-3 pt-2 pb-1 flex items-center justify-between gap-2">
