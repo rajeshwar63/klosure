@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PLANS, formatPrice } from '../lib/plans.ts'
+import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
 import './LandingPage.css'
 
 const SHOWN_PLANS = ['pro', 'team_starter', 'team_growth', 'team_scale', 'enterprise']
@@ -486,6 +486,18 @@ function Pricing() {
           If this saves even one deal this quarter, it pays for itself.
         </p>
 
+        {LAUNCH_DISCOUNT.active && (
+          <div className="pricing-launch-banner" role="note">
+            <span className="pricing-launch-pill mono">
+              {LAUNCH_DISCOUNT.percentOff}% OFF
+            </span>
+            <span>
+              {LAUNCH_DISCOUNT.label} — {LAUNCH_DISCOUNT.percentOff}% off all
+              plans. Applied automatically at checkout.
+            </span>
+          </div>
+        )}
+
         <div className="pricing-toolbar">
           <span className="pricing-currency-note mono">
             Prices shown in {currency === 'INR' ? 'Indian Rupees' : 'UAE Dirhams'}.
@@ -554,7 +566,7 @@ function SlideArrow({ dir }) {
 function PricingCard({ plan, currency }) {
   const isEnterprise = plan.slug === 'enterprise'
   const isFeatured = plan.slug === 'pro'
-  const price = formatPrice(plan.slug, currency)
+  const priceInfo = priceDisplayFor(plan.slug, currency)
 
   return (
     <div className={`price-card${isFeatured ? ' featured' : ''}`}>
@@ -562,13 +574,23 @@ function PricingCard({ plan, currency }) {
       <div className="price-name">{plan.label}</div>
       <p className="price-desc">{plan.description}</p>
 
+      {!isEnterprise && priceInfo.hasDiscount && (
+        <div className="price-launch-badge mono">
+          {LAUNCH_DISCOUNT.label} · {priceInfo.percentOff}% off
+        </div>
+      )}
       <div className="price-amount">
         {isEnterprise ? (
           <span className="num enterprise">Contact sales</span>
         ) : (
           <>
-            <span className="num">{price}</span>
+            <span className="num">{priceInfo.primary}</span>
             <span className="per">/mo</span>
+            {priceInfo.original && (
+              <span className="price-original" aria-label="Original price">
+                {priceInfo.original}
+              </span>
+            )}
           </>
         )}
       </div>

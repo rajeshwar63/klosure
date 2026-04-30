@@ -225,11 +225,15 @@ export function priceFor(slug: PlanSlug, currency: Currency): number | null {
   return PLANS[slug].monthly[currency]
 }
 
+function formatAmount(amount: number, currency: Currency): string {
+  if (currency === 'INR') return `₹${amount.toLocaleString('en-IN')}`
+  return `AED ${amount.toLocaleString('en-AE')}`
+}
+
 export function formatPrice(slug: PlanSlug, currency: Currency): string {
   const p = priceFor(slug, currency)
   if (p === null) return 'Contact sales'
-  if (currency === 'INR') return `₹${p.toLocaleString('en-IN')}`
-  return `AED ${p.toLocaleString('en-AE')}`
+  return formatAmount(p, currency)
 }
 
 export function effectivePerSeat(slug: PlanSlug, currency: Currency): number | null {
@@ -237,4 +241,47 @@ export function effectivePerSeat(slug: PlanSlug, currency: Currency): number | n
   const monthly = def.monthly[currency]
   if (monthly === null || def.seatCap === 0) return null
   return Math.round(monthly / def.seatCap)
+}
+
+// =============================================================================
+// Launch discount — promotional 30% off, applied via a Razorpay Offer.
+// =============================================================================
+// `active` toggles both the UI treatment (strikethrough + badge) and whether
+// the create-subscription edge function passes the offer_id to Razorpay. The
+// percent here is purely for *display* — the actual amount charged comes from
+// the Offer configured in the Razorpay dashboard. Keep them in sync, and when
+// the launch period ends, flip `active` to false and remove the offer in
+// Razorpay (or let it expire).
+// =============================================================================
+export const LAUNCH_DISCOUNT = {
+  active: true,
+  percentOff: 30,
+  label: 'Launch offer',
+} as const
+
+export interface PriceDisplay {
+  hasDiscount: boolean
+  /** What to show as the headline price (discounted if active, otherwise the regular price). */
+  primary: string
+  /** Original price to render with strikethrough alongside `primary`. Null when there's no discount. */
+  original: string | null
+  percentOff: number
+}
+
+export function priceDisplayFor(slug: PlanSlug, currency: Currency): PriceDisplay {
+  const monthly = priceFor(slug, currency)
+  const regular = formatPrice(slug, currency)
+
+  // No discount on free/contact-sales tiers, or when the launch is off.
+  if (!LAUNCH_DISCOUNT.active || monthly === null || monthly === 0) {
+    return { hasDiscount: false, primary: regular, original: null, percentOff: 0 }
+  }
+
+  const discounted = Math.round(monthly * (1 - LAUNCH_DISCOUNT.percentOff / 100))
+  return {
+    hasDiscount: true,
+    primary: formatAmount(discounted, currency),
+    original: regular,
+    percentOff: LAUNCH_DISCOUNT.percentOff,
+  }
 }
