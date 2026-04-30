@@ -143,21 +143,25 @@ export default function BuyerDealHeader({ deal }) {
         <div className="flex flex-col items-stretch gap-2 w-full md:w-auto md:min-w-[200px]">
           <button
             type="button"
+            onClick={async () => {
+              const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+              const shareTitle = `Klosure deal room: ${title}`
+              const shareText = `Sharing the Klosure deal room for ${title}. Latest status, blockers, and next steps are kept up to date here:`
+              if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+                try {
+                  await navigator.share({ title: shareTitle, text: shareText, url: shareUrl })
+                  return
+                } catch {
+                  // fall through to mailto fallback
+                }
+              }
+              const subject = encodeURIComponent(shareTitle)
+              const body = encodeURIComponent(`${shareText}\n\n${shareUrl}`)
+              window.location.href = `mailto:?subject=${subject}&body=${body}`
+            }}
             className="rounded-md bg-navy text-white text-sm font-medium px-3 py-2 hover:bg-navy/90"
           >
-            Do now
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-navy/20 text-navy text-sm font-medium px-3 py-2 hover:bg-navy/[0.03]"
-          >
-            Share with stakeholder
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-navy/20 text-navy text-sm font-medium px-3 py-2 hover:bg-navy/[0.03]"
-          >
-            Ask Klo
+            Share with Internal Team
           </button>
           <a
             href="https://klosure.ai"
