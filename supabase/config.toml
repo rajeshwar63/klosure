@@ -1,0 +1,40 @@
+# =============================================================================
+# Supabase project config
+# =============================================================================
+# Only the [auth.email.template.*] blocks are populated — they tell the
+# Supabase CLI / Management API which HTML files back the built-in auth
+# emails (confirm signup, password recovery, magic link, email change,
+# reauthentication, invite). Without this block Supabase falls back to its
+# default unbranded templates.
+#
+# To apply on the hosted project:
+#   supabase link --project-ref <ref>
+#   supabase config push
+#
+# Or upload the HTML manually in Dashboard → Authentication → Email Templates
+# (see supabase/auth-email-templates/README.md).
+# =============================================================================
+
+[auth.email.template.confirmation]
+subject = "Confirm your Klosure account"
+content_path = "./auth-email-templates/confirm-signup.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Klosure password"
+content_path = "./auth-email-templates/reset-password.html"
+
+[auth.email.template.magic_link]
+subject = "Your Klosure sign-in link"
+content_path = "./auth-email-templates/magic-link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Klosure email"
+content_path = "./auth-email-templates/email-change.html"
+
+[auth.email.template.reauthentication]
+subject = "Klosure verification code"
+content_path = "./auth-email-templates/reauthentication.html"
+
+[auth.email.template.invite]
+subject = "You've been invited to Klosure"
+content_path = "./auth-email-templates/invite.html"
