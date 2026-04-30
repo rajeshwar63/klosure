@@ -167,19 +167,27 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [lastInvite, setLastInvite] = useState(null)
+  const [lastEmailStatus, setLastEmailStatus] = useState(null) // 'sent' | 'skipped' | null
 
   async function submit(e) {
     e.preventDefault()
     setError('')
     if (!email.trim()) return
     setBusy(true)
-    const res = await inviteMember({ teamId, email, invitedBy })
+    const res = await inviteMember({ email })
     setBusy(false)
     if (!res.ok) {
-      setError(res.error || 'Could not send invite.')
+      setError(res.error === 'invalid_email' ? 'That email looks invalid.' :
+              res.error === 'no_team_owned' ? 'Only team owners can send invites.' :
+              res.error === 'email_send_failed' ? 'Invite created but the email could not be sent. Use the copy-link as a fallback.' :
+              res.error || 'Could not send invite.')
+      // If the function created the invite but failed to email, surface the
+      // link so the manager can paste it manually.
+      if (res.invite) setLastInvite(res.invite)
       return
     }
     setLastInvite(res.invite)
+    setLastEmailStatus(res.emailSent ? 'sent' : res.emailSkipped ? 'skipped' : null)
     setEmail('')
     onInvited?.()
   }
@@ -212,7 +220,7 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
             Invite a teammate
           </p>
           <p className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
-            They join as a rep. Their deals roll up here automatically.
+            We'll email them an invite link. Once they accept, their deals roll up here automatically.
           </p>
         </div>
         {!open && (
@@ -276,15 +284,21 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
       {lastInvite && (
         <InviteLinkChip
           invite={lastInvite}
-          onDismiss={() => setLastInvite(null)}
+          emailStatus={lastEmailStatus}
+          onDismiss={() => {
+            setLastInvite(null)
+            setLastEmailStatus(null)
+          }}
         />
       )}
     </section>
   )
 }
 
-function InviteLinkChip({ invite, onDismiss }) {
-  const link = buildInviteLink(invite.token)
+function InviteLinkChip({ invite, emailStatus, onDismiss }) {
+  // Prefer the link the edge function returned; fall back to the legacy
+  // builder for backwards compat with any code still passing a raw token.
+  const link = invite.link || buildInviteLink(invite.token)
   const [copied, setCopied] = useState(false)
 
   async function copy() {
@@ -297,13 +311,20 @@ function InviteLinkChip({ invite, onDismiss }) {
     }
   }
 
+  const headline =
+    emailStatus === 'sent'
+      ? `Invite emailed to ${invite.email}`
+      : emailStatus === 'skipped'
+        ? `Invite created · ${invite.email} (email service not configured — copy the link)`
+        : `Invite ready · ${invite.email}`
+
   return (
     <div
       className="mt-4 p-3 rounded-lg flex flex-col sm:flex-row gap-2 sm:items-center"
       style={{ background: 'var(--klo-bg)', border: '1px dashed var(--klo-line-strong)' }}
     >
       <div className="flex-1 min-w-0">
-        <MonoKicker>Invite ready · {invite.email}</MonoKicker>
+        <MonoKicker>{headline}</MonoKicker>
         <p
           className="mt-1 text-[12px] truncate kl-mono"
           style={{ color: 'var(--klo-text-dim)' }}

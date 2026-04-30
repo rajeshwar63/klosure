@@ -160,11 +160,43 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "subscription_not_found", subscription_id: subscriptionId }, 404)
     }
 
+    // 6. Best-effort invoice email. We grab the most recent captured payment
+    //    on the subscription and call send-invoice. Idempotency lives in the
+    //    invoices_sent table, so a webhook firing the same payment_id later
+    //    is a no-op. Failure here doesn't block the verify response — the
+    //    user's account is already paid.
+    let invoiceEmailed = false
+    if (status === "active" || status === "pending") {
+      try {
+        const paymentId = await fetchLatestCapturedPaymentId(subscriptionId)
+        if (paymentId) {
+          const sendRes = await fetch(
+            `${SUPABASE_URL}/functions/v1/send-invoice`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                payment_id: paymentId,
+                subscription_id: subscriptionId,
+              }),
+            },
+          )
+          invoiceEmailed = sendRes.ok
+        }
+      } catch (err) {
+        console.warn("verify: invoice email dispatch failed", err)
+      }
+    }
+
     return json({
       ok: true,
       subscription_id: subscriptionId,
       status,
       plan: planSlug,
+      invoice_emailed: invoiceEmailed,
     })
   } catch (err) {
     console.error("razorpay-verify-subscription error", err)
@@ -177,4 +209,28 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   })
+}
+
+// Fetch the latest captured payment on a subscription. Used to hand a
+// payment_id to send-invoice when verifying right after checkout — the
+// authorisation charge has fired by the time the user lands on /billing/return.
+async function fetchLatestCapturedPaymentId(
+  subscriptionId: string,
+): Promise<string | null> {
+  try {
+    const auth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`)
+    const res = await fetch(
+      `https://api.razorpay.com/v1/subscriptions/${subscriptionId}/invoices?count=1`,
+      { method: "GET", headers: { Authorization: `Basic ${auth}` } },
+    )
+    if (!res.ok) return null
+    const body = (await res.json()) as {
+      items?: Array<{ payment_id?: string | null; status?: string }>
+    }
+    const inv = body.items?.[0]
+    return inv?.payment_id ?? null
+  } catch (err) {
+    console.warn("fetchLatestCapturedPaymentId error", err)
+    return null
+  }
 }

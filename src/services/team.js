@@ -107,15 +107,57 @@ export async function createTeam({ name, ownerId, ownerName, ownerEmail }) {
   return { ok: true, team }
 }
 
-export async function inviteMember({ teamId, email, invitedBy }) {
-  if (!teamId || !email) return { ok: false, error: 'team + email required' }
-  const { data, error } = await supabase
-    .from('team_invites')
-    .insert({ team_id: teamId, email: email.trim().toLowerCase(), invited_by: invitedBy })
-    .select()
-    .single()
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, invite: data }
+// Sends the invite email via the send-team-invite edge function. The function
+// also creates (or reuses) the team_invites row, so we no longer need a direct
+// insert from the client. A successful response includes the invite row and
+// the join link as a fallback in case the manager wants to copy + paste it.
+//
+// The legacy `teamId` and `invitedBy` arguments are kept in the signature for
+// caller compatibility but are no longer trusted on the server — the edge
+// function derives both from the JWT.
+export async function inviteMember({ email }) {
+  if (!email) return { ok: false, error: 'email required' }
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData?.session?.access_token
+  if (!token) return { ok: false, error: 'not_signed_in' }
+
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL
+  let res
+  try {
+    res = await fetch(`${baseUrl}/functions/v1/send-team-invite`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    })
+  } catch (err) {
+    return { ok: false, error: err?.message || 'network_error' }
+  }
+
+  let body = null
+  try {
+    body = await res.json()
+  } catch {
+    body = null
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: body?.error || `request_failed_${res.status}`,
+      detail: body?.detail,
+      invite: body?.invite,
+    }
+  }
+  return {
+    ok: true,
+    invite: body?.invite,
+    emailSent: !!body?.email_sent,
+    emailSkipped: !!body?.email_skipped,
+  }
 }
 
 export async function revokeInvite({ inviteId }) {

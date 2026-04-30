@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { hasSupabaseConfig } from '../lib/supabase.js'
+import { sendWelcomeEmail } from '../services/email.js'
 
 const PENDING_INVITE_KEY = 'klo.pendingInviteToken'
 
@@ -39,6 +40,12 @@ export default function AuthPage({ mode = 'login' }) {
         const { data, error } = await signUp({ email, password, name })
         if (error) throw error
         if (data?.session) {
+          // Fire-and-forget — the edge function is idempotent (gates on
+          // users.welcome_email_sent_at) so calling it from the page doesn't
+          // create the risk of double-sends if the user lands here twice.
+          sendWelcomeEmail().catch((err) =>
+            console.warn('welcome email dispatch failed', err),
+          )
           navigate(postAuthDestination(inviteToken, '/onboarding'), { replace: true })
         } else {
           setInfo('Check your email to confirm your account, then log in.')

@@ -135,11 +135,12 @@ export default function Sidebar({
   const currentDealId = activeDealId(activeView)
   const handle = (view) => () => onNavigate?.(view)
 
-  const widthClass = collapsed ? 'w-[52px]' : 'w-[260px]'
-
+  // The shell sets the wrapper width via inline style (so the drag-resize
+  // handle can update it live). We just fill 100% of whatever the parent
+  // gives us — no responsibility for the width number lives here.
   return (
     <aside
-      className={`shrink-0 ${widthClass} h-full bg-[#fafafa] border-r border-navy/10 flex flex-col`}
+      className="w-full h-full bg-[#fafafa] border-r border-navy/10 flex flex-col"
     >
       {/* Header — logo + collapse toggle */}
       <div
