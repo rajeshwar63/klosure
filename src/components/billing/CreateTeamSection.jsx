@@ -1,5 +1,8 @@
 // Phase 11 — self-service team creation surface on the Billing page.
-// Hidden for users who already own a team.
+// Hidden for users who already own a team, or who have already been added
+// to someone else's team as a rep — letting an invited member create their
+// own team would silently detach them from their manager (and from the paid
+// team plan they're seated under).
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7,7 +10,7 @@ import { useProfile } from '../../hooks/useProfile.jsx'
 import { createTeamForCurrentUser } from '../../services/team.js'
 
 export default function CreateTeamSection() {
-  const { team, refresh } = useProfile()
+  const { profile, team, refresh } = useProfile()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [open, setOpen] = useState(false)
@@ -15,6 +18,7 @@ export default function CreateTeamSection() {
   const [error, setError] = useState('')
 
   if (team) return null
+  if (profile?.team_id) return null
 
   async function handleCreate(e) {
     e.preventDefault()
