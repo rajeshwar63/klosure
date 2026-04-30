@@ -766,6 +766,58 @@
   width: 100%;
 }
 
+/* Launch-discount badge above the price + strikethrough on the original */
+.klo-landing .price-launch-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.klo-landing .price-amount .price-original {
+  font-size: 15px;
+  color: var(--text-mute);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  margin-left: 4px;
+}
+
+/* Banner above the pricing grid that announces the launch promo */
+.klo-landing .pricing-launch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: 720px;
+  margin: 0 auto 24px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.klo-landing .pricing-launch-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: var(--accent);
+  color: #fff;
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+
 /* CONTACT */
 .klo-landing .contact {
   padding: 120px 0 96px;
