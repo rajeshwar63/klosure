@@ -111,12 +111,17 @@ export default function TeamDealsPage() {
     )
   }
 
-  const deals = data?.deals ?? []
+  // loadTeamPipeline returns deals as { active, archived } (sortDeals output),
+  // so flatten before filtering.
+  const dealsFlat = [
+    ...(data?.deals?.active ?? []),
+    ...(data?.deals?.archived ?? []),
+  ]
   const rollUp = data?.rollUp ?? []
 
   const filtered = repFilter
-    ? deals.filter((d) => d.seller_id === repFilter)
-    : deals
+    ? dealsFlat.filter((d) => d.seller_id === repFilter)
+    : dealsFlat
   const active = filtered.filter((d) => d.status === 'active')
   const archived = filtered.filter((d) => d.status !== 'active')
 
