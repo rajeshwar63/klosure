@@ -4,8 +4,8 @@ import './LandingPage.css'
 
 const PHONE_DISPLAY = '+91 93985 74255'
 const PHONE_TEL = '+919398574255'
-const EMAIL = 'raja@klosure.ai'
-const LINKEDIN = 'https://www.linkedin.com/in/rajeshwar'
+const EMAIL = 'support@klosure.ai'
+const LINKEDIN = 
 
 function handleAnchorClick(e, id) {
   e.preventDefault()
