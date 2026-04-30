@@ -164,12 +164,6 @@ export default function BuyerDealHeader({ deal }) {
             Share with Internal Team
           </button>
           <a
-            href={`mailto:support@klosure.ai?subject=${encodeURIComponent(`Ask Klo about ${title}`)}`}
-            className="rounded-md border border-navy/20 text-navy text-sm font-medium px-3 py-2 hover:bg-navy/[0.03] text-center"
-          >
-            Ask Klo
-          </a>
-          <a
             href="https://klosure.ai"
             target="_blank"
             rel="noreferrer"
