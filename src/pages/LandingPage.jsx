@@ -1,6 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PLANS, formatPrice } from '../lib/plans.ts'
 import './LandingPage.css'
+
+const SHOWN_PLANS = ['pro', 'team_starter', 'team_growth', 'team_scale', 'enterprise']
+const CURRENCIES = ['INR', 'AED']
 
 const PHONE_DISPLAY = '+91 93985 74255'
 const PHONE_TEL = '+919398574255'
@@ -273,6 +277,8 @@ function CompareRow({ k, v, tone }) {
 }
 
 function Pricing() {
+  const [currency, setCurrency] = useState('INR')
+
   return (
     <section id="pricing" className="pricing">
       <div className="container">
@@ -282,49 +288,81 @@ function Pricing() {
           If this saves even one deal this quarter, it pays for itself.
         </p>
 
-        <div className="price-grid">
-          <div className="price-card">
-            <div className="price-tier mono">For individual sellers</div>
-            <div className="price-name">Pro</div>
-            <div className="price-amount">
-              <span className="num">₹2,499</span>
-              <span className="per">/ month</span>
-            </div>
-            <div className="price-was mono">₹4,999</div>
-            <ul className="price-list">
-              <li>AI deal coaching</li>
-              <li>Confidence scoring</li>
-              <li>Shared buyer view</li>
-              <li>Email + Slack signals</li>
-            </ul>
-            <Link to="/signup" className="btn btn-ghost btn-lg">
-              Start free
-            </Link>
+        <div className="pricing-toolbar">
+          <span className="pricing-currency-note mono">
+            Prices shown in {currency === 'INR' ? 'Indian Rupees' : 'UAE Dirhams'}.
+          </span>
+          <div className="currency-toggle" role="tablist" aria-label="Select currency">
+            {CURRENCIES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="tab"
+                aria-selected={currency === c}
+                className={`currency-btn${currency === c ? ' active' : ''}`}
+                onClick={() => setCurrency(c)}
+              >
+                {c}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="price-card featured">
-            <span className="price-badge mono">Most popular</span>
-            <div className="price-tier mono">For sales teams</div>
-            <div className="price-name">Team</div>
-            <div className="price-amount">
-              <span className="num">₹9,999</span>
-              <span className="per">/ month</span>
-            </div>
-            <div className="price-was mono">₹19,999</div>
-            <ul className="price-list">
-              <li>Everything in Pro</li>
-              <li>Manager dashboard</li>
-              <li>Pipeline reality reports</li>
-              <li>Forecast you can defend</li>
-              <li>Priority support</li>
-            </ul>
-            <Link to="/signup" className="btn btn-primary btn-lg">
-              Get started
-            </Link>
-          </div>
+        <div className="price-grid">
+          {SHOWN_PLANS.map((slug) => (
+            <PricingCard key={slug} plan={PLANS[slug]} currency={currency} />
+          ))}
         </div>
       </div>
     </section>
+  )
+}
+
+function PricingCard({ plan, currency }) {
+  const isEnterprise = plan.slug === 'enterprise'
+  const isFeatured = plan.slug === 'pro'
+  const price = formatPrice(plan.slug, currency)
+
+  return (
+    <div className={`price-card${isFeatured ? ' featured' : ''}`}>
+      <div className="price-tier mono">{plan.shortLabel}</div>
+      <div className="price-name">{plan.label}</div>
+      <p className="price-desc">{plan.description}</p>
+
+      <div className="price-amount">
+        {isEnterprise ? (
+          <span className="num enterprise">Contact sales</span>
+        ) : (
+          <>
+            <span className="num">{price}</span>
+            <span className="per">/mo</span>
+          </>
+        )}
+      </div>
+      {!isEnterprise && plan.seatCap > 1 && (
+        <p className="price-seats mono">Up to {plan.seatCap} seats</p>
+      )}
+
+      <ul className="price-list">
+        {plan.highlights.map((h, i) => (
+          <li key={i}>{h}</li>
+        ))}
+      </ul>
+
+      {isEnterprise ? (
+        <a
+          href="#contact"
+          onClick={(e) => handleAnchorClick(e, 'contact')}
+          className="btn btn-primary btn-lg"
+        >
+          Talk to sales
+        </a>
+      ) : (
+        <Link to="/signup" className="btn btn-primary btn-lg">
+          Get started
+        </Link>
+      )}
+    </div>
   )
 }
 
