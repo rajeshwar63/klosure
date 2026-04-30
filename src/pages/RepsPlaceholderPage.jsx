@@ -91,7 +91,7 @@ export default function RepsPlaceholderPage() {
   return (
     <div className="p-6 md:p-8 max-w-[960px] mx-auto">
       <header className="mb-8">
-        <Eyebrow>Team · {rollUp.length} seller{rollUp.length === 1 ? '' : 's'}</Eyebrow>
+        <Eyebrow>Team · {rollUp.length} rep{rollUp.length === 1 ? '' : 's'}</Eyebrow>
         <h1
           className="mt-3"
           style={{
@@ -212,7 +212,7 @@ function InvitePanel({ teamId, invitedBy, onInvited }) {
             Invite a teammate
           </p>
           <p className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
-            They join as a seller. Their deals roll up here automatically.
+            They join as a rep. Their deals roll up here automatically.
           </p>
         </div>
         {!open && (
@@ -452,7 +452,7 @@ function RepCell({ index, rep, teamOwnerId, onRemoved }) {
         </div>
         <div className="flex-1 min-w-0">
           <MonoKicker>
-            {index} / {rep.role === 'manager' ? 'Manager' : 'Seller'}
+            {index} / {rep.role === 'manager' ? 'Manager' : 'Rep'}
           </MonoKicker>
           <p
             className="mt-1 text-[17px] font-semibold truncate"

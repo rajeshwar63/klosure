@@ -580,13 +580,75 @@
   color: #fff;
 }
 
-.klo-landing .price-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+.klo-landing .price-slider {
+  position: relative;
   max-width: 1180px;
   margin: 0 auto;
+}
+
+.klo-landing .price-track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 8px;
+  padding: 8px 4px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  -webkit-overflow-scrolling: touch;
   text-align: left;
+}
+
+.klo-landing .price-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.klo-landing .price-track::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.klo-landing .price-track::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+
+.klo-landing .slide-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elev);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: 0 6px 20px rgba(15, 17, 28, 0.08);
+  transition: all 0.15s ease;
+}
+
+.klo-landing .slide-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.klo-landing .slide-btn:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.klo-landing .slide-prev {
+  left: -8px;
+}
+
+.klo-landing .slide-next {
+  right: -8px;
 }
 
 .klo-landing .price-card {
@@ -597,6 +659,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  flex: 0 0 calc((100% - 60px) / 4);
+  min-width: 260px;
+  scroll-snap-align: start;
 }
 
 .klo-landing .price-card.featured {
@@ -813,10 +878,9 @@
 }
 
 /* RESPONSIVE */
-@media (max-width: 1024px) {
-  .klo-landing .price-grid {
-    grid-template-columns: repeat(2, 1fr);
-    max-width: 780px;
+@media (max-width: 1100px) {
+  .klo-landing .price-card {
+    flex: 0 0 calc((100% - 40px) / 3);
   }
 }
 
@@ -836,16 +900,36 @@
   .klo-landing .problem,
   .klo-landing .features,
   .klo-landing .deal-strip,
+  .klo-landing .manager-view,
   .klo-landing .pricing,
   .klo-landing .contact {
     padding: 80px 0;
   }
+  .klo-landing .price-card {
+    flex: 0 0 calc((100% - 20px) / 2);
+  }
+  .klo-landing .slide-btn {
+    display: none;
+  }
+  .klo-landing .mgr-bullets {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
-  .klo-landing .price-grid {
+  .klo-landing .price-card {
+    flex: 0 0 86%;
+    min-width: 0;
+  }
+  .klo-landing .price-track {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .klo-landing .mgr-glance {
     grid-template-columns: 1fr;
-    max-width: 420px;
+  }
+  .klo-landing .rep-row {
+    flex-wrap: wrap;
   }
 }
 
@@ -856,4 +940,311 @@
   .klo-landing .hero-sub {
     font-size: 17px;
   }
+}
+
+/* NAV CTA — explicit white text on the dark sign-up button. */
+.klo-landing .nav-cta,
+.klo-landing .nav-cta:hover,
+.klo-landing .nav-cta:visited {
+  color: #fff;
+}
+
+/* MANAGER VIEW SECTION */
+.klo-landing .manager-view {
+  padding: 120px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.klo-landing .manager-view .section-head {
+  margin: 0 auto 56px;
+  text-align: center;
+}
+
+.klo-landing .mgr-stage {
+  max-width: 980px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.klo-landing .mgr-stage::before {
+  content: '';
+  position: absolute;
+  inset: -40px -60px auto -60px;
+  height: 280px;
+  background: radial-gradient(ellipse at top, var(--accent-soft) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.klo-landing .mgr-window {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px -20px rgba(15, 17, 28, 0.18);
+}
+
+.klo-landing .mgr-windowbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.klo-landing .mgr-windowbar .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.klo-landing .mgr-windowbar-title {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-mute);
+  letter-spacing: 0;
+}
+
+.klo-landing .mgr-screen {
+  padding: 28px 28px 32px;
+}
+
+.klo-landing .mgr-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-mute);
+}
+
+.klo-landing .mgr-header h3 {
+  margin: 8px 0 6px;
+  font-size: clamp(22px, 2.5vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.klo-landing .mgr-sub {
+  margin: 0 0 22px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.klo-landing .mgr-glance {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.klo-landing .mgr-bucket {
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.klo-landing .mgr-bucket-good {
+  background: #EAF3DE;
+  color: #173404;
+}
+
+.klo-landing .mgr-bucket-caution {
+  background: #FAEEDA;
+  color: #412402;
+}
+
+.klo-landing .mgr-bucket-muted {
+  background: #F1F0EC;
+  color: #3A3A36;
+}
+
+.klo-landing .mgr-bucket-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.klo-landing .mgr-bucket-amount {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.klo-landing .mgr-bucket-deals {
+  font-size: 11px;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+.klo-landing .mgr-row-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-mute);
+  margin-bottom: 10px;
+}
+
+.klo-landing .mgr-row-eyebrow-2 {
+  margin-top: 22px;
+}
+
+.klo-landing .mgr-rollup {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.klo-landing .rep-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.klo-landing .rep-row:last-child {
+  border-bottom: 0;
+}
+
+.klo-landing .rep-row-warn {
+  background: rgba(196, 69, 47, 0.04);
+}
+
+.klo-landing .rep-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.klo-landing .rep-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.klo-landing .rep-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.klo-landing .rep-counts {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 2px;
+}
+
+.klo-landing .rep-numbers {
+  text-align: right;
+}
+
+.klo-landing .rep-pipeline {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.klo-landing .rep-risk {
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+.klo-landing .mgr-flags {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.klo-landing .mgr-flag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.klo-landing .flag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.klo-landing .flag-dot-bad {
+  background: var(--danger);
+}
+
+.klo-landing .flag-dot-warn {
+  background: var(--warn);
+}
+
+.klo-landing .flag-who {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.klo-landing .flag-sep {
+  color: var(--text-mute);
+}
+
+.klo-landing .flag-what {
+  color: var(--text-dim);
+}
+
+.klo-landing .mgr-bullets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 56px;
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.klo-landing .mgr-bullet {
+  text-align: left;
+}
+
+.klo-landing .mgr-bullet-num {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.klo-landing .mgr-bullet h4 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.klo-landing .mgr-bullet p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 0;
 }

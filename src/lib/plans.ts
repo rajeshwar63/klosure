@@ -83,7 +83,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       weekly_brief: false,
       realtime_buyer_link: true,
     },
-    description: 'For solo sellers running their own pipeline',
+    description: 'For solo reps running their own pipeline',
     highlights: [
       'Unlimited deals',
       'Klo coaching on every conversation',
@@ -111,7 +111,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     },
     description: 'For small teams who want a coach across the whole pipeline',
     highlights: [
-      'Up to 5 sellers',
+      'Up to 5 reps',
       'Manager view: full team rollup',
       'Ask Klo about any deal across the team',
       'Weekly team brief',
@@ -137,7 +137,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     },
     description: 'For growing sales orgs',
     highlights: [
-      'Up to 15 sellers',
+      'Up to 15 reps',
       'Everything in Starter',
       'Forecast view for the manager',
       'Pattern detection across reps',
@@ -163,7 +163,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     },
     description: 'For larger sales orgs',
     highlights: [
-      'Up to 30 sellers',
+      'Up to 30 reps',
       'Everything in Growth',
       'Priority support',
       'Custom Klo training (Phase 13+)',
@@ -187,7 +187,7 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       weekly_brief: true,
       realtime_buyer_link: true,
     },
-    description: 'For 30+ seller orgs',
+    description: 'For 30+ rep orgs',
     highlights: [
       'Custom seat counts',
       'SSO & SAML (Phase 14+)',
