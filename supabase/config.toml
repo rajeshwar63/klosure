@@ -15,26 +15,26 @@
 # (see supabase/auth-email-templates/README.md).
 # =============================================================================
 
-[auth.email.template.confirmation]
-subject = "Confirm your Klosure account"
-content_path = "./auth-email-templates/confirm-signup.html"
+#[auth.email.template.confirmation]
+#subject = "Confirm your Klosure account"
+#content_path = "./auth-email-templates/confirm-signup.html"
 
-[auth.email.template.recovery]
-subject = "Reset your Klosure password"
-content_path = "./auth-email-templates/reset-password.html"
+#[auth.email.template.recovery]
+#subject = "Reset your Klosure password"
+#content_path = "./auth-email-templates/reset-password.html"
 
-[auth.email.template.magic_link]
-subject = "Your Klosure sign-in link"
-content_path = "./auth-email-templates/magic-link.html"
+#[auth.email.template.magic_link]
+#subject = "Your Klosure sign-in link"
+#content_path = "./auth-email-templates/magic-link.html"
 
-[auth.email.template.email_change]
-subject = "Confirm your new Klosure email"
-content_path = "./auth-email-templates/email-change.html"
+#[auth.email.template.email_change]
+#subject = "Confirm your new Klosure email"
+#content_path = "./auth-email-templates/email-change.html"
 
-[auth.email.template.reauthentication]
-subject = "Klosure verification code"
-content_path = "./auth-email-templates/reauthentication.html"
+#[auth.email.template.reauthentication]
+#subject = "Klosure verification code"
+#content_path = "./auth-email-templates/reauthentication.html"
 
-[auth.email.template.invite]
-subject = "You've been invited to Klosure"
-content_path = "./auth-email-templates/invite.html"
+#[auth.email.template.invite]
+#subject = "You've been invited to Klosure"
+#content_path = "./auth-email-templates/invite.html"
