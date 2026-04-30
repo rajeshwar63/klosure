@@ -24,9 +24,31 @@ const MANAGER_NAV = [
   { id: 'this-week', icon: '◆', label: 'This week' },
   { id: 'forecast', icon: '↗', label: 'Forecast' },
   { id: 'reps', icon: '◎', label: 'Reps' },
+  { id: 'team-deals', icon: '◫', label: 'Team Deals' },
   { id: 'askklo', icon: '✦', label: 'Ask Klo' },
   { id: 'settings', icon: '⚙', label: 'Settings' },
 ]
+
+const STORAGE_KEY_MANAGER_SECTION = 'klosure:sidebarManagerOpen'
+
+function loadManagerSectionOpen() {
+  if (typeof window === 'undefined') return true
+  try {
+    const v = window.localStorage.getItem(STORAGE_KEY_MANAGER_SECTION)
+    if (v === null) return true
+    return v === '1'
+  } catch {
+    return true
+  }
+}
+
+function saveManagerSectionOpen(open) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY_MANAGER_SECTION, open ? '1' : '0')
+  } catch {
+    // localStorage can throw in private mode; ignore
+  }
+}
 
 function sortDealsForSidebar(deals) {
   return [...(deals || [])].sort((a, b) => {
@@ -85,7 +107,16 @@ export default function Sidebar({
   onCollapseToggle,
 }) {
   const [query, setQuery] = useState('')
+  const [managerOpen, setManagerOpen] = useState(loadManagerSectionOpen)
   const sorted = sortDealsForSidebar(deals)
+
+  function toggleManagerSection() {
+    setManagerOpen((open) => {
+      const next = !open
+      saveManagerSectionOpen(next)
+      return next
+    })
+  }
   const filteredDeals = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return sorted
@@ -146,16 +177,47 @@ export default function Sidebar({
         </nav>
       )}
 
-      {/* Team deals — manager-only shortcut to every deal across the team */}
+      {/* Manager section — collapsible, pinned near the top so manager
+          destinations (including Team Deals) are reachable without scrolling
+          past the deal list. */}
       {!collapsed && role === 'manager' && (
-        <nav className="px-2 pb-1 flex flex-col gap-0.5">
-          <SidebarNavItem
-            icon="◫"
-            label="Team Deals"
-            active={activeView === 'team-deals'}
-            onClick={handle('team-deals')}
-          />
-        </nav>
+        <div className="px-2 pt-1 pb-2">
+          <button
+            type="button"
+            onClick={toggleManagerSection}
+            aria-expanded={managerOpen}
+            aria-controls="sidebar-manager-nav"
+            className="w-full flex items-center justify-between px-1.5 py-1 rounded hover:bg-navy/5"
+          >
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
+              Manager
+            </span>
+            <span
+              className={`text-navy/45 text-[10px] leading-none transition-transform ${
+                managerOpen ? 'rotate-90' : ''
+              }`}
+              aria-hidden
+            >
+              ›
+            </span>
+          </button>
+          {managerOpen && (
+            <nav
+              id="sidebar-manager-nav"
+              className="mt-1 flex flex-col gap-0.5"
+            >
+              {MANAGER_NAV.map((item) => (
+                <SidebarNavItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  active={activeView === item.id}
+                  onClick={handle(item.id)}
+                />
+              ))}
+            </nav>
+          )}
+        </div>
       )}
 
       {/* My deals header — "+" creates a new deal */}
@@ -222,28 +284,6 @@ export default function Sidebar({
           ))
         )}
       </div>
-
-      {/* Manager nav — pinned above the user profile, only when acting as manager */}
-      {!collapsed && role === 'manager' && (
-        <div className="border-t border-navy/5 px-2 pt-2 pb-2 shrink-0">
-          <div className="px-1.5 pb-1">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-navy/45">
-              Manager
-            </span>
-          </div>
-          <nav className="flex flex-col gap-0.5">
-            {MANAGER_NAV.map((item) => (
-              <SidebarNavItem
-                key={item.id}
-                icon={item.icon}
-                label={item.label}
-                active={activeView === item.id}
-                onClick={handle(item.id)}
-              />
-            ))}
-          </nav>
-        </div>
-      )}
 
       {/* Bottom utility nav — pinned above the trial/team badges. */}
       {!collapsed && (
