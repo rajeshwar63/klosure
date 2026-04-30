@@ -14,6 +14,10 @@ export default function BuyerJoinPage() {
   const [, setDealContext] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // 'invalid' = the token didn't match a deal. 'network' = the request itself
+  // failed. We use this to pick a retry-vs-no-retry message in the error UI.
+  const [errorKind, setErrorKind] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
   const [buyerName, setBuyerName] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [joining, setJoining] = useState(false)
@@ -34,26 +38,44 @@ export default function BuyerJoinPage() {
   useEffect(() => {
     if (!token) return
     let mounted = true
+    setLoading(true)
+    setError('')
+    setErrorKind('')
     async function load() {
-      const { data: dealData, error: dealErr } = await supabase
-        .from('deals')
-        .select('*')
-        .eq('buyer_token', token)
-        .maybeSingle()
-      if (!mounted) return
-      if (dealErr || !dealData) {
-        setError('This link is invalid or expired.')
+      try {
+        const { data: dealData, error: dealErr } = await supabase
+          .from('deals')
+          .select('*')
+          .eq('buyer_token', token)
+          .maybeSingle()
+        if (!mounted) return
+        if (dealErr) {
+          // Distinguish between "no row" (handled below) and an actual fetch
+          // error so we can offer a retry button instead of "link invalid".
+          throw dealErr
+        }
+        if (!dealData) {
+          setError('This link is invalid or expired.')
+          setErrorKind('invalid')
+          setLoading(false)
+          return
+        }
+        const { data: ctx } = await supabase
+          .from('deal_context')
+          .select('*')
+          .eq('deal_id', dealData.id)
+          .maybeSingle()
+        if (!mounted) return
+        setDeal(dealData)
+        setDealContext(ctx)
         setLoading(false)
-        return
+      } catch (err) {
+        if (!mounted) return
+        console.error('[BuyerJoinPage] load failed', err)
+        setError("Couldn't reach the server. Check your connection and try again.")
+        setErrorKind('network')
+        setLoading(false)
       }
-      const { data: ctx } = await supabase
-        .from('deal_context')
-        .select('*')
-        .eq('deal_id', dealData.id)
-        .maybeSingle()
-      setDeal(dealData)
-      setDealContext(ctx)
-      setLoading(false)
     }
     load()
 
@@ -79,7 +101,7 @@ export default function BuyerJoinPage() {
       mounted = false
       supabase.removeChannel(channel)
     }
-  }, [token])
+  }, [token, retryCount])
 
   async function handleJoin(e) {
     e.preventDefault()
@@ -126,15 +148,26 @@ export default function BuyerJoinPage() {
     )
   }
   if (error) {
+    const isNetwork = errorKind === 'network'
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
         style={{ background: 'var(--klo-bg)' }}
       >
         <p className="font-semibold mb-2" style={{ color: 'var(--klo-text)' }}>
-          Link not found.
+          {isNetwork ? 'We couldn’t open this room.' : 'Link not found.'}
         </p>
-        <p className="text-sm" style={{ color: 'var(--klo-text-dim)' }}>{error}</p>
+        <p className="text-sm mb-4" style={{ color: 'var(--klo-text-dim)' }}>{error}</p>
+        {isNetwork ? (
+          <button
+            type="button"
+            onClick={() => setRetryCount((c) => c + 1)}
+            className="rounded-lg px-4 py-2 text-sm font-medium"
+            style={{ background: 'var(--klo-text)', color: '#fff' }}
+          >
+            Try again
+          </button>
+        ) : null}
       </div>
     )
   }

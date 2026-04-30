@@ -7,7 +7,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { buildBootstrapPrompt } from "../_shared/prompts/bootstrap-prompt.ts"
 import { buildExtractionPrompt } from "../_shared/prompts/extraction-prompt.ts"
-import type { KloState, KloRespondOutput, BuyerView } from "../_shared/klo-state-types.ts"
+import type {
+  KloState,
+  KloRespondOutput,
+  BuyerView,
+  BuyerViewOutcome,
+} from "../_shared/klo-state-types.ts"
 import type { LlmMessage, LlmToolDefinition } from "../_shared/llm-types.ts"
 import { callLlm } from "../_shared/llm-client.ts"
 import { loadSellerProfile, type SellerProfile } from "../_shared/seller-profile-loader.ts"
@@ -436,6 +441,11 @@ Deno.serve(async (req) => {
       })
     } catch (err) {
       console.error("buyer_view generation failed", err)
+      await writeBuyerViewStatus(
+        deal_id,
+        "thrown_error",
+        err instanceof Error ? err.message : String(err),
+      )
     }
 
     return json({ ok: true })
@@ -492,12 +502,14 @@ async function maybeRegenerateBuyerView(args: {
 
   if (!buyerViewResult.toolCalled) {
     console.warn("buyer_view tool not called — skipping update")
+    await writeBuyerViewStatus(deal.id, "tool_not_called")
     return
   }
 
   const buyerView = buyerViewResult.input.buyer_view
   if (!buyerView) {
     console.warn("buyer_view missing in tool input — skipping update")
+    await writeBuyerViewStatus(deal.id, "missing_input")
     return
   }
   buyerView.generated_at = new Date().toISOString()
@@ -518,7 +530,15 @@ async function maybeRegenerateBuyerView(args: {
     .eq("id", deal.id)
     .maybeSingle()
   const baseState = (fresh?.klo_state ?? newState) as KloState
-  const mergedState: KloState = { ...baseState, buyer_view: buyerView }
+  const mergedState: KloState = {
+    ...baseState,
+    buyer_view: buyerView,
+    buyer_view_status: {
+      last_attempt_at: new Date().toISOString(),
+      last_outcome: "success",
+      last_error: null,
+    },
+  }
 
   const { error: updateErr } = await sb
     .from("deals")
@@ -526,6 +546,7 @@ async function maybeRegenerateBuyerView(args: {
     .eq("id", deal.id)
   if (updateErr) {
     console.error("buyer_view persist failed", updateErr)
+    await writeBuyerViewStatus(deal.id, "persist_failed", updateErr.message)
     return
   }
 
@@ -561,8 +582,14 @@ async function runBuyerViewRefresh(args: {
     maxTokens: 1500,
     temperature: 0.6,
   })
-  if (!result.toolCalled || !result.input?.buyer_view) {
+  if (!result.toolCalled) {
     console.warn("buyer_view manual refresh: tool not called")
+    await writeBuyerViewStatus(deal.id, "tool_not_called")
+    return null
+  }
+  if (!result.input?.buyer_view) {
+    console.warn("buyer_view manual refresh: missing input")
+    await writeBuyerViewStatus(deal.id, "missing_input")
     return null
   }
   const buyerView = result.input.buyer_view
@@ -580,13 +607,22 @@ async function runBuyerViewRefresh(args: {
     .eq("id", deal.id)
     .maybeSingle()
   const baseState = (fresh?.klo_state ?? currentState) as KloState
-  const mergedState: KloState = { ...baseState, buyer_view: buyerView }
+  const mergedState: KloState = {
+    ...baseState,
+    buyer_view: buyerView,
+    buyer_view_status: {
+      last_attempt_at: new Date().toISOString(),
+      last_outcome: "success",
+      last_error: null,
+    },
+  }
   const { error: updateErr } = await sb
     .from("deals")
     .update({ klo_state: mergedState })
     .eq("id", deal.id)
   if (updateErr) {
     console.error("buyer_view manual refresh persist failed", updateErr)
+    await writeBuyerViewStatus(deal.id, "persist_failed", updateErr.message)
     return null
   }
   console.log(JSON.stringify({
@@ -596,6 +632,36 @@ async function runBuyerViewRefresh(args: {
     momentum_score: buyerView.momentum_score,
   }))
   return buyerView
+}
+
+// Best-effort writer for buyer_view generation telemetry. Reads klo_state,
+// merges in buyer_view_status, writes back. Never throws — a failure here
+// must not break the chat turn.
+async function writeBuyerViewStatus(
+  dealId: string,
+  outcome: BuyerViewOutcome,
+  errorDetail?: string | null,
+): Promise<void> {
+  try {
+    const { data: fresh } = await sb
+      .from("deals")
+      .select("klo_state")
+      .eq("id", dealId)
+      .maybeSingle()
+    const baseState = (fresh?.klo_state ?? null) as KloState | null
+    if (!baseState) return
+    const merged: KloState = {
+      ...baseState,
+      buyer_view_status: {
+        last_attempt_at: new Date().toISOString(),
+        last_outcome: outcome,
+        last_error: errorDetail ? errorDetail.slice(0, 240) : null,
+      },
+    }
+    await sb.from("deals").update({ klo_state: merged }).eq("id", dealId)
+  } catch (err) {
+    console.error("writeBuyerViewStatus failed", err)
+  }
 }
 
 async function countMessagesSince(dealId: string, sinceISO: string | null): Promise<number> {
