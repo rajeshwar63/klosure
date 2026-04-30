@@ -58,6 +58,7 @@ export async function loadTeamPipeline({ teamId }) {
 export function rollUpByMember(deals, members) {
   const rows = members.map((m) => ({
     user_id: m.user_id,
+    member_row_id: m.id,
     name: m.users?.name || m.users?.email || 'Member',
     email: m.users?.email || '',
     role: m.role,
@@ -126,10 +127,15 @@ export async function revokeInvite({ inviteId }) {
   return { ok: true }
 }
 
+// Server-side via remove_team_member RPC (security definer). The RPC enforces
+// "caller owns the team" and "removed user isn't the owner", deletes the
+// team_members row, and clears the removed user's users.team_id (which RLS
+// would otherwise block when the manager updates someone else's row).
 export async function removeMember({ memberRowId }) {
-  const { error } = await supabase.from('team_members').delete().eq('id', memberRowId)
+  if (!memberRowId) return { ok: false, error: 'no member id' }
+  const { data, error } = await supabase.rpc('remove_team_member', { p_member_id: memberRowId })
   if (error) return { ok: false, error: error.message }
-  return { ok: true }
+  return data || { ok: false, error: 'no_response' }
 }
 
 // Invitee redeems a pending invite. Server-side `accept_team_invite` validates

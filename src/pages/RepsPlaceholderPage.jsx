@@ -15,6 +15,7 @@ import {
   buildInviteLink,
   inviteMember,
   loadTeamPipeline,
+  removeMember,
   revokeInvite,
 } from '../services/team.js'
 import { formatCurrency } from '../lib/format.js'
@@ -28,6 +29,7 @@ import {
 export default function RepsPlaceholderPage() {
   const { user } = useAuth()
   const { team, loading: profileLoading } = useProfile()
+  const { refresh: refreshStatus } = useAccountStatus()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -51,6 +53,12 @@ export default function RepsPlaceholderPage() {
     if (!team) return
     const res = await loadTeamPipeline({ teamId: team.id })
     setData(res)
+  }
+
+  // Use after a mutation that also changes seat usage (remove / accept) so
+  // the seat counter chip in InvitePanel updates without a page reload.
+  async function refreshAll() {
+    await Promise.all([refresh(), refreshStatus?.()])
   }
 
   if (profileLoading || loading) {
@@ -122,7 +130,13 @@ export default function RepsPlaceholderPage() {
       ) : (
         <HairlineGrid cols={2}>
           {rollUp.map((r, idx) => (
-            <RepCell key={r.user_id} index={String(idx + 1).padStart(2, '0')} rep={r} />
+            <RepCell
+              key={r.user_id}
+              index={String(idx + 1).padStart(2, '0')}
+              rep={r}
+              teamOwnerId={team.owner_id}
+              onRemoved={refreshAll}
+            />
           ))}
         </HairlineGrid>
       )}
@@ -401,8 +415,32 @@ function PendingInviteRow({ invite, isLast, onChange }) {
   )
 }
 
-function RepCell({ index, rep }) {
+function RepCell({ index, rep, teamOwnerId, onRemoved }) {
   const initial = (rep.name || 'M').charAt(0).toUpperCase()
+  const canRemove = Boolean(teamOwnerId) && rep.user_id !== teamOwnerId && Boolean(rep.member_row_id)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function remove() {
+    if (busy) return
+    if (
+      !window.confirm(
+        `Remove ${rep.name} from the team? Their deals stay with them; you'll lose visibility and the seat will free up.`,
+      )
+    ) {
+      return
+    }
+    setError('')
+    setBusy(true)
+    const res = await removeMember({ memberRowId: rep.member_row_id })
+    setBusy(false)
+    if (!res?.ok) {
+      setError(removalErrorCopy(res?.error))
+      return
+    }
+    onRemoved?.()
+  }
+
   return (
     <HairlineGrid.Cell>
       <div className="flex items-start gap-3">
@@ -426,7 +464,24 @@ function RepCell({ index, rep }) {
             Active · {rep.activeCount}  ·  Red · {rep.redCount}  ·  Overdue · {rep.overdueCount}
           </MonoTimestamp>
         </div>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={remove}
+            disabled={busy}
+            className="kl-mono text-[11px] uppercase tracking-wider disabled:opacity-50"
+            style={{ color: 'var(--klo-danger)', letterSpacing: '0.05em' }}
+            title={`Remove ${rep.name} from team`}
+          >
+            {busy ? '…' : 'Remove'}
+          </button>
+        )}
       </div>
+      {error && (
+        <p className="mt-2 text-[12px]" style={{ color: 'var(--klo-danger)' }}>
+          {error}
+        </p>
+      )}
       <div
         className="mt-4 pt-4 flex items-baseline justify-between"
         style={{ borderTop: '1px dashed var(--klo-line-strong)' }}
@@ -456,4 +511,19 @@ function RepCell({ index, rep }) {
       </div>
     </HairlineGrid.Cell>
   )
+}
+
+function removalErrorCopy(code) {
+  switch (code) {
+    case 'not_authenticated':
+      return 'You need to be signed in to remove a member.'
+    case 'not_manager':
+      return 'Only the team owner can remove members.'
+    case 'cannot_remove_owner':
+      return "The team owner can't be removed."
+    case 'not_found':
+      return 'That member is no longer on the team — refreshing.'
+    default:
+      return code || 'Could not remove member.'
+  }
 }
