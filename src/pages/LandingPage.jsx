@@ -605,11 +605,7 @@ function PricingCard({ plan, currency }) {
       </ul>
 
       {isEnterprise ? (
-        <a
-          href="#contact"
-          onClick={(e) => handleAnchorClick(e, 'contact')}
-          className="btn btn-primary btn-lg"
-        >
+        <a href={`mailto:${EMAIL}`} className="btn btn-primary btn-lg">
           Talk to sales
         </a>
       ) : (

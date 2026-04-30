@@ -603,19 +603,33 @@ function PlanCard({ plan, currency, isCurrent, user }) {
         ))}
       </ul>
 
-      <button
-        type="button"
-        onClick={planAvailable && !isCurrent ? handleUpgrade : undefined}
-        disabled={busy || isCurrent || !planAvailable}
-        className="mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{
-          background: isCurrent ? 'transparent' : 'var(--klo-text)',
-          color: isCurrent ? 'var(--klo-text)' : 'white',
-          border: isCurrent ? '1px solid var(--klo-line-strong)' : 'none',
-        }}
-      >
-        {buttonLabel}
-      </button>
+      {isEnterprise ? (
+        <a
+          href="mailto:support@klosure.ai"
+          className="mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold text-center"
+          style={{
+            background: 'var(--klo-text)',
+            color: 'white',
+            border: 'none',
+          }}
+        >
+          {buttonLabel}
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={planAvailable && !isCurrent ? handleUpgrade : undefined}
+          disabled={busy || isCurrent || !planAvailable}
+          className="mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: isCurrent ? 'transparent' : 'var(--klo-text)',
+            color: isCurrent ? 'var(--klo-text)' : 'white',
+            border: isCurrent ? '1px solid var(--klo-line-strong)' : 'none',
+          }}
+        >
+          {buttonLabel}
+        </button>
+      )}
       {err && (
         <p className="mt-2 text-[12px]" style={{ color: 'var(--klo-danger)' }}>
           {err}
