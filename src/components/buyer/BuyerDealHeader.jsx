@@ -112,35 +112,22 @@ export default function BuyerDealHeader({ deal }) {
 
   return (
     <div className="border-b border-navy/10 bg-white">
-      <div className="max-w-[1080px] mx-auto px-6 py-5 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-3">
+      <div className="max-w-[1080px] mx-auto px-6 py-5 space-y-3">
+        <div className="space-y-3">
           <p className="text-[11px] uppercase tracking-wider text-navy/45">{title}</p>
           <h1 className="text-lg md:text-xl font-semibold text-navy tracking-tight">
             Next best action: {nextBestAction}
           </h1>
+        </div>
 
-          <div className="text-sm text-navy/65 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="text-sm text-navy/65 flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
             {valueAmount != null && <span>{formatCurrency(valueAmount)}</span>}
             {valueAmount != null && goLiveLabel && <span className="text-navy/30">·</span>}
             {goLiveLabel ? <span>Go-live {goLiveLabel}</span> : <span>No go-live date set</span>}
             <span className="text-navy/30">·</span>
             <span className="text-navy/70">{urgencyLabel}</span>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            {readiness.map((item) => (
-              <div
-                key={item.key}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${READINESS_TONE[item.state.tone]}`}
-              >
-                <span className="font-medium">{item.label}</span>
-                <span className="opacity-80">{item.state.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-stretch gap-2 w-full md:w-auto md:min-w-[200px]">
           <button
             type="button"
             onClick={async () => {
@@ -159,15 +146,29 @@ export default function BuyerDealHeader({ deal }) {
               const body = encodeURIComponent(`${shareText}\n\n${shareUrl}`)
               window.location.href = `mailto:?subject=${subject}&body=${body}`
             }}
-            className="rounded-md bg-navy text-white text-sm font-medium px-3 py-2 hover:bg-navy/90"
+            className="rounded-md bg-navy text-white text-sm font-medium px-3 py-2 hover:bg-navy/90 w-full md:w-auto md:min-w-[200px] md:flex-shrink-0"
           >
             Share with Internal Team
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {readiness.map((item) => (
+              <div
+                key={item.key}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${READINESS_TONE[item.state.tone]}`}
+              >
+                <span className="font-medium">{item.label}</span>
+                <span className="opacity-80">{item.state.label}</span>
+              </div>
+            ))}
+          </div>
           <a
             href="https://klosure.ai"
             target="_blank"
             rel="noreferrer"
-            className="hidden md:inline text-[11px] uppercase tracking-wider text-navy/30 hover:text-navy/60 text-right pt-1"
+            className="hidden md:inline text-[11px] uppercase tracking-wider text-navy/30 hover:text-navy/60"
           >
             Powered by Klosure
           </a>
