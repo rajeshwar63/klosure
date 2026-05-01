@@ -1,0 +1,585 @@
+# Sprint 04 — Nylas webhook handler
+
+**Sprint:** 4 of 11
+**Estimated:** 2 days
+**Goal:** Build `nylas-webhook` — the single edge function that receives all Nylas events (email, calendar, notetaker, grant lifecycle), verifies signatures, dedupes, persists to the right table, and triggers downstream pipelines. After this sprint, every email and meeting in connected accounts produces a row in `email_events` or `meeting_events`. Extraction (sprints 5, 6) is the next layer.
+
+## ⚠️ Validation prerequisite
+
+This sprint must NOT ship until the three Nylas validation tests in `nylas-validation-notes.md` pass. If Notetaker quality is bad on Gulf accents, the meeting half of this handler needs rewriting against Recall.ai instead. **Do not commit this sprint with empty validation notes.**
+
+## Why this matters
+
+This is the single source of truth for everything Nylas tells us. Webhook handlers are notoriously bug-prone because:
+- Events arrive out of order
+- Events are retried on any non-2xx response, so duplicate processing must be safe
+- Signature verification is mandatory — without it, anyone can forge "user X received an email saying Y"
+- One slow LLM call inside a handler causes Nylas to time out and retry, multiplying load
+
+We solve all four with: idempotency via the unique constraints from sprint 02, HMAC signature check before any work, and **enqueue-not-process** — the webhook just persists the raw event and triggers async processing. Extraction happens in a separate function call.
+
+## Architecture: thin webhook + fan-out
+
+```
+Nylas → nylas-webhook → verify sig → persist raw → return 200 (fast)
+                                  ↓
+                                  └─ trigger async: nylas-process-email
+                                                    nylas-process-meeting
+```
+
+The webhook returns 200 in <500ms regardless of payload complexity. Processing happens in dedicated functions. This split is essential because Nylas times out at 5 seconds.
+
+## Deliverable
+
+Three edge functions in this sprint:
+1. `nylas-webhook` — entry point, signature verification, persistence
+2. `nylas-process-email` — invoked async per email_event (sprint 05 wires it to klo-respond)
+3. `nylas-process-meeting` — invoked async per meeting state change (sprint 06 wires it to klo-respond)
+
+This sprint ships the webhook plus stub processors that just log + mark processed. Sprints 5 and 6 add real extraction.
+
+## Edge function: nylas-webhook
+
+Path: `supabase/functions/nylas-webhook/index.ts`
+
+```typescript
+// =============================================================================
+// nylas-webhook — Phase A
+// =============================================================================
+// Single endpoint for all Nylas v3 webhook events.
+//
+// Behavior:
+//   1. Verify HMAC-SHA256 signature using NYLAS_WEBHOOK_SECRET
+//   2. Parse the deltas array (Nylas batches events)
+//   3. For each delta, persist to the right table idempotently
+//   4. Trigger async processing for new events
+//   5. Return 200 within 5s or Nylas retries
+//
+// Deploy:
+//   supabase functions deploy nylas-webhook --no-verify-jwt
+// (--no-verify-jwt because Nylas obviously doesn't send a Supabase JWT)
+// =============================================================================
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+const NYLAS_WEBHOOK_SECRET = Deno.env.get("NYLAS_WEBHOOK_SECRET") ?? ""
+
+const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+})
+
+Deno.serve(async (req) => {
+  // Nylas sends a one-time challenge GET when you register the webhook URL.
+  // Echo it back to confirm we own the endpoint.
+  if (req.method === "GET") {
+    const url = new URL(req.url)
+    const challenge = url.searchParams.get("challenge")
+    if (challenge) {
+      return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } })
+    }
+    return new Response("ok", { status: 200 })
+  }
+
+  if (req.method !== "POST") {
+    return new Response("method not allowed", { status: 405 })
+  }
+
+  const startTime = Date.now()
+
+  try {
+    const rawBody = await req.text()
+    const signature = req.headers.get("X-Nylas-Signature") ?? ""
+
+    // 1. Verify signature.
+    const valid = await verifySignature(rawBody, signature, NYLAS_WEBHOOK_SECRET)
+    if (!valid) {
+      console.warn("invalid webhook signature", { signature: signature.slice(0, 16) })
+      // Return 200 anyway — invalid signatures are likely abuse/scans, no point
+      // signaling to attackers that they're being rejected. Real Nylas will
+      // never get here.
+      return new Response("ok", { status: 200 })
+    }
+
+    // 2. Parse.
+    const payload = JSON.parse(rawBody) as NylasWebhookPayload
+    if (!Array.isArray(payload.deltas)) {
+      console.warn("payload missing deltas", payload)
+      return new Response("ok", { status: 200 })
+    }
+
+    // 3. Process each delta.
+    let processed = 0
+    let skipped = 0
+    const triggers: Array<Promise<void>> = []
+
+    for (const delta of payload.deltas) {
+      try {
+        const result = await handleDelta(delta)
+        if (result === "processed") processed++
+        else skipped++
+        if (result === "processed") {
+          // Fire-and-forget the downstream processor. Don't await — the webhook
+          // must return fast.
+          triggers.push(triggerProcessor(delta).catch((e) => {
+            console.error("trigger failed", e, delta.type)
+          }))
+        }
+      } catch (err) {
+        console.error("delta error", err, delta.type, delta.object?.id)
+        // Continue processing other deltas. We log the error but don't fail
+        // the whole webhook — that would cause Nylas to retry the entire
+        // batch, including the deltas we already wrote.
+        skipped++
+      }
+    }
+
+    // Best-effort kick the triggers; ignore the result.
+    Promise.allSettled(triggers).catch(() => {})
+
+    const durationMs = Date.now() - startTime
+    console.log(JSON.stringify({
+      event: "nylas_webhook_complete",
+      deltas: payload.deltas.length,
+      processed,
+      skipped,
+      duration_ms: durationMs,
+    }))
+
+    return new Response(JSON.stringify({ ok: true, processed, skipped }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  } catch (err) {
+    console.error("webhook handler exception", err)
+    // Return 200 — letting Nylas retry doesn't help if our own code is buggy.
+    // The error is logged; we'll fix and the next event will succeed.
+    return new Response("ok", { status: 200 })
+  }
+})
+
+// ----- Signature verification ----------------------------------------------
+
+async function verifySignature(body: string, signature: string, secret: string): Promise<boolean> {
+  if (!signature || !secret) return false
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    )
+    const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body))
+    const sigHex = Array.from(new Uint8Array(sigBuf))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("")
+    // Constant-time comparison to avoid timing attacks.
+    if (sigHex.length !== signature.length) return false
+    let mismatch = 0
+    for (let i = 0; i < sigHex.length; i++) {
+      mismatch |= sigHex.charCodeAt(i) ^ signature.charCodeAt(i)
+    }
+    return mismatch === 0
+  } catch (e) {
+    console.error("sig verify error", e)
+    return false
+  }
+}
+
+// ----- Delta routing -------------------------------------------------------
+
+interface NylasDelta {
+  type: string
+  object: {
+    id: string
+    grant_id: string
+    [k: string]: unknown
+  }
+  date?: number
+}
+
+interface NylasWebhookPayload {
+  deltas: NylasDelta[]
+  [k: string]: unknown
+}
+
+type DeltaResult = "processed" | "duplicate" | "skipped"
+
+async function handleDelta(delta: NylasDelta): Promise<DeltaResult> {
+  // Fast skip: if the grant isn't one we recognize, ignore. This guards
+  // against webhook leakage if someone else points their Nylas app at our
+  // URL by mistake.
+  const { data: grant } = await sb.from("nylas_grants")
+    .select("id, user_id, team_id, sync_state")
+    .eq("nylas_grant_id", delta.object.grant_id)
+    .maybeSingle()
+  if (!grant) {
+    console.log("unknown grant, skipping", delta.object.grant_id)
+    return "skipped"
+  }
+
+  // If grant is revoked locally, skip processing but don't error.
+  if (grant.sync_state === "revoked") {
+    console.log("revoked grant, skipping", delta.object.grant_id, delta.type)
+    return "skipped"
+  }
+
+  // Touch the grant's last_seen_at so we know it's alive.
+  await sb.from("nylas_grants")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("nylas_grant_id", delta.object.grant_id)
+
+  switch (delta.type) {
+    case "message.created":
+    case "message.updated":
+      return await handleMessage(delta, grant)
+    case "event.created":
+    case "event.updated":
+      return await handleEvent(delta, grant)
+    case "event.deleted":
+      return await handleEventDeleted(delta)
+    case "notetaker.media.updated":
+    case "notetaker.meeting_state.updated":
+      return await handleNotetaker(delta, grant)
+    case "grant.expired":
+      await sb.from("nylas_grants")
+        .update({ sync_state: "expired", last_error: "grant expired" })
+        .eq("nylas_grant_id", delta.object.grant_id)
+      return "processed"
+    case "grant.deleted":
+      await sb.from("nylas_grants")
+        .update({ sync_state: "revoked" })
+        .eq("nylas_grant_id", delta.object.grant_id)
+      return "processed"
+    default:
+      console.log("unhandled delta type", delta.type)
+      return "skipped"
+  }
+}
+
+// ----- Message (email) ------------------------------------------------------
+
+async function handleMessage(
+  delta: NylasDelta,
+  grant: { user_id: string; team_id: string | null },
+): Promise<DeltaResult> {
+  const msg = delta.object as Record<string, unknown> & {
+    id: string
+    grant_id: string
+    thread_id?: string
+    from?: Array<{ name?: string; email: string }>
+    to?: Array<{ name?: string; email: string }>
+    cc?: Array<{ name?: string; email: string }>
+    subject?: string
+    snippet?: string
+    date?: number
+  }
+
+  const fromAddr = msg.from?.[0]?.email ?? null
+  const receivedAt = msg.date
+    ? new Date(msg.date * 1000).toISOString()
+    : new Date().toISOString()
+
+  // Upsert by (grant_id, message_id) — handles message.updated firing after
+  // message.created without creating duplicates.
+  const { error } = await sb.from("email_events")
+    .upsert({
+      nylas_grant_id: msg.grant_id,
+      nylas_message_id: msg.id,
+      thread_id: msg.thread_id ?? null,
+      from_addr: fromAddr,
+      to_addrs: msg.to ?? [],
+      cc_addrs: msg.cc ?? [],
+      subject: msg.subject ?? null,
+      snippet: msg.snippet ?? null,
+      received_at: receivedAt,
+      raw_event: delta,
+    }, { onConflict: "nylas_grant_id,nylas_message_id" })
+
+  if (error) {
+    console.error("email_events upsert failed", error)
+    throw error
+  }
+  return "processed"
+}
+
+// ----- Event (calendar) -----------------------------------------------------
+
+async function handleEvent(
+  delta: NylasDelta,
+  grant: { user_id: string; team_id: string | null },
+): Promise<DeltaResult> {
+  const evt = delta.object as Record<string, unknown> & {
+    id: string
+    grant_id: string
+    title?: string
+    participants?: Array<{ name?: string; email: string }>
+    when?: { start_time: number; end_time: number; object: string }
+    conferencing?: { provider?: string; details?: { url?: string } }
+  }
+
+  if (!evt.when || evt.when.object !== "timespan") {
+    // All-day events and recurring masters don't have notetaker capture.
+    return "skipped"
+  }
+
+  const startsAt = new Date(evt.when.start_time * 1000).toISOString()
+  const endsAt = new Date(evt.when.end_time * 1000).toISOString()
+
+  const meetingUrl = evt.conferencing?.details?.url ?? null
+  const meetingProvider = detectProvider(meetingUrl)
+
+  const { error } = await sb.from("meeting_events")
+    .upsert({
+      nylas_grant_id: evt.grant_id,
+      nylas_event_id: evt.id,
+      title: evt.title ?? null,
+      participants: evt.participants ?? [],
+      starts_at: startsAt,
+      ends_at: endsAt,
+      meeting_url: meetingUrl,
+      meeting_provider: meetingProvider,
+      updated_at: new Date().toISOString(),
+      raw_event: delta,
+    }, { onConflict: "nylas_grant_id,nylas_event_id" })
+
+  if (error) {
+    console.error("meeting_events upsert failed", error)
+    throw error
+  }
+  return "processed"
+}
+
+async function handleEventDeleted(delta: NylasDelta): Promise<DeltaResult> {
+  // Don't hard-delete — keep the row, mark notetaker_state appropriately.
+  await sb.from("meeting_events")
+    .update({
+      notetaker_state: "not_dispatched",  // explicit "we won't be capturing"
+      updated_at: new Date().toISOString(),
+    })
+    .eq("nylas_event_id", delta.object.id)
+    .eq("nylas_grant_id", delta.object.grant_id)
+  return "processed"
+}
+
+// ----- Notetaker -----------------------------------------------------------
+
+async function handleNotetaker(
+  delta: NylasDelta,
+  grant: { user_id: string; team_id: string | null },
+): Promise<DeltaResult> {
+  const nt = delta.object as Record<string, unknown> & {
+    id: string
+    grant_id: string
+    event_id?: string
+    state?: string
+    media?: { transcript_url?: string; recording_url?: string }
+  }
+
+  const updates: Record<string, unknown> = {
+    nylas_notetaker_id: nt.id,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (delta.type === "notetaker.meeting_state.updated") {
+    const state = (nt.state ?? "").toLowerCase()
+    // Map Nylas notetaker states to our enum.
+    const stateMap: Record<string, string> = {
+      scheduled: "scheduled",
+      joining: "scheduled",
+      in_meeting: "joined",
+      recording: "recording",
+      processing: "media_processing",
+      completed: "ready",     // overridden if media not yet present
+      failed: "failed",
+    }
+    if (stateMap[state]) updates.notetaker_state = stateMap[state]
+  }
+
+  if (delta.type === "notetaker.media.updated" && nt.media?.transcript_url) {
+    updates.transcript_url = nt.media.transcript_url
+    updates.notetaker_state = "ready"
+  }
+
+  // Find the meeting_event row this notetaker belongs to. Match on event_id
+  // if present; otherwise we update by notetaker_id (sprint 06 sets this when
+  // dispatching).
+  const matchKey = nt.event_id
+    ? { nylas_event_id: nt.event_id, nylas_grant_id: nt.grant_id }
+    : { nylas_notetaker_id: nt.id }
+
+  const { error } = await sb.from("meeting_events")
+    .update(updates)
+    .match(matchKey)
+
+  if (error) {
+    console.error("meeting_events notetaker update failed", error, matchKey)
+    throw error
+  }
+  return "processed"
+}
+
+// ----- Helpers --------------------------------------------------------------
+
+function detectProvider(url: string | null): string | null {
+  if (!url) return null
+  if (url.includes("zoom.us")) return "zoom"
+  if (url.includes("meet.google.com")) return "meet"
+  if (url.includes("teams.microsoft.com") || url.includes("teams.live.com")) return "teams"
+  return "other"
+}
+
+// ----- Trigger downstream processors ---------------------------------------
+
+async function triggerProcessor(delta: NylasDelta): Promise<void> {
+  const isEmail = delta.type === "message.created" || delta.type === "message.updated"
+  const isMeeting = delta.type.startsWith("event.") || delta.type.startsWith("notetaker.")
+
+  if (!isEmail && !isMeeting) return
+
+  const fnName = isEmail ? "nylas-process-email" : "nylas-process-meeting"
+  const body = isEmail
+    ? { nylas_grant_id: delta.object.grant_id, nylas_message_id: delta.object.id }
+    : { nylas_grant_id: delta.object.grant_id, nylas_event_or_notetaker_id: delta.object.id, type: delta.type }
+
+  // Fire the function async. We don't await the response.
+  await sb.functions.invoke(fnName, { body }).catch((err) => {
+    // Log but don't propagate — the processor will be retried by the next
+    // matching event, and the row is already in our DB.
+    console.warn(`trigger ${fnName} failed:`, err)
+  })
+}
+```
+
+## Stub processors
+
+Sprints 5 and 6 fill these in. For sprint 4, ship empty shells so the trigger calls don't 404.
+
+### supabase/functions/nylas-process-email/index.ts
+
+```typescript
+// Stub — sprint 05 implements stakeholder match + klo-respond extension.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+
+const sb = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+)
+
+Deno.serve(async (req) => {
+  const { nylas_grant_id, nylas_message_id } = await req.json()
+  console.log("[STUB nylas-process-email]", { nylas_grant_id, nylas_message_id })
+
+  await sb.from("email_events")
+    .update({ processed_at: new Date().toISOString(), processing_error: "stub_no_extraction" })
+    .eq("nylas_grant_id", nylas_grant_id)
+    .eq("nylas_message_id", nylas_message_id)
+
+  return new Response(JSON.stringify({ ok: true, stub: true }), {
+    headers: { "Content-Type": "application/json" },
+  })
+})
+```
+
+### supabase/functions/nylas-process-meeting/index.ts
+
+```typescript
+// Stub — sprint 06 implements bot dispatch + transcript extraction.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+
+const sb = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+)
+
+Deno.serve(async (req) => {
+  const body = await req.json()
+  console.log("[STUB nylas-process-meeting]", body)
+
+  return new Response(JSON.stringify({ ok: true, stub: true }), {
+    headers: { "Content-Type": "application/json" },
+  })
+})
+```
+
+## Deploy
+
+```powershell
+supabase functions deploy nylas-webhook --no-verify-jwt
+supabase functions deploy nylas-process-email --no-verify-jwt
+supabase functions deploy nylas-process-meeting --no-verify-jwt
+```
+
+## Verify the challenge
+
+After deployment, in the Nylas dashboard, click "Test webhook" or just save the webhook URL. Nylas sends a GET with a `?challenge=...` parameter. We echo it back. Look for HTTP 200 with the challenge string in the response body.
+
+```powershell
+# Manual test:
+curl "https://azpdsgnvqkrfdvqxacqw.supabase.co/functions/v1/nylas-webhook?challenge=hello"
+# Expected: hello
+```
+
+## End-to-end test
+
+With your sandbox Gmail grant from sprint 03:
+
+1. Send yourself a test email from another account
+2. Within 60 seconds, check:
+
+```sql
+select id, from_addr, subject, received_at, processed_at, processing_error
+  from email_events
+  order by created_at desc
+  limit 5;
+```
+
+You should see a row with `from_addr` = the test sender, `processed_at` set (because the stub marks it), `processing_error = 'stub_no_extraction'`.
+
+3. Schedule a Google Meet 5 minutes in the future. Check:
+
+```sql
+select id, title, starts_at, meeting_url, meeting_provider, notetaker_state
+  from meeting_events
+  order by created_at desc
+  limit 5;
+```
+
+You should see the event with `meeting_provider = 'meet'` and `notetaker_state = 'not_dispatched'` (we'll dispatch in sprint 06).
+
+## Acceptance
+
+- [ ] All three functions deploy successfully
+- [ ] GET `/functions/v1/nylas-webhook?challenge=foo` returns `foo` with status 200
+- [ ] Sending an email to a connected Gmail produces a row in `email_events` within 60s
+- [ ] Creating a Google Calendar event with a Meet link produces a row in `meeting_events` within 30s
+- [ ] An email from a sender NOT in any deal still produces an `email_events` row (matching is sprint 5)
+- [ ] Webhook signature verification is enforced — confirm by:
+  ```powershell
+  # POST without a signature should return 200 (silent reject) and NOT create a row
+  curl -X POST -d '{"deltas":[]}' https://.../functions/v1/nylas-webhook
+  ```
+- [ ] Webhook handler completes in <1s for typical payloads (check function logs)
+- [ ] Duplicate deliveries don't duplicate rows (replay an event from Nylas dashboard, confirm one row)
+- [ ] Disconnecting a grant in sprint 03's UI causes subsequent webhooks for that grant to be skipped (check logs)
+
+## Pitfalls
+
+- **Don't await the trigger calls** — those run async by design. If you accidentally `await` them, the webhook can take 30s and Nylas will retry.
+- **Constant-time signature comparison** — important. A timing-attack on the secret is unlikely but cheap to prevent.
+- **Always return 200** unless the request is so malformed you can't even parse it. Returning 500 makes Nylas retry, which doesn't help and pollutes logs.
+- **The notetaker.meeting_state state names from Nylas are not stable** — they evolved during the v3 beta. Log unknown states and add to the map as you see them.
+- **The `event.deleted` handler does NOT delete the row** — we keep history. A deleted meeting that already has a transcript stays queryable.
+- **Test mode vs production webhook URLs**: Nylas only allows ONE webhook URL per app. Use `klosure-prod` for production and create a separate `klosure-dev` Nylas app pointed at a Supabase preview branch if you need separate dev/prod webhook handling.
+
+## What this sprint does NOT do
+
+- Stakeholder matching → sprint 05
+- Bot dispatch on calendar events → sprint 06
+- Transcript fetching → sprint 06
+- Pool throttling → sprint 07
+- The user-facing settings page → sprint 09 (this sprint provides the components, sprint 09 wires the page)
+
+→ Next: `05-email-extraction-pipeline.md`
