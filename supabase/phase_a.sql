@@ -165,10 +165,12 @@ create table if not exists public.meeting_usage (
   user_id uuid not null references public.users(id) on delete cascade,
   meeting_event_id uuid references public.meeting_events(id) on delete set null,
   duration_minutes integer not null check (duration_minutes >= 0),
-  -- Denormalised for cheap month-bucketing without a join:
+  -- Denormalised for cheap month-bucketing without a join. Cast through UTC
+  -- to keep the generated expression IMMUTABLE — `to_char(timestamptz, …)`
+  -- alone is STABLE (depends on session TZ) and Postgres rejects it here.
   consumed_at timestamptz not null default now(),
-  consumed_year_month text not null           -- 'YYYY-MM' from consumed_at
-    generated always as (to_char(consumed_at, 'YYYY-MM')) stored
+  consumed_year_month text not null
+    generated always as (to_char((consumed_at at time zone 'UTC'), 'YYYY-MM')) stored
 );
 
 create index if not exists meeting_usage_team_month_idx
