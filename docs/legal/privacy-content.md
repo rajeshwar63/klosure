@@ -5,7 +5,7 @@
 
 This Privacy Policy describes how Klosure.ai ("Klosure," "we," "our," or "us") collects, uses, stores, and shares information when you use our B2B sales coaching platform available at klosure.ai (the "Service").
 
-Klosure is operated by Rajeshwar Yelne, an individual founder based in Hyderabad, India. You can reach us at **rajeshwar63@gmail.com**.
+Klosure is operated by Rajeshwar Yelne, an individual founder based in Hyderabad, India. You can reach us at **support@klosure.com**.
 
 If you do not agree with this policy, please do not use the Service.
 
@@ -145,7 +145,7 @@ Depending on where you live, you may have the right to:
 - **Object** — object to certain types of processing
 - **Withdraw consent** — disconnect any integration at any time
 
-To exercise any of these rights, email **rajeshwar63@gmail.com** with the subject line "Privacy request." We will respond within 30 days.
+To exercise any of these rights, email **support@klosure.com** with the subject line "Privacy request." We will respond within 30 days.
 
 If you are in the European Economic Area, the United Kingdom, or a jurisdiction with similar data protection laws, you also have the right to lodge a complaint with your local supervisory authority.
 
@@ -161,7 +161,7 @@ Klosure is operated from India, but our sub-processors are based in multiple cou
 
 ## 10. Children's privacy
 
-Klosure is a B2B sales tool intended for use by adults in a professional capacity. We do not knowingly collect data from anyone under 18. If you believe a child has provided us data, contact us at **rajeshwar63@gmail.com** and we will delete it.
+Klosure is a B2B sales tool intended for use by adults in a professional capacity. We do not knowingly collect data from anyone under 18. If you believe a child has provided us data, contact us at **support@klosure.com** and we will delete it.
 
 ---
 
@@ -182,7 +182,7 @@ For privacy questions, data requests, or to report a security concern:
 **Rajeshwar Yelne**
 Klosure.ai
 Hyderabad, Telangana, India
-**rajeshwar63@gmail.com**
+**support@klosure.com**
 
 ---
 
