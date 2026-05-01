@@ -26,7 +26,7 @@ To use Klosure, you must:
 - Not be barred from using the Service under the laws of India or your country of residence
 - Provide accurate registration information and keep it current
 
-You are responsible for safeguarding your account credentials and for all activity that happens under your account. Notify us immediately at **rajeshwar63@gmail.com** if you suspect unauthorized access.
+You are responsible for safeguarding your account credentials and for all activity that happens under your account. Notify us immediately at **support@klosure.com** if you suspect unauthorized access.
 
 ---
 
@@ -54,7 +54,7 @@ If a payment fails, we will attempt to recharge your payment method. If we canno
 
 ### 3.6 Refunds
 
-Subscription fees are non-refundable, except where required by law. If you believe you were charged in error, contact us within 30 days of the charge at **rajeshwar63@gmail.com** and we will review the situation.
+Subscription fees are non-refundable, except where required by law. If you believe you were charged in error, contact us within 30 days of the charge at **support@klosure.com** and we will review the situation.
 
 ### 3.7 Cancellation
 
@@ -228,4 +228,4 @@ For questions about these Terms:
 **Rajeshwar Yelne**
 Klosure.ai
 Hyderabad, Telangana, India
-**rajeshwar63@gmail.com**
+**support@klosure.com**
