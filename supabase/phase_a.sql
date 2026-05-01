@@ -155,6 +155,22 @@ create index if not exists meeting_events_state_idx
   on public.meeting_events(notetaker_state, ends_at)
   where notetaker_state in ('media_processing', 'recording', 'joined');
 
+-- ----- yyyymm_utc helper ----------------------------------------------------
+-- IMMUTABLE wrapper used by meeting_usage's generated column. PG17 marks
+-- to_char() STABLE (it depends on lc_time), so it can't appear in a stored
+-- generated expression. extract() + lpad() + numeric→text are all IMMUTABLE,
+-- and casting through `at time zone 'UTC'` removes the session-TZ dependency.
+
+create or replace function public.yyyymm_utc(ts timestamptz)
+returns text
+language sql
+immutable
+as $$
+  select extract(year  from ts at time zone 'UTC')::int::text
+      || '-'
+      || lpad(extract(month from ts at time zone 'UTC')::int::text, 2, '0')
+$$;
+
 -- ----- meeting_usage --------------------------------------------------------
 -- Append-only ledger. Each completed meeting writes one row. team_pool is the
 -- aggregate; this is the breakdown for the manager's per-rep view.
@@ -165,12 +181,10 @@ create table if not exists public.meeting_usage (
   user_id uuid not null references public.users(id) on delete cascade,
   meeting_event_id uuid references public.meeting_events(id) on delete set null,
   duration_minutes integer not null check (duration_minutes >= 0),
-  -- Denormalised for cheap month-bucketing without a join. Cast through UTC
-  -- to keep the generated expression IMMUTABLE — `to_char(timestamptz, …)`
-  -- alone is STABLE (depends on session TZ) and Postgres rejects it here.
+  -- Denormalised for cheap month-bucketing without a join.
   consumed_at timestamptz not null default now(),
   consumed_year_month text not null
-    generated always as (to_char((consumed_at at time zone 'UTC'), 'YYYY-MM')) stored
+    generated always as (public.yyyymm_utc(consumed_at)) stored
 );
 
 create index if not exists meeting_usage_team_month_idx
@@ -379,7 +393,7 @@ end $$;
 
 create or replace function public.get_team_usage_by_rep(
   p_team_id uuid,
-  p_year_month text default to_char(now(), 'YYYY-MM')
+  p_year_month text default public.yyyymm_utc(now())
 )
 returns table (
   user_id uuid,
@@ -458,39 +472,71 @@ $$;
 
 grant execute on function public.ensure_team_for_user(uuid) to authenticated;
 
--- ----- Plan check constraint widening (Phase A sprint 08) -------------------
--- Before Phase A: trial / pro / team_starter / team_growth / team_scale / enterprise.
--- After Phase A: trial / klosure / enterprise. Old slugs stay valid for one
--- migration cycle so existing rows don't break the constraint mid-deploy.
-alter table public.users
-  drop constraint if exists users_plan_check;
+-- ----- Plan migration & constraint widening (Phase A sprint 08) -------------
+-- Before Phase A: free / trial / pro / team_starter / team_growth / team_scale
+-- / enterprise (mixed across migrations + the original 'free'/'team' defaults
+-- from schema.sql).
+-- After Phase A: trial / klosure / enterprise.
+--
+-- Order matters: drop the old constraint first, migrate ALL legacy values to
+-- canonical slugs, then add the new constraint. Otherwise the constraint
+-- check fires before we get a chance to clean up.
+
+alter table public.users  drop constraint if exists users_plan_check;
+alter table public.teams  drop constraint if exists teams_plan_check;
+
+do $$
+begin
+  -- Solo / unpaid users:
+  update public.users set plan = 'trial'    where plan in ('free');
+  update public.users set plan = 'klosure'  where plan in ('pro', 'team_starter', 'team_growth', 'team_scale', 'team');
+  -- Teams:
+  update public.teams set plan = 'klosure'  where plan in ('team', 'pro', 'team_starter', 'team_growth', 'team_scale');
+exception when others then
+  raise notice 'plan migration skipped: %', sqlerrm;
+end $$;
+
+-- New canonical defaults so future inserts land on legal values.
+alter table public.users alter column plan set default 'trial';
+alter table public.teams alter column plan set default 'klosure';
+
+-- Now narrow to the canonical set. Legacy slugs are kept as a backstop for
+-- any in-flight rows mid-deploy — drop them once you've verified zero rows
+-- still reference them.
 alter table public.users
   add constraint users_plan_check
   check (plan in (
     'trial', 'klosure', 'enterprise',
-    'pro', 'team_starter', 'team_growth', 'team_scale'  -- legacy, will be migrated
+    'free', 'pro', 'team', 'team_starter', 'team_growth', 'team_scale'
   ));
 
-alter table public.teams
-  drop constraint if exists teams_plan_check;
 alter table public.teams
   add constraint teams_plan_check
   check (plan in (
     'trial', 'klosure', 'enterprise',
-    'pro', 'team_starter', 'team_growth', 'team_scale'  -- legacy, will be migrated
+    'free', 'pro', 'team', 'team_starter', 'team_growth', 'team_scale'
   ));
 
--- ----- One-shot pricing migration -------------------------------------------
--- Move any test users still on legacy plan slugs onto 'klosure'. Since we have
--- zero paying customers, this is internal-only data. Wrapped in DO block so
--- repeated runs are no-ops.
-do $$
-begin
-  update public.users  set plan = 'klosure' where plan in ('pro');
-  update public.teams  set plan = 'klosure' where plan in ('team_starter', 'team_growth', 'team_scale');
-exception when others then
-  raise notice 'plan migration skipped: %', sqlerrm;
-end $$;
+-- ----- Pin search_path on Phase A functions --------------------------------
+-- Silences the Supabase function_search_path_mutable advisor and prevents
+-- search-path hijacking via temp objects. reset_team_pools and
+-- ensure_team_for_user already declare it in their bodies; ALTERing the rest
+-- for parity. Idempotent.
+
+alter function public.yyyymm_utc(timestamptz)
+  set search_path = public, pg_temp;
+alter function public.get_team_pool(uuid)
+  set search_path = public, pg_temp;
+alter function public.increment_meeting_usage(uuid, uuid, uuid, integer)
+  set search_path = public, pg_temp;
+alter function public.get_team_usage_by_rep(uuid, text)
+  set search_path = public, pg_temp;
+alter function public.create_team_pool()
+  set search_path = public, pg_temp;
+alter function public.reset_team_pools()
+  set search_path = public, pg_temp;
+alter function public.ensure_team_for_user(uuid)
+  set search_path = public, pg_temp;
 
 -- ----- RLS ------------------------------------------------------------------
 
