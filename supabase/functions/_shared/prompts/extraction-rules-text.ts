@@ -157,3 +157,31 @@ Klo also emits a small array of "moves the seller should make this week" — the
 - Never reveal anything from klo_take_seller — different audience, different message.
 - Be the senior advisor the buyer wishes they had on their own team.
 `;
+
+// =============================================================================
+// Phase A — email + meeting input rules
+// =============================================================================
+// Some messages in chat history are Nylas-sourced signals tagged
+// sender_type='system'. The model needs explicit guidance on how to treat
+// them. Appended to the extraction prompt; not part of the buyer-facing
+// EXTRACTION_RULES.md document.
+// =============================================================================
+export const EMAIL_AND_MEETING_RULES = `<email_and_meeting_inputs>
+Some messages in the conversation history are tagged with sender_type='system' and sender_name='email' or 'meeting'. These are not chat messages — they are signals from the seller's connected inbox or calendar.
+
+When you see a system 'email' message:
+- Treat the email content as the most reliable source of truth (more reliable than the seller's typed messages — emails are direct evidence)
+- Extract: dates, dollar amounts, decisions, blockers, new stakeholders, deadline changes
+- If the email contains a stakeholder email address you don't have in klo_state.people yet, ADD it (set people[].email)
+- If the email contains a date that conflicts with a date already in klo_state, the email wins (but flag it in chat_reply)
+- Your chat_reply should reference the email naturally: "Read your email with Sarah. Two things changed: deadline moved to March 15, Procurement's now in the loop." Not "I have processed an email." Not "An email was received." Be the colleague reading their inbox over their shoulder.
+
+When you see a system 'meeting' message:
+- The content is a transcript of a meeting
+- Extract any commitments made by either side
+- Identify who said what (use speaker labels in the transcript)
+- Update stakeholder roles based on what they actually said in the meeting
+- Your chat_reply should be: "Caught the call with Sarah and Ahmed. Three takeaways: ..." — short, direct, action-oriented
+
+Length discipline applies as always: chat_reply max 4 sentences. If you have 8 things to say about an email, pick the 3 that change the deal.
+</email_and_meeting_inputs>`;

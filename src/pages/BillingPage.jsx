@@ -18,7 +18,8 @@ import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
 
-const SHOWN_PLANS = ['pro', 'team_starter', 'team_growth', 'team_scale', 'enterprise']
+// Phase A sprint 08: collapsed to one paid plan + enterprise contact-sales card.
+const SHOWN_PLANS = ['klosure', 'enterprise']
 const CURRENCIES = ['INR', 'AED']
 
 export default function BillingPage() {
@@ -588,9 +589,9 @@ function PlanCard({ plan, currency, isCurrent, user }) {
           </span>
         </div>
       )}
-      {!isEnterprise && plan.seatCap > 1 && (
+      {!isEnterprise && plan.isTeam && (
         <p className="text-[12px] kl-mono mt-1" style={{ color: 'var(--klo-text-mute)' }}>
-          Up to {plan.seatCap} seats
+          Per seat · pay only for who you onboard
         </p>
       )}
 

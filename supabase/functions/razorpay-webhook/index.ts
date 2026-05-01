@@ -43,11 +43,14 @@ import {
 
 const APP_URL = Deno.env.get("APP_URL") ?? "https://klosure.ai"
 const PLAN_LABELS: Record<string, string> = {
-  pro: "Pro",
-  team_starter: "Team Starter",
-  team_growth: "Team Growth",
-  team_scale: "Team Scale",
+  klosure: "Klosure",
   enterprise: "Enterprise",
+  // Legacy slugs preserved for historical webhook events; everything maps to
+  // the unified Klosure label.
+  pro: "Klosure",
+  team_starter: "Klosure",
+  team_growth: "Klosure",
+  team_scale: "Klosure",
 }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""

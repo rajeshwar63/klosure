@@ -3,7 +3,7 @@
 // Reads current klo_state + recent messages.
 // Produces updated klo_state + a role-scoped chat reply.
 
-import { extractionRulesText } from './extraction-rules-text.ts';
+import { extractionRulesText, EMAIL_AND_MEETING_RULES } from './extraction-rules-text.ts';
 import {
   VOICE_SECTION,
   OUTPUT_REQUIREMENTS_SECTION,
@@ -31,6 +31,8 @@ ${OUTPUT_REQUIREMENTS_SECTION}
 <extraction_rules>
 ${extractionRulesText}
 </extraction_rules>
+
+${EMAIL_AND_MEETING_RULES}
 
 ${GROUNDING_SECTION}
 
