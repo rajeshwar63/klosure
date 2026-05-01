@@ -26,6 +26,8 @@ const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
 const TrainKloPage = lazy(() => import('./pages/TrainKloPage.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
+const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -90,9 +92,10 @@ export default function App() {
           element={<RequireAuth><BillingReturnPage /></RequireAuth>}
         />
 
-        {/* Marketing-only placeholder routes referenced from the homepage footer. */}
-        <Route path="/privacy" element={<ComingSoonPage title="Privacy policy" />} />
-        <Route path="/terms" element={<ComingSoonPage title="Terms of service" />} />
+        {/* Public legal pages — must be reachable without auth so Google's
+            OAuth verification bot can fetch them. */}
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/refund" element={<ComingSoonPage title="Refund policy" />} />
 
         {/* Buyer flow stays outside the shell. */}
