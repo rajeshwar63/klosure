@@ -690,7 +690,21 @@ function Footer() {
           <a href="#pricing" onClick={(e) => handleAnchorClick(e, 'pricing')}>Pricing</a>
           <a href="#contact" onClick={(e) => handleAnchorClick(e, 'contact')}>Contact</a>
         </div>
-        <div>© 2026 Klosure. Built for sales heads who want the truth.</div>
+        <div className="footer-tagline">
+          Built for sales heads who want the truth.
+        </div>
+      </div>
+      <div className="container footer-legal">
+        <div className="footer-legal-links">
+          <Link to="/privacy">Privacy Policy</Link>
+          <span className="footer-legal-sep" aria-hidden>·</span>
+          <Link to="/terms">Terms of Service</Link>
+          <span className="footer-legal-sep" aria-hidden>·</span>
+          <a href="mailto:rajeshwar63@gmail.com">rajeshwar63@gmail.com</a>
+        </div>
+        <div className="footer-legal-copy">
+          © 2026 Klosure.ai. All rights reserved.
+        </div>
       </div>
     </footer>
   )

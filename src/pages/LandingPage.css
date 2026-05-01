@@ -898,7 +898,7 @@
 
 /* FOOTER */
 .klo-landing .klo-footer {
-  padding: 48px 0 64px;
+  padding: 48px 0 32px;
   color: var(--text-mute);
   font-size: 13px;
 }
@@ -927,6 +927,49 @@
 
 .klo-landing .footer-links a:hover {
   color: var(--text);
+}
+
+.klo-landing .footer-tagline {
+  color: var(--text-mute);
+}
+
+.klo-landing .footer-legal {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  font-size: 12px;
+}
+
+.klo-landing .footer-legal-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 12px;
+}
+
+.klo-landing .footer-legal-links a {
+  color: var(--text-mute);
+  text-decoration: none;
+}
+
+.klo-landing .footer-legal-links a:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.klo-landing .footer-legal-sep {
+  color: var(--text-mute);
+  opacity: 0.6;
+}
+
+.klo-landing .footer-legal-copy {
+  color: var(--text-mute);
 }
 
 /* RESPONSIVE */

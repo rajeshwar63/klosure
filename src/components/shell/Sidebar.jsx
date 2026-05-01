@@ -9,6 +9,7 @@
 // need work float to the top.
 
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import SidebarNavItem from './SidebarNavItem.jsx'
 import SidebarDealRow from './SidebarDealRow.jsx'
 import TeamContextBadge from './TeamContextBadge.jsx'
@@ -348,6 +349,27 @@ export default function Sidebar({
               Log out
             </button>
           )}
+        </div>
+      )}
+
+      {/* Legal links — required by Google/Microsoft OAuth verification so
+          authenticated users can find the policies from inside the app. */}
+      {!collapsed && (
+        <div className="px-3 pb-2 flex items-center gap-1.5 text-[10px] text-navy/45 shrink-0">
+          <Link to="/privacy" className="hover:text-klo hover:underline">
+            Privacy
+          </Link>
+          <span aria-hidden>·</span>
+          <Link to="/terms" className="hover:text-klo hover:underline">
+            Terms
+          </Link>
+          <span aria-hidden>·</span>
+          <a
+            href="mailto:rajeshwar63@gmail.com"
+            className="hover:text-klo hover:underline"
+          >
+            Contact
+          </a>
         </div>
       )}
     </aside>
