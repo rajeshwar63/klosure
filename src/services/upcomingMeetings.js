@@ -1,14 +1,23 @@
-// Phase A — upcoming notetaker reads.
+// Phase A — upcoming meeting awareness on the deal page.
 //
-// Surfaces "Klo will join your call" awareness on the deal page. Reads
-// meeting_events directly via Supabase; RLS gates access by grant ownership.
-// We treat any non-finished, recent-or-future meeting as "live awareness" so
-// the band can transition through scheduled → joined → recording → media_processing
-// without flickering.
+// Surfaces every relevant upcoming meeting on the deal in the KloMeetingBand
+// — including those Klo's notetaker can't or won't join (no recognized
+// provider, quota full). Cancelled and finished states stay out so the band
+// reflects only what's actually still upcoming.
+//
+// Reads meeting_events directly via Supabase; RLS gates access by grant
+// ownership.
 
 import { supabase } from '../lib/supabase.js'
 
-const ACTIVE_STATES = ['scheduled', 'joined', 'recording', 'media_processing']
+const VISIBLE_STATES = [
+  'not_dispatched',
+  'scheduled',
+  'joined',
+  'recording',
+  'media_processing',
+  'skipped_quota',
+]
 const GRACE_HOURS = 4
 
 export async function loadActiveMeetingsForDeal(dealId) {
@@ -17,10 +26,10 @@ export async function loadActiveMeetingsForDeal(dealId) {
   const { data, error } = await supabase
     .from('meeting_events')
     .select(
-      'id, title, starts_at, ends_at, notetaker_state, meeting_provider, participants, matched_stakeholder',
+      'id, title, starts_at, ends_at, notetaker_state, meeting_provider, participants, matched_stakeholder, processing_error',
     )
     .eq('deal_id', dealId)
-    .in('notetaker_state', ACTIVE_STATES)
+    .in('notetaker_state', VISIBLE_STATES)
     .gte('starts_at', cutoff)
     .order('starts_at', { ascending: true })
     .limit(5)

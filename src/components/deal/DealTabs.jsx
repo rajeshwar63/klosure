@@ -6,6 +6,7 @@ const STORAGE_KEY_PREFIX = 'klosure:dealTab:'
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'chat', label: 'Chat' },
+  { id: 'calendar', label: 'Calendar' },
   { id: 'buyer', label: 'Buyer view' },
 ]
 
