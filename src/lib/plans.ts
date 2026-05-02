@@ -195,7 +195,9 @@ function formatAmount(amount: number, currency: Currency): string {
 export function formatPrice(slug: PlanSlug, currency: Currency): string {
   const p = priceFor(slug, currency)
   if (p === null) return 'Contact sales'
-  return `${formatAmount(p, currency)}/seat/mo`
+  // Returns "$49/seat" — the surrounding card template appends "/mo" as a
+  // smaller suffix span, so the two combined render as "$49/seat /mo".
+  return `${formatAmount(p, currency)}/seat`
 }
 
 export function totalPriceForTeam(
