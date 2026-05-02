@@ -289,24 +289,12 @@ export default function Sidebar({
           Settings is the unified hub: profile, integrations, train-klo,
           billing, account. Visible to all roles. */}
       {!collapsed && (
-        <div className="border-t border-navy/5 px-2 pt-2 pb-1 shrink-0 flex flex-col gap-0.5">
-          <SidebarNavItem
-            icon="✦"
-            label="Train Klo"
-            active={activeView === 'train-klo'}
-            onClick={handle('train-klo')}
-          />
+        <div className="border-t border-navy/5 px-2 pt-2 pb-1 shrink-0">
           <SidebarNavItem
             icon="⚙"
             label="Settings"
             active={activeView === 'settings'}
             onClick={handle('settings')}
-          />
-          <SidebarNavItem
-            icon="₹"
-            label="Billing"
-            active={activeView === 'billing'}
-            onClick={handle('billing')}
           />
         </div>
       )}
