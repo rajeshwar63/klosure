@@ -665,7 +665,14 @@
 .klo-landing .price-seats {
   font-size: 12px;
   color: var(--text-mute);
-  margin: 0 0 20px;
+  margin: 0;
+}
+
+.klo-landing .price-tax {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin: 4px 0 20px;
+  opacity: 0.85;
 }
 
 .klo-landing .price-amount + .price-list,

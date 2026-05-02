@@ -602,9 +602,14 @@ function PlanCard({ plan, currency, isCurrent, user }) {
         </div>
       )}
       {!isEnterprise && plan.isTeam && (
-        <p className="text-[12px] kl-mono mt-1" style={{ color: 'var(--klo-text-mute)' }}>
-          Per seat · pay only for who you onboard
-        </p>
+        <>
+          <p className="text-[12px] kl-mono mt-1" style={{ color: 'var(--klo-text-mute)' }}>
+            Per seat · pay only for who you onboard
+          </p>
+          <p className="text-[11px] kl-mono mt-0.5" style={{ color: 'var(--klo-text-mute)' }}>
+            Exclusive of applicable taxes
+          </p>
+        </>
       )}
 
       <ul className="mt-4 space-y-1.5 flex-1">
