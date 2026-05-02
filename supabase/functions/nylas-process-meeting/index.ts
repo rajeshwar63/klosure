@@ -112,6 +112,7 @@ async function handleCalendarEvent(grantId: string, eventId: string): Promise<Re
   let matchedDealId: string | null = null
   let matchedAddress: string | null = null
 
+  // Pass 1: exact email match across all deals (strongest signal).
   for (const deal of deals ?? []) {
     const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
       []) as Array<{ email?: string }>
@@ -127,6 +128,30 @@ async function handleCalendarEvent(grantId: string, eventId: string): Promise<Re
       }
     }
     if (matchedDealId) break
+  }
+
+  // Pass 2: domain fallback. If any participant shares a domain with a known
+  // stakeholder on a deal (excluding free-mail providers), treat as a match.
+  if (!matchedDealId) {
+    for (const deal of deals ?? []) {
+      const people = ((deal.klo_state as { people?: Array<{ email?: string }> })
+        ?.people ?? []) as Array<{ email?: string }>
+      const peopleDomains = new Set(
+        people
+          .map((p) => domainOf((p.email ?? "").toLowerCase().trim()))
+          .filter((d): d is string => !!d && !isCommonDomain(d)),
+      )
+      if (peopleDomains.size === 0) continue
+      for (const ext of externals) {
+        const dom = domainOf(ext.email.toLowerCase())
+        if (dom && peopleDomains.has(dom)) {
+          matchedDealId = deal.id
+          matchedAddress = ext.email.toLowerCase()
+          break
+        }
+      }
+      if (matchedDealId) break
+    }
   }
 
   if (!matchedDealId) {
@@ -432,6 +457,30 @@ async function markEvent(
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
+}
+
+function domainOf(email: string): string | null {
+  const at = email.lastIndexOf("@")
+  if (at < 0) return null
+  return email.slice(at + 1).toLowerCase().trim() || null
+}
+
+const COMMON_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "proton.me",
+  "protonmail.com",
+  "aol.com",
+])
+
+function isCommonDomain(d: string): boolean {
+  return COMMON_DOMAINS.has(d)
 }
 
 function json(payload: unknown, status = 200) {

@@ -7,7 +7,8 @@ import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { requestKloCoaching } from '../services/klo.js'
 import { getSellerProfile, upsertSellerProfile } from '../lib/sellerProfile.js'
 
-const EMPTY_STAKEHOLDER = { name: '', role: '', company: '' }
+const EMPTY_STAKEHOLDER = { name: '', role: '', company: '', email: '' }
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function NewDealPage() {
   const navigate = useNavigate()
@@ -92,8 +93,23 @@ export default function NewDealPage() {
     setSubmitting(true)
 
     const cleanStakeholders = stakeholders
-      .map((s) => ({ name: s.name.trim(), role: s.role.trim(), company: s.company.trim() }))
+      .map((s) => ({
+        name: s.name.trim(),
+        role: s.role.trim(),
+        company: s.company.trim(),
+        email: s.email.trim().toLowerCase(),
+      }))
       .filter((s) => s.name)
+
+    // Validate emails if provided. Empty email is allowed; invalid is not.
+    const badEmail = cleanStakeholders.find(
+      (s) => s.email && !EMAIL_RE.test(s.email),
+    )
+    if (badEmail) {
+      setError(`"${badEmail.email}" doesn't look like a valid email.`)
+      setSubmitting(false)
+      return
+    }
 
     try {
       const { data: deal, error: dealError } = await supabase
@@ -124,6 +140,29 @@ export default function NewDealPage() {
         notes: notes || null
       })
       if (contextError) throw contextError
+
+      // Seed klo_state.people directly from the form so emails (and the rest)
+      // are captured deterministically — independent of LLM extraction. The
+      // subsequent klo-respond run merges richer context from chat but won't
+      // drop what's already here.
+      if (cleanStakeholders.length > 0) {
+        const nowIso = new Date().toISOString()
+        const seededPeople = cleanStakeholders.map((s) => ({
+          name: s.name,
+          role: s.role || null,
+          company: s.company || null,
+          email: s.email || null,
+          added_at: nowIso,
+          first_seen_message_id: null,
+        }))
+        const { error: peopleSeedError } = await supabase
+          .from('deals')
+          .update({ klo_state: { people: seededPeople } })
+          .eq('id', deal.id)
+        if (peopleSeedError) {
+          console.warn('[NewDeal] failed to seed klo_state.people', peopleSeedError)
+        }
+      }
 
       // Seed the chat with the seller's context as the first message so Klo
       // responds to it instead of opening with a generic greeting. If both
@@ -237,36 +276,55 @@ export default function NewDealPage() {
             </div>
           </Card>
 
-          <Card title="Stakeholders" subtitle="Who's involved on the buyer side? Klo uses this to coach you on whom to pull in.">
-            <div className="space-y-2">
+          <Card
+            title="Stakeholders"
+            subtitle="Who's involved on the buyer side? Email is optional but lets Klo read messages and meetings with that person."
+          >
+            <div className="space-y-3">
               {stakeholders.map((s, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                <div key={i} className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 items-center">
+                    <input
+                      className="col-span-4 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
+                      placeholder="Name"
+                      value={s.name}
+                      onChange={(e) => updateStakeholder(i, 'name', e.target.value)}
+                    />
+                    <input
+                      className="col-span-4 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
+                      placeholder="Role"
+                      value={s.role}
+                      onChange={(e) => updateStakeholder(i, 'role', e.target.value)}
+                    />
+                    <input
+                      className="col-span-3 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
+                      placeholder="Company"
+                      value={s.company}
+                      onChange={(e) => updateStakeholder(i, 'company', e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeStakeholder(i)}
+                      className="col-span-1 text-navy/40 hover:text-red-500 text-lg"
+                      aria-label="Remove stakeholder"
+                    >
+                      ×
+                    </button>
+                  </div>
                   <input
-                    className="col-span-4 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                    placeholder="Name"
-                    value={s.name}
-                    onChange={(e) => updateStakeholder(i, 'name', e.target.value)}
+                    type="email"
+                    inputMode="email"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    className="w-full border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
+                    placeholder={
+                      s.name.trim()
+                        ? `${s.name.split(' ')[0]}'s email (optional)`
+                        : 'Email (optional)'
+                    }
+                    value={s.email}
+                    onChange={(e) => updateStakeholder(i, 'email', e.target.value)}
                   />
-                  <input
-                    className="col-span-4 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                    placeholder="Role"
-                    value={s.role}
-                    onChange={(e) => updateStakeholder(i, 'role', e.target.value)}
-                  />
-                  <input
-                    className="col-span-3 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                    placeholder="Company"
-                    value={s.company}
-                    onChange={(e) => updateStakeholder(i, 'company', e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeStakeholder(i)}
-                    className="col-span-1 text-navy/40 hover:text-red-500 text-lg"
-                    aria-label="Remove stakeholder"
-                  >
-                    ×
-                  </button>
                 </div>
               ))}
               <button
