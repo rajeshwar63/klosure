@@ -85,8 +85,10 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     isTeam: true,
     monthlyPerSeat: {
       // Launch pricing — $49/seat/mo. Goes to $79 once Google integration
-      // (email + meeting capture) ships. INR/AED kept at rough $49 parity.
-      INR: 3999,
+      // (email + meeting capture) ships. INR is 4499 to cover GST + the
+      // higher payment-processor fees on local cards. All prices exclude
+      // applicable taxes.
+      INR: 4499,
       AED: 180,
       USD: 49,
     },
@@ -111,9 +113,12 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     description: 'Everything Klosure does, per seat, per month',
     highlights: [
       'Klo coaching on every conversation',
-      'Email + meeting capture (Gmail, Outlook, Zoom, Meet, Teams)',
+      'Email + Note Taker (Gmail, Outlook, Zoom, Meet, Teams)',
+      'Unlimited email + calendar events',
+      '15 hours of Notetaker meetings per seat',
+      'AI Dashboard for Rep and Client',
       'Manager dashboard with team rollup',
-      'Daily focus + weekly brief',
+      'Daily focus + weekly brief for Manager and Rep',
       'Pooled meeting hours across the team',
     ],
   },

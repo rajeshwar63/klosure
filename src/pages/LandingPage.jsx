@@ -539,7 +539,10 @@ function PricingCard({ plan, currency }) {
         )}
       </div>
       {!isEnterprise && plan.isTeam && (
-        <p className="price-seats mono">Per seat · scale to as many reps as you need</p>
+        <>
+          <p className="price-seats mono">Per seat · scale to as many reps as you need</p>
+          <p className="price-tax mono">Exclusive of applicable taxes</p>
+        </>
       )}
 
       <ul className="price-list">
