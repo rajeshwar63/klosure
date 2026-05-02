@@ -84,9 +84,11 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     shortLabel: 'Klosure',
     isTeam: true,
     monthlyPerSeat: {
+      // Launch pricing — $49/seat/mo. Goes to $79 once Google integration
+      // (email + meeting capture) ships. INR/AED kept at rough $49 parity.
       INR: 3999,
-      AED: 290,
-      USD: 79,
+      AED: 180,
+      USD: 49,
     },
     poolDefaults: {
       meeting_minutes_per_seat: 900,

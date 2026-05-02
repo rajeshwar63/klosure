@@ -20,7 +20,13 @@ import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
 
 // Phase A sprint 08: collapsed to one paid plan + enterprise contact-sales card.
 const SHOWN_PLANS = ['klosure', 'enterprise']
-const CURRENCIES = ['INR', 'AED']
+const CURRENCIES = ['USD', 'INR', 'AED']
+
+const CURRENCY_LABELS = {
+  USD: 'US Dollars',
+  INR: 'Indian Rupees',
+  AED: 'UAE Dirhams',
+}
 
 export default function BillingPage() {
   const { user, signOut } = useAuth()
@@ -170,7 +176,7 @@ export default function BillingPage() {
 
         <div className="mt-8 flex items-center justify-between flex-wrap gap-3">
           <p className="text-[14px]" style={{ color: 'var(--klo-text-dim)' }}>
-            Prices shown in {currency === 'INR' ? 'Indian Rupees' : 'UAE Dirhams'}.
+            Prices shown in {CURRENCY_LABELS[currency] ?? currency}.
           </p>
           <div
             className="inline-flex rounded-lg p-1"
@@ -510,7 +516,10 @@ function PlanCard({ plan, currency, isCurrent, user }) {
   } else if (isEnterprise) {
     buttonLabel = 'Talk to sales'
   } else if (!planAvailable) {
-    buttonLabel = currency === 'AED' ? 'Contact sales — AED billing soon' : 'Talk to sales'
+    buttonLabel =
+      currency === 'INR'
+        ? 'Talk to sales'
+        : `Contact sales — ${currency} billing soon`
   } else if (busy) {
     buttonLabel = 'Opening checkout…'
   } else {
@@ -636,13 +645,13 @@ function PlanCard({ plan, currency, isCurrent, user }) {
           {err}
         </p>
       )}
-      {!planAvailable && !isCurrent && !isEnterprise && currency === 'AED' && (
+      {!planAvailable && !isCurrent && !isEnterprise && currency !== 'INR' && (
         <p className="mt-2 text-[11px]" style={{ color: 'var(--klo-text-mute)' }}>
           Email{' '}
           <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
             support@klosure.ai
           </a>{' '}
-          for AED billing.
+          for {currency} billing.
         </p>
       )}
     </div>

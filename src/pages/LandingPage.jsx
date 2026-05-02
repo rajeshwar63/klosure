@@ -5,7 +5,13 @@ import './LandingPage.css'
 
 // Phase A sprint 08: collapsed pricing.
 const SHOWN_PLANS = ['klosure', 'enterprise']
-const CURRENCIES = ['INR', 'AED']
+const CURRENCIES = ['USD', 'INR', 'AED']
+
+const CURRENCY_LABELS = {
+  USD: 'US Dollars',
+  INR: 'Indian Rupees',
+  AED: 'UAE Dirhams',
+}
 
 const PHONE_DISPLAY = '+91 93985 74255'
 const PHONE_TEL = '+919398574255'
@@ -501,7 +507,7 @@ function Pricing() {
 
         <div className="pricing-toolbar">
           <span className="pricing-currency-note mono">
-            Prices shown in {currency === 'INR' ? 'Indian Rupees' : 'UAE Dirhams'}.
+            Prices shown in {CURRENCY_LABELS[currency] ?? currency}.
           </span>
           <div className="currency-toggle" role="tablist" aria-label="Select currency">
             {CURRENCIES.map((c) => (
