@@ -59,6 +59,10 @@ DO NOT extract:
 
 When uncertain, include them with a role like "mentioned only — relevance unclear."
 
+#### email addresses on people (load-bearing — do not skip)
+
+When a chat message includes an email address paired with a person's name (e.g. "Noora's email is noora@adcb.com", "Ahmed: ahmed@adcb.com", "update Kumar's email to kumar@hdfc.com", "add Raja — raja@klosure.ai"), you MUST set that address on the corresponding person's \`email\` field in klo_state.people. This is not optional. Do not just acknowledge in chat_reply — write the value into people[].email and emit it in the JSON output. If the named person doesn't exist in klo_state.people yet, ADD them with the email. If they exist, UPDATE the existing entry. Same applies for system 'email' messages: any new sender or stakeholder address gets attached to people[].email.
+
 ### blockers
 
 DO extract: anything explicitly slowing the deal down — unresolved budget, missing approval, legal review, competing vendor, internal politics, technical concern.

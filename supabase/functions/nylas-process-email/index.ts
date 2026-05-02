@@ -190,16 +190,67 @@ async function markProcessed(eventId: string, error: string | null): Promise<voi
 function emailsMatch(
   participants: Array<{ email: string }>,
   people: Array<{ email?: string }>,
-): { matched: boolean; matched_address?: string } {
-  const peopleEmails = new Set(
-    people.map((p) => (p.email ?? "").toLowerCase().trim()).filter(Boolean),
-  )
+): { matched: boolean; matched_address?: string; matched_via?: "exact" | "domain" } {
+  const peopleEmails = new Set<string>()
+  const peopleDomains = new Set<string>()
+  for (const p of people) {
+    const addr = (p.email ?? "").toLowerCase().trim()
+    if (!addr) continue
+    peopleEmails.add(addr)
+    const dom = domainOf(addr)
+    if (dom && !isCommonDomain(dom)) peopleDomains.add(dom)
+  }
   if (peopleEmails.size === 0) return { matched: false }
+
+  // Pass 1: exact email match — strongest signal.
   for (const p of participants) {
     const addr = p.email.toLowerCase().trim()
-    if (peopleEmails.has(addr)) return { matched: true, matched_address: addr }
+    if (peopleEmails.has(addr)) {
+      return { matched: true, matched_address: addr, matched_via: "exact" }
+    }
   }
+
+  // Pass 2: domain match. If any participant shares a domain with a known
+  // stakeholder on this deal (and that domain isn't a free-mail provider),
+  // route the email to this deal. The seller can then add the new contact
+  // as a stakeholder; for now we record the matched address so klo-respond
+  // sees who actually emailed.
+  for (const p of participants) {
+    const addr = p.email.toLowerCase().trim()
+    const dom = domainOf(addr)
+    if (dom && peopleDomains.has(dom)) {
+      return { matched: true, matched_address: addr, matched_via: "domain" }
+    }
+  }
+
   return { matched: false }
+}
+
+function domainOf(email: string): string | null {
+  const at = email.lastIndexOf("@")
+  if (at < 0) return null
+  return email.slice(at + 1).toLowerCase().trim() || null
+}
+
+// Free-mail domains shouldn't pull every gmail/outlook contact into a deal.
+// Keep this list short and conservative; expand only if seller traffic
+// surfaces a missing one.
+const COMMON_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "proton.me",
+  "protonmail.com",
+  "aol.com",
+])
+
+function isCommonDomain(d: string): boolean {
+  return COMMON_DOMAINS.has(d)
 }
 
 async function fetchNylasMessage(
