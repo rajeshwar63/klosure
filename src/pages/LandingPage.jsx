@@ -617,7 +617,7 @@ function Contact() {
             </a>
           </div>
 
-          <div className="contact-foot">— Rajeshwar, Founder. 13 years in B2B sales.</div>
+          <div className="contact-foot">— Raja Komatipalli, Founder. 15+ years in B2B sales.</div>
         </div>
       </div>
     </section>
