@@ -80,13 +80,32 @@ Deno.serve(async (req) => {
       .eq("status", "active")
       .order("updated_at", { ascending: false })
 
+    // Klo's coaching loop occasionally rewrites klo_state.people without the
+    // email field, so we union with deal_context.stakeholders — that's the
+    // durable email-of-record source captured at deal creation.
+    const dealIds = (deals ?? []).map((d) => d.id)
+    const { data: contexts } = dealIds.length
+      ? await sb
+          .from("deal_context")
+          .select("deal_id, stakeholders")
+          .in("deal_id", dealIds)
+      : { data: [] }
+    const stakeholdersByDeal = new Map<string, Array<{ email?: string }>>()
+    for (const ctx of contexts ?? []) {
+      stakeholdersByDeal.set(
+        ctx.deal_id as string,
+        (ctx.stakeholders ?? []) as Array<{ email?: string }>,
+      )
+    }
+
     let matchedDealId: string | null = null
     let matchedAddress: string | null = null
 
     for (const deal of deals ?? []) {
       const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
         []) as Array<{ email?: string }>
-      const m = emailsMatch(externalParticipants, people)
+      const stakeholders = stakeholdersByDeal.get(deal.id) ?? []
+      const m = emailsMatch(externalParticipants, [...people, ...stakeholders])
       if (m.matched) {
         matchedDealId = deal.id
         matchedAddress = m.matched_address ?? null
