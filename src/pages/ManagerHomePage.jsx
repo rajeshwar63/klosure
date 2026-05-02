@@ -10,6 +10,7 @@ import KloTeamBriefCard from '../components/manager/KloTeamBriefCard.jsx'
 import DealsSlippingList from '../components/manager/DealsSlippingList.jsx'
 import QuarterGlanceStrip from '../components/manager/QuarterGlanceStrip.jsx'
 import ByRepRollup from '../components/manager/ByRepRollup.jsx'
+import TeamPoolPanel from '../components/manager/TeamPoolPanel.jsx'
 import { Eyebrow } from '../components/shared/index.js'
 
 function thisWeekRange() {
@@ -105,6 +106,10 @@ export default function ManagerHomePage() {
       </header>
 
       <QuarterGlanceStrip deals={dealsActive} />
+
+      <div className="my-4">
+        <TeamPoolPanel teamId={team?.id} />
+      </div>
 
       <ByRepRollup rollUp={pipeline?.rollUp ?? []} />
 

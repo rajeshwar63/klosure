@@ -679,7 +679,7 @@ async function countMessagesSince(dealId: string, sinceISO: string | null): Prom
 
 interface MessageRow {
   id: string
-  sender_type: "seller" | "buyer" | "klo"
+  sender_type: "seller" | "buyer" | "klo" | "system"
   sender_name: string | null
   content: string
   created_at: string
@@ -726,10 +726,14 @@ async function loadDealContext(deal_id: string): Promise<DealContext> {
   const context = (contextRes.data ?? null) as DealContext["context"]
   const messages = (messagesRes.data ?? []) as MessageRow[]
 
-  // recipientRole = role of the most recent non-Klo message sender
-  const lastNonKlo = [...messages].reverse().find((m) => m.sender_type !== "klo")
+  // recipientRole = role of the most recent non-Klo non-system message sender.
+  // If the trigger was a system message (email/meeting), Klo's reply is for
+  // the seller — buyers don't see Nylas-sourced content.
+  const lastNonKloNonSystem = [...messages]
+    .reverse()
+    .find((m) => m.sender_type !== "klo" && m.sender_type !== "system")
   const recipientRole: "seller" | "buyer" =
-    lastNonKlo?.sender_type === "buyer" ? "buyer" : "seller"
+    lastNonKloNonSystem?.sender_type === "buyer" ? "buyer" : "seller"
 
   return { deal, context, messages, recipientRole }
 }

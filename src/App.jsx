@@ -84,7 +84,14 @@ export default function App() {
           <Route path="/billing/manage" element={<BillingManagePage />} />
           <Route path="/settings/train-klo" element={<TrainKloPage />} />
           <Route path="/settings/password" element={<ChangePasswordPage />} />
+          <Route path="/settings/connections" element={<SettingsConnectionsPage />} />
         </Route>
+
+        {/* Nylas hosted-auth callback. Outside the shell — full-screen confirming page. */}
+        <Route
+          path="/settings/connect/callback"
+          element={<RequireAuth><NylasCallbackPage /></RequireAuth>}
+        />
 
         {/* Razorpay return — full-screen confirming-payment page outside the shell. */}
         <Route

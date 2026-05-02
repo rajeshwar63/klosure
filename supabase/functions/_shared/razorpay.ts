@@ -10,17 +10,23 @@
 // src/lib/razorpay-plans.ts. Both webhook and verify prefer the
 // klosure_plan_slug stored on the subscription's notes (set at create time)
 // and only fall back to this map.
+// Phase A sprint 08: collapsed to a single 'klosure' plan. Legacy plan IDs
+// from the previous 6-tier structure are kept here mapping to 'klosure' so any
+// old in-flight test subscriptions migrate gracefully when their next webhook
+// fires. Drop the legacy entries once no subscriptions reference them.
 export const PLAN_ID_TO_SLUG: Record<string, string> = {
-  // Test mode
-  "plan_SjJt4hH14l4xTF": "pro",
-  "plan_SjJtU4Ic9gMKQT": "team_starter",
-  "plan_SjJtqGy7KxXBv1": "team_growth",
-  "plan_SjJu9eaMjFv92Y": "team_scale",
-  // Live mode
-  "plan_SjJAkRxX87ZYuz": "pro",
-  "plan_SjJi8s6ORnUzxb": "team_starter",
-  "plan_SjJikkUK5hjVVw": "team_growth",
-  "plan_SjJjCRGcjI8Os1": "team_scale",
+  // New unified plan (populate with the actual Razorpay plan_id once created):
+  "plan_<paste-new-test-plan-id-here>": "klosure",
+  // Legacy test mode — migrate gracefully:
+  "plan_SjJt4hH14l4xTF": "klosure",
+  "plan_SjJtU4Ic9gMKQT": "klosure",
+  "plan_SjJtqGy7KxXBv1": "klosure",
+  "plan_SjJu9eaMjFv92Y": "klosure",
+  // Legacy live mode:
+  "plan_SjJAkRxX87ZYuz": "klosure",
+  "plan_SjJi8s6ORnUzxb": "klosure",
+  "plan_SjJikkUK5hjVVw": "klosure",
+  "plan_SjJjCRGcjI8Os1": "klosure",
 }
 
 export type SubscriptionStatus = "active" | "pending" | "halted" | "cancelled" | "completed"

@@ -30,12 +30,14 @@ const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID") ?? ""
 const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? ""
 const APP_URL = Deno.env.get("APP_URL") ?? "https://klosure.ai"
 // Server-side mirror of src/lib/plans.ts → plan slug -> human label.
+// Legacy slugs kept here so historical invoices still render the plan name.
 const PLAN_LABELS: Record<string, string> = {
-  pro: "Pro",
-  team_starter: "Team Starter",
-  team_growth: "Team Growth",
-  team_scale: "Team Scale",
+  klosure: "Klosure",
   enterprise: "Enterprise",
+  pro: "Klosure",
+  team_starter: "Klosure",
+  team_growth: "Klosure",
+  team_scale: "Klosure",
 }
 
 const CORS = {

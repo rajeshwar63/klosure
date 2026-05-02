@@ -26,7 +26,10 @@ const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? ""
 // off) and set the resulting offer_id here. Empty/unset = no offer attached.
 const RAZORPAY_LAUNCH_OFFER_ID = Deno.env.get("RAZORPAY_LAUNCH_OFFER_ID") ?? ""
 
-const TEAM_PLANS = new Set(["team_starter", "team_growth", "team_scale"])
+// Phase A sprint 08: pricing collapsed to one plan. Every paid checkout is a
+// team plan; we auto-create a single-seat team for solo users via the
+// ensure_team_for_user RPC.
+const PAID_PLANS = new Set(["klosure"])
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -64,37 +67,36 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "invalid_plan_id" }, 400)
     }
 
-    const isTeamPlan = TEAM_PLANS.has(planSlug)
+    if (!PAID_PLANS.has(planSlug)) {
+      return json({ ok: false, error: "invalid_plan_for_checkout" }, 400)
+    }
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-    // 3. For team plans, verify user owns a team. Use that team's data.
-    let teamId: string | null = null
-    let existingSubscriptionId: string | null = null
-    let razorpayCustomerId: string | null = null
-    let userName = ""
-    let userPhone: string | null = null
-
-    if (isTeamPlan) {
-      const { data: team } = await sb.from("teams").select("*").eq("owner_id", userId).maybeSingle()
-      if (!team) {
-        return json({ ok: false, error: "no_team_owned" }, 400)
-      }
-      teamId = team.id
-      existingSubscriptionId = team.razorpay_subscription_id
-      razorpayCustomerId = team.razorpay_customer_id
-    }
-
-    // Always pull the user record for name/phone/customer_id.
+    // Pull the user record up-front for name/phone.
     const { data: userRow } = await sb.from("users").select("*").eq("id", userId).maybeSingle()
     if (!userRow) {
       return json({ ok: false, error: "user_not_found" }, 404)
     }
-    userName = userRow.name ?? ""
-    userPhone = userRow.phone ?? null
-    if (!isTeamPlan) {
-      existingSubscriptionId = userRow.razorpay_subscription_id
-      razorpayCustomerId = userRow.razorpay_customer_id
+    const userName = userRow.name ?? ""
+    const userPhone = (userRow.phone ?? null) as string | null
+
+    // Phase A sprint 08: ensure the user has a team (auto-creates if missing).
+    const { data: ensuredTeamId, error: teamErr } = await sb.rpc("ensure_team_for_user", {
+      p_user_id: userId,
+    })
+    if (teamErr || !ensuredTeamId) {
+      console.error("ensure_team_for_user failed", teamErr)
+      return json(
+        { ok: false, error: "team_setup_failed", detail: teamErr?.message },
+        500,
+      )
     }
+    const teamId: string = ensuredTeamId as string
+
+    const { data: team } = await sb.from("teams").select("*").eq("id", teamId).maybeSingle()
+    let existingSubscriptionId: string | null = team?.razorpay_subscription_id ?? null
+    let razorpayCustomerId: string | null = team?.razorpay_customer_id ?? null
+    const isTeamPlan = true
 
     // 4. Cancel existing active subscription (plan switch case).
     if (existingSubscriptionId) {

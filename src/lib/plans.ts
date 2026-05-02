@@ -1,29 +1,31 @@
 // =============================================================================
-// Plan definitions — Phase 12.1
+// Plan definitions — Phase A sprint 08
 // =============================================================================
-// All pricing/seat/feature data lives here as a constant. The DB only stores
-// the plan slug ("pro", "team_starter", etc.) and references this for limits.
-// Updating a price = code change + redeploy. Intentional — payment-relevant
-// data should not be edited via SQL.
+// One plan: 'klosure'. Plus 'trial' and 'enterprise' as edge states.
+//
+// 'klosure' is a per-seat plan. Pricing is monthly; teams pay
+// (price_per_seat × seat_count). Pool quotas (meeting minutes, voice minutes,
+// chat messages) are computed at the team level via team_pool table from
+// sprint 02.
 // =============================================================================
 
-export type PlanSlug =
-  | 'trial'
-  | 'pro'
-  | 'team_starter'
-  | 'team_growth'
-  | 'team_scale'
-  | 'enterprise'
+export type PlanSlug = 'trial' | 'klosure' | 'enterprise'
 
-export type Currency = 'INR' | 'AED'
+export type Currency = 'INR' | 'AED' | 'USD'
 
 export interface PlanDefinition {
   slug: PlanSlug
   label: string
   shortLabel: string
   isTeam: boolean
-  seatCap: number
-  monthly: Record<Currency, number | null>
+  /** Per-seat monthly price. null = contact sales. */
+  monthlyPerSeat: Record<Currency, number | null>
+  /** Per-seat default pool quotas. team_pool is initialised from these. */
+  poolDefaults: {
+    meeting_minutes_per_seat: number
+    voice_minutes_per_seat: number
+    chat_messages_per_seat: number
+  }
   features: {
     klo_coaching: boolean
     manager_view: boolean
@@ -33,6 +35,9 @@ export interface PlanDefinition {
     daily_focus: boolean
     weekly_brief: boolean
     realtime_buyer_link: boolean
+    email_capture: boolean
+    meeting_capture: boolean
+    voice: boolean
   }
   description: string
   highlights: string[]
@@ -45,8 +50,12 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     label: 'Trial',
     shortLabel: 'Trial',
     isTeam: false,
-    seatCap: 1,
-    monthly: { INR: 0, AED: 0 },
+    monthlyPerSeat: { INR: 0, AED: 0, USD: 0 },
+    poolDefaults: {
+      meeting_minutes_per_seat: 600,
+      voice_minutes_per_seat: 60,
+      chat_messages_per_seat: 1000,
+    },
     features: {
       klo_coaching: true,
       manager_view: false,
@@ -56,117 +65,54 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       daily_focus: true,
       weekly_brief: false,
       realtime_buyer_link: true,
+      email_capture: true,
+      meeting_capture: true,
+      voice: false,
     },
-    description: '14 days of full Pro access',
+    description: '14 days of full Klosure',
     highlights: [
       'Full Klo coaching on every deal',
-      'Unlimited deals during trial',
+      'Email + meeting capture',
       'Buyer link sharing',
     ],
     hiddenFromPricingPage: true,
   },
 
-  pro: {
-    slug: 'pro',
-    label: 'Pro',
-    shortLabel: 'Pro',
-    isTeam: false,
-    seatCap: 1,
-    monthly: { INR: 4999, AED: 179 },
+  klosure: {
+    slug: 'klosure',
+    label: 'Klosure',
+    shortLabel: 'Klosure',
+    isTeam: true,
+    monthlyPerSeat: {
+      INR: 3999,
+      AED: 290,
+      USD: 79,
+    },
+    poolDefaults: {
+      meeting_minutes_per_seat: 900,
+      voice_minutes_per_seat: 100,
+      chat_messages_per_seat: 1500,
+    },
     features: {
       klo_coaching: true,
-      manager_view: false,
-      forecast_view: false,
-      askklo: false,
+      manager_view: true,
+      forecast_view: true,
+      askklo: true,
       seller_profile: true,
       daily_focus: true,
-      weekly_brief: false,
+      weekly_brief: true,
       realtime_buyer_link: true,
+      email_capture: true,
+      meeting_capture: true,
+      voice: false,
     },
-    description: 'For solo reps running their own pipeline',
+    description: 'Everything Klosure does, per seat, per month',
     highlights: [
-      'Unlimited deals',
       'Klo coaching on every conversation',
-      'Daily focus paragraph',
-      'Buyer link sharing with live coaching',
-    ],
-  },
-
-  team_starter: {
-    slug: 'team_starter',
-    label: 'Team Starter',
-    shortLabel: 'Starter',
-    isTeam: true,
-    seatCap: 5,
-    monthly: { INR: 19999, AED: 799 },
-    features: {
-      klo_coaching: true,
-      manager_view: true,
-      forecast_view: true,
-      askklo: true,
-      seller_profile: true,
-      daily_focus: true,
-      weekly_brief: true,
-      realtime_buyer_link: true,
-    },
-    description: 'For small teams who want a coach across the whole pipeline',
-    highlights: [
-      'Up to 5 reps',
-      'Manager view: full team rollup',
-      'Ask Klo about any deal across the team',
-      'Weekly team brief',
-    ],
-  },
-
-  team_growth: {
-    slug: 'team_growth',
-    label: 'Team Growth',
-    shortLabel: 'Growth',
-    isTeam: true,
-    seatCap: 15,
-    monthly: { INR: 49999, AED: 1999 },
-    features: {
-      klo_coaching: true,
-      manager_view: true,
-      forecast_view: true,
-      askklo: true,
-      seller_profile: true,
-      daily_focus: true,
-      weekly_brief: true,
-      realtime_buyer_link: true,
-    },
-    description: 'For growing sales orgs',
-    highlights: [
-      'Up to 15 reps',
-      'Everything in Starter',
-      'Forecast view for the manager',
-      'Pattern detection across reps',
-    ],
-  },
-
-  team_scale: {
-    slug: 'team_scale',
-    label: 'Team Scale',
-    shortLabel: 'Scale',
-    isTeam: true,
-    seatCap: 30,
-    monthly: { INR: 89999, AED: 3499 },
-    features: {
-      klo_coaching: true,
-      manager_view: true,
-      forecast_view: true,
-      askklo: true,
-      seller_profile: true,
-      daily_focus: true,
-      weekly_brief: true,
-      realtime_buyer_link: true,
-    },
-    description: 'For larger sales orgs',
-    highlights: [
-      'Up to 30 reps',
-      'Everything in Growth',
-      'Priority support',
-      'Custom Klo training (Phase 13+)',
+      'Email + meeting capture (Gmail, Outlook, Zoom, Meet, Teams)',
+      'Manager dashboard with team rollup',
+      'Daily focus + weekly brief',
+      'Pooled meeting hours across the team',
     ],
   },
 
@@ -175,8 +121,12 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     label: 'Enterprise',
     shortLabel: 'Enterprise',
     isTeam: true,
-    seatCap: 100,
-    monthly: { INR: null, AED: null },
+    monthlyPerSeat: { INR: null, AED: null, USD: null },
+    poolDefaults: {
+      meeting_minutes_per_seat: 1800,
+      voice_minutes_per_seat: 200,
+      chat_messages_per_seat: 3000,
+    },
     features: {
       klo_coaching: true,
       manager_view: true,
@@ -186,10 +136,14 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       daily_focus: true,
       weekly_brief: true,
       realtime_buyer_link: true,
+      email_capture: true,
+      meeting_capture: true,
+      voice: false,
     },
-    description: 'For 30+ rep orgs',
+    description: 'For 30+ rep orgs needing custom contracts',
     highlights: [
       'Custom seat counts',
+      'Custom pool quotas',
       'SSO & SAML (Phase 14+)',
       'Dedicated onboarding',
       'Custom contracts & invoicing',
@@ -222,66 +176,53 @@ export interface EffectivePlan {
 }
 
 export function priceFor(slug: PlanSlug, currency: Currency): number | null {
-  return PLANS[slug].monthly[currency]
+  return PLANS[slug].monthlyPerSeat[currency]
 }
 
 function formatAmount(amount: number, currency: Currency): string {
   if (currency === 'INR') return `₹${amount.toLocaleString('en-IN')}`
-  return `AED ${amount.toLocaleString('en-AE')}`
+  if (currency === 'AED') return `AED ${amount.toLocaleString('en-AE')}`
+  return `$${amount.toLocaleString('en-US')}`
 }
 
 export function formatPrice(slug: PlanSlug, currency: Currency): string {
   const p = priceFor(slug, currency)
   if (p === null) return 'Contact sales'
-  return formatAmount(p, currency)
+  return `${formatAmount(p, currency)}/seat/mo`
 }
 
-export function effectivePerSeat(slug: PlanSlug, currency: Currency): number | null {
-  const def = PLANS[slug]
-  const monthly = def.monthly[currency]
-  if (monthly === null || def.seatCap === 0) return null
-  return Math.round(monthly / def.seatCap)
+export function totalPriceForTeam(
+  slug: PlanSlug,
+  currency: Currency,
+  seatCount: number,
+): string {
+  const perSeat = priceFor(slug, currency)
+  if (perSeat === null) return 'Contact sales'
+  return formatAmount(perSeat * seatCount, currency)
 }
 
 // =============================================================================
-// Launch discount — promotional 30% off, applied via a Razorpay Offer.
-// =============================================================================
-// `active` toggles both the UI treatment (strikethrough + badge) and whether
-// the create-subscription edge function passes the offer_id to Razorpay. The
-// percent here is purely for *display* — the actual amount charged comes from
-// the Offer configured in the Razorpay dashboard. Keep them in sync, and when
-// the launch period ends, flip `active` to false and remove the offer in
-// Razorpay (or let it expire).
+// Launch discount — kept as a struct for future promos. The $79 is the
+// founding price; no discount is applied.
 // =============================================================================
 export const LAUNCH_DISCOUNT = {
   active: true,
-  percentOff: 30,
-  label: 'Launch offer',
+  percentOff: 0,
+  label: 'Founding member',
 } as const
 
 export interface PriceDisplay {
   hasDiscount: boolean
-  /** What to show as the headline price (discounted if active, otherwise the regular price). */
   primary: string
-  /** Original price to render with strikethrough alongside `primary`. Null when there's no discount. */
   original: string | null
   percentOff: number
 }
 
 export function priceDisplayFor(slug: PlanSlug, currency: Currency): PriceDisplay {
-  const monthly = priceFor(slug, currency)
-  const regular = formatPrice(slug, currency)
-
-  // No discount on free/contact-sales tiers, or when the launch is off.
-  if (!LAUNCH_DISCOUNT.active || monthly === null || monthly === 0) {
-    return { hasDiscount: false, primary: regular, original: null, percentOff: 0 }
-  }
-
-  const discounted = Math.round(monthly * (1 - LAUNCH_DISCOUNT.percentOff / 100))
   return {
-    hasDiscount: true,
-    primary: formatAmount(discounted, currency),
-    original: regular,
-    percentOff: LAUNCH_DISCOUNT.percentOff,
+    hasDiscount: false,
+    primary: formatPrice(slug, currency),
+    original: null,
+    percentOff: 0,
   }
 }

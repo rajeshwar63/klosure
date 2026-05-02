@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
 import './LandingPage.css'
 
-const SHOWN_PLANS = ['pro', 'team_starter', 'team_growth', 'team_scale', 'enterprise']
+// Phase A sprint 08: collapsed pricing.
+const SHOWN_PLANS = ['klosure', 'enterprise']
 const CURRENCIES = ['INR', 'AED']
 
 const PHONE_DISPLAY = '+91 93985 74255'
@@ -565,7 +566,7 @@ function SlideArrow({ dir }) {
 
 function PricingCard({ plan, currency }) {
   const isEnterprise = plan.slug === 'enterprise'
-  const isFeatured = plan.slug === 'pro'
+  const isFeatured = plan.slug === 'klosure'
   const priceInfo = priceDisplayFor(plan.slug, currency)
 
   return (
@@ -594,8 +595,8 @@ function PricingCard({ plan, currency }) {
           </>
         )}
       </div>
-      {!isEnterprise && plan.seatCap > 1 && (
-        <p className="price-seats mono">Up to {plan.seatCap} seats</p>
+      {!isEnterprise && plan.isTeam && (
+        <p className="price-seats mono">Per seat · scale to as many reps as you need</p>
       )}
 
       <ul className="price-list">
