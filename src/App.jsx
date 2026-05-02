@@ -28,6 +28,9 @@ const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
 const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
+// Phase A — Nylas connect flow.
+const SettingsConnectionsPage = lazy(() => import('./pages/SettingsConnectionsPage.jsx'))
+const NylasCallbackPage = lazy(() => import('./pages/NylasCallbackPage.jsx'))
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
