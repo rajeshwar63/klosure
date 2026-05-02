@@ -34,7 +34,9 @@ export default function BillingPage() {
   const { status, planSlug, isTrialing, daysLeftInTrial, isReadOnly, loading } = useAccountStatus()
   const navigate = useNavigate()
 
-  const [currency, setCurrency] = useState(status?.currency || 'INR')
+  // Default to USD now that pricing is anchored at $49/seat/mo. The user can
+  // toggle to INR/AED if their local currency is preferable.
+  const [currency, setCurrency] = useState(status?.currency || 'USD')
 
   // Account-deletion form state (preserved from previous BillingPage).
   const [deleteForm, setDeleteForm] = useState({ password: '', mfaCode: '', typed: '' })
@@ -199,7 +201,8 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Two-card grid: Klosure (the only paid plan) + Enterprise contact-sales. */}
+        <div className="mt-6 grid gap-4 md:grid-cols-2 max-w-3xl mx-auto">
           {SHOWN_PLANS.map((slug) => (
             <PlanCard
               key={slug}

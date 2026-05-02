@@ -204,11 +204,13 @@ export function totalPriceForTeam(
 }
 
 // =============================================================================
-// Launch discount — kept as a struct for future promos. The $79 is the
-// founding price; no discount is applied.
+// Launch discount — kept as a struct for future promos. The $49 is the
+// founding price; no discount is applied. `active=false` suppresses the
+// "X% OFF" banner on landing/billing pages — flip to true and set
+// percentOff > 0 when running a real promo.
 // =============================================================================
 export const LAUNCH_DISCOUNT = {
-  active: true,
+  active: false,
   percentOff: 0,
   label: 'Founding member',
 } as const
