@@ -31,6 +31,12 @@ const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
 // Phase A — Nylas connect flow.
 const SettingsConnectionsPage = lazy(() => import('./pages/SettingsConnectionsPage.jsx'))
 const NylasCallbackPage = lazy(() => import('./pages/NylasCallbackPage.jsx'))
+// Phase A follow-up — unified Settings hub. The layout component renders a
+// left-rail sub-nav and an <Outlet />; the sub-pages live as nested routes.
+const SettingsLayoutPage = lazy(() => import('./pages/SettingsLayoutPage.jsx'))
+const SettingsProfilePage = lazy(() => import('./pages/SettingsProfilePage.jsx'))
+const SettingsPreferencesPage = lazy(() => import('./pages/SettingsPreferencesPage.jsx'))
+const SettingsAccountPage = lazy(() => import('./pages/SettingsAccountPage.jsx'))
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -85,9 +91,20 @@ export default function App() {
           <Route path="/team/askklo" element={<AskKloPage />} />
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/billing/manage" element={<BillingManagePage />} />
-          <Route path="/settings/train-klo" element={<TrainKloPage />} />
-          <Route path="/settings/password" element={<ChangePasswordPage />} />
-          <Route path="/settings/connections" element={<SettingsConnectionsPage />} />
+
+          {/* Unified Settings hub. Visiting /settings redirects to /settings/profile;
+              every section lives as a nested child of SettingsLayoutPage so the
+              left-rail sub-nav stays consistent across pages. */}
+          <Route path="/settings" element={<SettingsLayoutPage />}>
+            <Route index element={<Navigate to="profile" replace />} />
+            <Route path="profile" element={<SettingsProfilePage />} />
+            <Route path="connections" element={<SettingsConnectionsPage />} />
+            <Route path="train-klo" element={<TrainKloPage />} />
+            <Route path="preferences" element={<SettingsPreferencesPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="password" element={<ChangePasswordPage />} />
+            <Route path="account" element={<SettingsAccountPage />} />
+          </Route>
         </Route>
 
         {/* Nylas hosted-auth callback. Outside the shell — full-screen confirming page. */}

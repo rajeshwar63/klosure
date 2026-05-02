@@ -25,6 +25,7 @@ export function resolveActiveView(pathname) {
   if (pathname === '/team/deals') return 'team-deals'
   if (pathname === '/team/askklo') return 'askklo'
   if (pathname === '/settings/train-klo') return 'train-klo'
+  if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'settings'
   if (pathname === '/billing' || pathname.startsWith('/billing/')) return 'billing'
   return null
 }
@@ -45,6 +46,7 @@ export function resolvePageTitle(pathname, deals) {
   if (pathname === '/team/askklo') return 'Ask Klo'
   if (pathname === '/billing') return 'Billing'
   if (pathname === '/billing/manage') return 'Manage subscription'
+  if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'Settings'
   return 'Klosure'
 }
 

@@ -116,11 +116,19 @@ export default function AppShell({
       navigate('/team/askklo')
       return
     }
-    if (view === 'train-klo' || view === 'settings') {
+    if (view === 'train-klo') {
       navigate('/settings/train-klo')
       return
     }
+    if (view === 'settings') {
+      // /settings index redirects to /settings/profile.
+      navigate('/settings')
+      return
+    }
     if (view === 'billing') {
+      // Keep the legacy /billing top-level URL for now; it lives inside the
+      // Settings layout via the same BillingPage component at
+      // /settings/billing too.
       navigate('/billing')
       return
     }
