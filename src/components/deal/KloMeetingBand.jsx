@@ -1,9 +1,10 @@
-// Phase A — "Klo will join your call" band.
+// Phase A — upcoming-meeting awareness band.
 //
-// A single quiet line under the DealHeader that surfaces upcoming meetings
-// where Klo's notetaker is dispatched (or already in-call / processing). The
-// goal is awareness, not management — when there's nothing scheduled, the
-// band renders nothing.
+// A single quiet line under the DealHeader that surfaces the next upcoming
+// meeting tied to this deal. Shows whether Klo will be in the call (🎙) or
+// not (📅) — meetings without a recognized provider or where the team's
+// quota is full are still surfaced so the user has full near-term agenda
+// awareness. The band renders nothing when there's nothing upcoming.
 
 import { useEffect, useState } from 'react'
 import {
@@ -37,6 +38,7 @@ export default function KloMeetingBand({ dealId }) {
 
   const next = meetings[0]
   const extra = meetings.length - 1
+  const kloAttending = isKloAttending(next.notetaker_state)
 
   return (
     <div
@@ -49,7 +51,7 @@ export default function KloMeetingBand({ dealId }) {
       role="status"
     >
       <span aria-hidden className="text-[14px] leading-none">
-        🎙
+        {kloAttending ? '🎙' : '📅'}
       </span>
       <span className="truncate">{describeMeeting(next)}</span>
       {extra > 0 && (
@@ -58,6 +60,15 @@ export default function KloMeetingBand({ dealId }) {
         </span>
       )}
     </div>
+  )
+}
+
+function isKloAttending(state) {
+  return (
+    state === 'scheduled' ||
+    state === 'joined' ||
+    state === 'recording' ||
+    state === 'media_processing'
   )
 }
 
@@ -73,8 +84,12 @@ function describeMeeting(m) {
       return `Klo is recording "${title}" — Klo will post takeaways shortly`
     case 'media_processing':
       return `Transcribing the call "${title}" — Klo will post takeaways shortly`
+    case 'skipped_quota':
+      return `"${title}" — ${when} (quota full — Klo can't join)`
+    case 'not_dispatched':
+      return `"${title}" — ${when}`
     default:
-      return `Klo · "${title}"`
+      return `"${title}" — ${when}`
   }
 }
 

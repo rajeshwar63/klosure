@@ -230,13 +230,15 @@ export default function ChatView({
 }
 
 function MessageRow({ message }) {
-  // Phase A: Nylas-sourced email/meeting messages render as compact pills, not
-  // chat turns. Klo's reply that follows is the headline; the raw signal is
-  // reference material the seller can expand if they want.
+  // Phase A: Nylas-sourced email/calendar/meeting messages render as compact
+  // pills, not chat turns. Klo's reply that follows is the headline; the raw
+  // signal is reference material the seller can expand if they want.
   const source = message?.metadata?.source
   if (
     message.sender_type === 'system' &&
-    (source === 'nylas_email' || source === 'nylas_notetaker')
+    (source === 'nylas_email' ||
+      source === 'nylas_calendar_event' ||
+      source === 'nylas_notetaker')
   ) {
     return <SignalPill message={message} />
   }
@@ -279,17 +281,22 @@ function MessageRow({ message }) {
   )
 }
 
-// SignalPill renders email and meeting events as a single muted line that
-// expands to show the raw content. The visual goal: keep Klo's voice front
-// and centre, demote the envelope to a footnote.
+// SignalPill renders email, calendar, and meeting events as a single muted
+// line that expands to show the raw content. The visual goal: keep Klo's
+// voice front and centre, demote the envelope to a footnote.
+const SOURCE_CONFIG = {
+  nylas_email: { emoji: '📧', summarize: summarizeEmailHeader },
+  nylas_calendar_event: { emoji: '📅', summarize: summarizeCalendarHeader },
+  nylas_notetaker: { emoji: '🎙', summarize: summarizeMeetingHeader },
+}
+
 function SignalPill({ message }) {
   const [expanded, setExpanded] = useState(false)
   const { content, created_at } = message
   const source = message?.metadata?.source
-  const isEmail = source === 'nylas_email'
-  const summary = isEmail
-    ? summarizeEmailHeader(content)
-    : summarizeMeetingHeader(content)
+  const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.nylas_email
+  const summary = config.summarize(content)
+  const cancelled = (content ?? '').startsWith('[CANCELLED] ')
 
   return (
     <article
@@ -306,11 +313,14 @@ function SignalPill({ message }) {
         aria-expanded={expanded}
       >
         <span aria-hidden className="text-[14px] leading-none">
-          {isEmail ? '📧' : '🎙'}
+          {config.emoji}
         </span>
         <span
           className="text-[13px] truncate"
-          style={{ color: 'var(--klo-text-dim)' }}
+          style={{
+            color: 'var(--klo-text-dim)',
+            textDecoration: cancelled ? 'line-through' : 'none',
+          }}
         >
           {summary}
         </span>
@@ -366,6 +376,21 @@ function summarizeMeetingHeader(content) {
   // Strip the "MEETING — " prefix so the pill reads naturally.
   const stripped = firstLine.replace(/^MEETING\s*—\s*/, '').trim()
   return stripped ? `Meeting · ${stripped}` : 'Meeting transcript'
+}
+
+function summarizeCalendarHeader(content) {
+  // nylas-process-meeting formats:
+  //   CALENDAR — <title> — <date> (<n> min)
+  //   Participants: ...
+  //   Provider: ...
+  //   URL: ...
+  // Cancellation prepends "[CANCELLED] " to the first line.
+  const firstLine = (content ?? '').split('\n', 1)[0] ?? ''
+  const stripped = firstLine
+    .replace(/^\[CANCELLED\]\s*/, '')
+    .replace(/^CALENDAR\s*—\s*/, '')
+    .trim()
+  return stripped ? `Meeting · ${stripped}` : 'Meeting on calendar'
 }
 
 function KloTyping() {

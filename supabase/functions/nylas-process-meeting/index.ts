@@ -1,9 +1,10 @@
 // =============================================================================
-// nylas-process-meeting — Phase A (sprint 06 + sprint 07 pool gate)
+// nylas-process-meeting — Phase A (sprint 06 + sprint 07 pool gate + calendar pills)
 // =============================================================================
-// Two flows:
-//  - event.created/updated → maybe dispatch a Notetaker bot
-//  - notetaker.* state updates → if media ready, fetch transcript and extract
+// Three flows:
+//  - event.created/updated → match deal, ensure calendar pill, maybe dispatch
+//  - event.deleted        → mark calendar pill as cancelled
+//  - notetaker.*          → if media ready, fetch transcript + post Klo coaching
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
@@ -30,6 +31,12 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "missing_args" }, 400)
     }
 
+    if (type === "event.deleted") {
+      return await handleCalendarEventCancelled(
+        nylas_grant_id,
+        nylas_event_or_notetaker_id,
+      )
+    }
     if (type.startsWith("event.")) {
       return await handleCalendarEvent(nylas_grant_id, nylas_event_or_notetaker_id)
     }
@@ -48,7 +55,7 @@ Deno.serve(async (req) => {
   }
 })
 
-// ----- Flow A: calendar event -> maybe dispatch -----------------------------
+// ----- Flow A: calendar event -> match deal, ensure pill, maybe dispatch ----
 
 async function handleCalendarEvent(grantId: string, eventId: string): Promise<Response> {
   const { data: event } = await sb
@@ -62,7 +69,68 @@ async function handleCalendarEvent(grantId: string, eventId: string): Promise<Re
     return json({ ok: false, error: "event_not_found" }, 404)
   }
 
-  // Idempotency — don't redispatch if we already scheduled.
+  // Internal-only meetings are never our business — no pill, no dispatch.
+  // Detect this BEFORE matching a deal so we don't pull a grant lookup for
+  // events we're going to drop on the floor.
+  const { data: grant } = await sb
+    .from("nylas_grants")
+    .select("user_id, team_id, email_address")
+    .eq("nylas_grant_id", grantId)
+    .maybeSingle()
+
+  if (!grant) {
+    if (event.notetaker_state === "not_dispatched") {
+      await markEvent(event.id, "not_dispatched", "grant_not_found")
+    }
+    return json({ ok: false, error: "grant_not_found" }, 404)
+  }
+
+  const participants = (event.participants ?? []) as Array<{ email: string; name?: string }>
+  const externals = participants.filter(
+    (p) => p.email && p.email.toLowerCase() !== grant.email_address.toLowerCase(),
+  )
+  if (externals.length === 0) {
+    if (event.notetaker_state === "not_dispatched") {
+      await markEvent(event.id, "not_dispatched", "no_external_participants")
+    }
+    return json({ ok: true, skipped: "internal_only" })
+  }
+
+  // Match a deal regardless of dispatch eligibility — calendar awareness is
+  // valuable even when the bot can't transcribe (no link, quota, etc.).
+  let dealId: string | null = event.deal_id ?? null
+  let matchedAddress: string | null = event.matched_stakeholder ?? null
+  if (!dealId) {
+    const match = await matchDealForEvent(grant.user_id, externals)
+    dealId = match.dealId
+    matchedAddress = match.address
+
+    if (dealId) {
+      await sb
+        .from("meeting_events")
+        .update({
+          deal_id: dealId,
+          matched_stakeholder: matchedAddress,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", event.id)
+      event.deal_id = dealId
+      event.matched_stakeholder = matchedAddress
+    }
+  }
+
+  if (!dealId) {
+    if (event.notetaker_state === "not_dispatched") {
+      await markEvent(event.id, "not_dispatched", "no_stakeholder_match")
+    }
+    return json({ ok: true, skipped: "no_match" })
+  }
+
+  // Ensure exactly one 📅 pill exists in chat for this meeting (idempotent).
+  await ensureCalendarPillForEvent(event)
+
+  // Dispatch decision only on the first call. Re-fires of event.updated
+  // refresh the pill but never redispatch — guarded here and in markEvent.
   if (event.notetaker_state !== "not_dispatched") {
     return json({ ok: true, skipped: `already_${event.notetaker_state}` })
   }
@@ -80,86 +148,7 @@ async function handleCalendarEvent(grantId: string, eventId: string): Promise<Re
     return json({ ok: true, skipped: "in_past" })
   }
 
-  // Check 3: external participants exist.
-  const { data: grant } = await sb
-    .from("nylas_grants")
-    .select("user_id, team_id, email_address")
-    .eq("nylas_grant_id", grantId)
-    .maybeSingle()
-
-  if (!grant) {
-    await markEvent(event.id, "not_dispatched", "grant_not_found")
-    return json({ ok: false, error: "grant_not_found" }, 404)
-  }
-
-  const participants = (event.participants ?? []) as Array<{ email: string; name?: string }>
-  const externals = participants.filter(
-    (p) => p.email && p.email.toLowerCase() !== grant.email_address.toLowerCase(),
-  )
-  if (externals.length === 0) {
-    await markEvent(event.id, "not_dispatched", "no_external_participants")
-    return json({ ok: true, skipped: "internal_only" })
-  }
-
-  // Check 4: stakeholder match against an active deal.
-  const { data: deals } = await sb
-    .from("deals")
-    .select("id, klo_state, updated_at")
-    .eq("seller_id", grant.user_id)
-    .eq("status", "active")
-    .order("updated_at", { ascending: false })
-
-  let matchedDealId: string | null = null
-  let matchedAddress: string | null = null
-
-  // Pass 1: exact email match across all deals (strongest signal).
-  for (const deal of deals ?? []) {
-    const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
-      []) as Array<{ email?: string }>
-    const peopleEmails = new Set(
-      people.map((p) => (p.email ?? "").toLowerCase().trim()).filter(Boolean),
-    )
-    if (peopleEmails.size === 0) continue
-    for (const ext of externals) {
-      if (peopleEmails.has(ext.email.toLowerCase())) {
-        matchedDealId = deal.id
-        matchedAddress = ext.email.toLowerCase()
-        break
-      }
-    }
-    if (matchedDealId) break
-  }
-
-  // Pass 2: domain fallback. If any participant shares a domain with a known
-  // stakeholder on a deal (excluding free-mail providers), treat as a match.
-  if (!matchedDealId) {
-    for (const deal of deals ?? []) {
-      const people = ((deal.klo_state as { people?: Array<{ email?: string }> })
-        ?.people ?? []) as Array<{ email?: string }>
-      const peopleDomains = new Set(
-        people
-          .map((p) => domainOf((p.email ?? "").toLowerCase().trim()))
-          .filter((d): d is string => !!d && !isCommonDomain(d)),
-      )
-      if (peopleDomains.size === 0) continue
-      for (const ext of externals) {
-        const dom = domainOf(ext.email.toLowerCase())
-        if (dom && peopleDomains.has(dom)) {
-          matchedDealId = deal.id
-          matchedAddress = ext.email.toLowerCase()
-          break
-        }
-      }
-      if (matchedDealId) break
-    }
-  }
-
-  if (!matchedDealId) {
-    await markEvent(event.id, "not_dispatched", "no_stakeholder_match")
-    return json({ ok: true, skipped: "no_match" })
-  }
-
-  // Check 5: pool capacity (sprint 07).
+  // Check 3: pool capacity (sprint 07).
   const expectedMinutes = Math.max(
     1,
     Math.round(
@@ -188,12 +177,9 @@ async function handleCalendarEvent(grantId: string, eventId: string): Promise<Re
     return json({ ok: false, error: "dispatch_failed", detail: dispatched.error })
   }
 
-  // Persist deal_id, matched stakeholder, and notetaker_id.
   await sb
     .from("meeting_events")
     .update({
-      deal_id: matchedDealId,
-      matched_stakeholder: matchedAddress,
       nylas_notetaker_id: dispatched.notetaker_id,
       notetaker_state: "scheduled",
       updated_at: new Date().toISOString(),
@@ -202,10 +188,189 @@ async function handleCalendarEvent(grantId: string, eventId: string): Promise<Re
 
   return json({
     ok: true,
-    deal_id: matchedDealId,
+    deal_id: dealId,
     notetaker_id: dispatched.notetaker_id,
   })
 }
+
+async function matchDealForEvent(
+  sellerId: string,
+  externals: Array<{ email: string; name?: string }>,
+): Promise<{ dealId: string | null; address: string | null }> {
+  const { data: deals } = await sb
+    .from("deals")
+    .select("id, klo_state, updated_at")
+    .eq("seller_id", sellerId)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+
+  // Pass 1: exact email match across all deals (strongest signal).
+  for (const deal of deals ?? []) {
+    const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
+      []) as Array<{ email?: string }>
+    const peopleEmails = new Set(
+      people.map((p) => (p.email ?? "").toLowerCase().trim()).filter(Boolean),
+    )
+    if (peopleEmails.size === 0) continue
+    for (const ext of externals) {
+      if (peopleEmails.has(ext.email.toLowerCase())) {
+        return { dealId: deal.id, address: ext.email.toLowerCase() }
+      }
+    }
+  }
+
+  // Pass 2: domain fallback. If any participant shares a domain with a known
+  // stakeholder on a deal (excluding free-mail providers), treat as a match.
+  for (const deal of deals ?? []) {
+    const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
+      []) as Array<{ email?: string }>
+    const peopleDomains = new Set(
+      people
+        .map((p) => domainOf((p.email ?? "").toLowerCase().trim()))
+        .filter((d): d is string => !!d && !isCommonDomain(d)),
+    )
+    if (peopleDomains.size === 0) continue
+    for (const ext of externals) {
+      const dom = domainOf(ext.email.toLowerCase())
+      if (dom && peopleDomains.has(dom)) {
+        return { dealId: deal.id, address: ext.email.toLowerCase() }
+      }
+    }
+  }
+
+  return { dealId: null, address: null }
+}
+
+async function ensureCalendarPillForEvent(event: Record<string, unknown>): Promise<void> {
+  const eventId = event.id as string
+  const dealId = event.deal_id as string | null
+  if (!dealId) return
+
+  const existingId = event.calendar_pill_message_id as string | null
+  if (existingId) return
+
+  // Defensive: another invocation may have inserted in the meantime without
+  // the FK column being set. Look it up by metadata back-reference.
+  const { data: prior } = await sb
+    .from("messages")
+    .select("id")
+    .eq("deal_id", dealId)
+    .contains("metadata", {
+      source: "nylas_calendar_event",
+      meeting_event_id: eventId,
+    })
+    .maybeSingle()
+  if (prior) {
+    await sb
+      .from("meeting_events")
+      .update({ calendar_pill_message_id: prior.id })
+      .eq("id", eventId)
+    return
+  }
+
+  const content = formatCalendarPillContent(event)
+  const { data: msg, error } = await sb
+    .from("messages")
+    .insert({
+      deal_id: dealId,
+      sender_type: "system",
+      sender_name: "calendar",
+      content,
+      visible_to: null,
+      metadata: {
+        source: "nylas_calendar_event",
+        meeting_event_id: eventId,
+        nylas_event_id: event.nylas_event_id,
+      },
+    })
+    .select("id")
+    .single()
+
+  if (error) {
+    console.error("calendar pill insert failed", error)
+    return
+  }
+
+  await sb
+    .from("meeting_events")
+    .update({ calendar_pill_message_id: msg.id })
+    .eq("id", eventId)
+}
+
+function formatCalendarPillContent(event: Record<string, unknown>): string {
+  const title = (event.title as string | null) ?? "Meeting"
+  const startsAt = event.starts_at as string
+  const endsAt = event.ends_at as string
+  const provider = (event.meeting_provider as string | null) ?? null
+  const meetingUrl = (event.meeting_url as string | null) ?? null
+  const participants =
+    (event.participants as Array<{ email: string; name?: string }> | null) ?? []
+  const durationMinutes = Math.max(
+    1,
+    Math.round((new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60000),
+  )
+  const dateStr = new Date(startsAt).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  const partyList = participants
+    .map((p) => p.name || p.email)
+    .filter(Boolean)
+    .join(", ") || "—"
+  return `CALENDAR — ${title} — ${dateStr} (${durationMinutes} min)
+Participants: ${partyList}
+Provider: ${provider ?? "—"}
+URL: ${meetingUrl ?? "—"}`
+}
+
+// ----- Flow B: cancellation ------------------------------------------------
+
+async function handleCalendarEventCancelled(
+  grantId: string,
+  eventId: string,
+): Promise<Response> {
+  const { data: event } = await sb
+    .from("meeting_events")
+    .select("id, deal_id, calendar_pill_message_id, notetaker_state")
+    .eq("nylas_grant_id", grantId)
+    .eq("nylas_event_id", eventId)
+    .maybeSingle()
+
+  if (!event) {
+    return json({ ok: true, skipped: "event_not_found" })
+  }
+
+  if (event.notetaker_state !== "cancelled") {
+    await sb
+      .from("meeting_events")
+      .update({
+        notetaker_state: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", event.id)
+  }
+
+  if (event.calendar_pill_message_id) {
+    const { data: pill } = await sb
+      .from("messages")
+      .select("content")
+      .eq("id", event.calendar_pill_message_id)
+      .maybeSingle()
+    const current = pill?.content ?? ""
+    if (current && !current.startsWith("[CANCELLED] ")) {
+      await sb
+        .from("messages")
+        .update({ content: `[CANCELLED] ${current}` })
+        .eq("id", event.calendar_pill_message_id)
+    }
+  }
+
+  return json({ ok: true, cancelled: event.id })
+}
+
+// ----- Helpers -------------------------------------------------------------
 
 async function dispatchNotetaker(args: {
   grantId: string
@@ -244,7 +409,7 @@ async function dispatchNotetaker(args: {
   return { ok: true, notetaker_id: notetakerId }
 }
 
-// ----- Flow B: notetaker state -> maybe extract -----------------------------
+// ----- Flow C: notetaker state -> maybe extract -----------------------------
 
 async function handleNotetakerUpdate(
   grantId: string,

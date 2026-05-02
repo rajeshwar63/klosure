@@ -354,11 +354,13 @@ async function handleEvent(
 }
 
 async function handleEventDeleted(delta: NylasDelta): Promise<DeltaResult> {
-  // Don't hard-delete — keep the row, mark notetaker_state appropriately.
+  // Don't hard-delete — keep the row + the chat pill so the user has a record
+  // that the meeting was cancelled. nylas-process-meeting will flip the pill
+  // content to a [CANCELLED] prefix on the downstream invoke.
   await sb
     .from("meeting_events")
     .update({
-      notetaker_state: "not_dispatched",
+      notetaker_state: "cancelled",
       updated_at: new Date().toISOString(),
     })
     .eq("nylas_event_id", delta.object.id)

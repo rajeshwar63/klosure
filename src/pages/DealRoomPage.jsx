@@ -25,6 +25,7 @@ import DealTabs, {
 } from '../components/deal/DealTabs.jsx'
 import SellerOverview from '../components/seller/SellerOverview.jsx'
 import BuyerViewPreview from '../components/seller/BuyerViewPreview.jsx'
+import DealCalendarTab from './DealCalendarTab.jsx'
 import DangerZoneFooter from '../components/deal/DangerZoneFooter.jsx'
 import AppPromptModal from '../components/ui/AppPromptModal.jsx'
 import AppToast from '../components/ui/AppToast.jsx'
@@ -442,6 +443,11 @@ export default function DealRoomPage() {
               locked={deal.locked}
               readOnly={isReadOnly}
             />
+          </div>
+        )}
+        {activeTab === 'calendar' && (
+          <div className="flex-1 min-h-0 overflow-y-auto bg-[#f5f6f8]">
+            <DealCalendarTab dealId={deal?.id} />
           </div>
         )}
         {activeTab === 'buyer' && (
