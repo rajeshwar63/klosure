@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
 import './LandingPage.css'
 
 // Phase A sprint 08: collapsed pricing.
 const SHOWN_PLANS = ['klosure', 'enterprise']
-const CURRENCIES = ['INR', 'AED']
+const CURRENCIES = ['USD', 'INR', 'AED']
+
+const CURRENCY_LABELS = {
+  USD: 'US Dollars',
+  INR: 'Indian Rupees',
+  AED: 'UAE Dirhams',
+}
 
 const PHONE_DISPLAY = '+91 93985 74255'
 const PHONE_TEL = '+919398574255'
@@ -445,38 +451,8 @@ function FlagRow({ who, what, tone }) {
 }
 
 function Pricing() {
-  const [currency, setCurrency] = useState('INR')
-  const trackRef = useRef(null)
-  const [canPrev, setCanPrev] = useState(false)
-  const [canNext, setCanNext] = useState(true)
-
-  function updateEdges() {
-    const el = trackRef.current
-    if (!el) return
-    const max = el.scrollWidth - el.clientWidth
-    setCanPrev(el.scrollLeft > 4)
-    setCanNext(el.scrollLeft < max - 4)
-  }
-
-  useEffect(() => {
-    updateEdges()
-    const el = trackRef.current
-    if (!el) return
-    el.addEventListener('scroll', updateEdges, { passive: true })
-    window.addEventListener('resize', updateEdges)
-    return () => {
-      el.removeEventListener('scroll', updateEdges)
-      window.removeEventListener('resize', updateEdges)
-    }
-  }, [])
-
-  function slide(dir) {
-    const el = trackRef.current
-    if (!el) return
-    const card = el.querySelector('.price-card')
-    const step = card ? card.offsetWidth + 20 : el.clientWidth * 0.9
-    el.scrollBy({ left: dir * step, behavior: 'smooth' })
-  }
+  // USD default — that's our anchor price. Toggle for INR/AED if local.
+  const [currency, setCurrency] = useState('USD')
 
   return (
     <section id="pricing" className="pricing">
@@ -487,7 +463,7 @@ function Pricing() {
           If this saves even one deal this quarter, it pays for itself.
         </p>
 
-        {LAUNCH_DISCOUNT.active && (
+        {LAUNCH_DISCOUNT.active && LAUNCH_DISCOUNT.percentOff > 0 && (
           <div className="pricing-launch-banner" role="note">
             <span className="pricing-launch-pill mono">
               {LAUNCH_DISCOUNT.percentOff}% OFF
@@ -501,7 +477,7 @@ function Pricing() {
 
         <div className="pricing-toolbar">
           <span className="pricing-currency-note mono">
-            Prices shown in {currency === 'INR' ? 'Indian Rupees' : 'UAE Dirhams'}.
+            Prices shown in {CURRENCY_LABELS[currency] ?? currency}.
           </span>
           <div className="currency-toggle" role="tablist" aria-label="Select currency">
             {CURRENCIES.map((c) => (
@@ -519,48 +495,15 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="price-slider">
-          <button
-            type="button"
-            aria-label="Previous plans"
-            className="slide-btn slide-prev"
-            onClick={() => slide(-1)}
-            disabled={!canPrev}
-          >
-            <SlideArrow dir="left" />
-          </button>
-          <div className="price-track" ref={trackRef}>
-            {SHOWN_PLANS.map((slug) => (
-              <PricingCard key={slug} plan={PLANS[slug]} currency={currency} />
-            ))}
-          </div>
-          <button
-            type="button"
-            aria-label="Next plans"
-            className="slide-btn slide-next"
-            onClick={() => slide(1)}
-            disabled={!canNext}
-          >
-            <SlideArrow dir="right" />
-          </button>
+        {/* Two-card centered grid: Klosure + Enterprise. No slider — only two
+            options, so a static layout is simpler and reads better. */}
+        <div className="price-grid">
+          {SHOWN_PLANS.map((slug) => (
+            <PricingCard key={slug} plan={PLANS[slug]} currency={currency} />
+          ))}
         </div>
       </div>
     </section>
-  )
-}
-
-function SlideArrow({ dir }) {
-  const d = dir === 'left' ? 'M11 4l-5 6 5 6' : 'M7 4l5 6-5 6'
-  return (
-    <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
-      <path
-        d={d}
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 

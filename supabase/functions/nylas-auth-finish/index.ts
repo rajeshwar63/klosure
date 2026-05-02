@@ -74,14 +74,17 @@ Deno.serve(async (req) => {
     const provider = statePayload.provider as "google" | "microsoft"
 
     // 4. Exchange the code with Nylas.
+    // v3 expects the API key in the body as `client_secret`, NOT as an
+    // Authorization Bearer header. The Authorization header is ignored on
+    // this endpoint.
     const exchangeRes = await fetch(`${NYLAS_API_URL}/v3/connect/token`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${NYLAS_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         client_id: NYLAS_APP_ID,
+        client_secret: NYLAS_API_KEY,
         code,
         redirect_uri: `${APP_URL}/settings/connect/callback`,
         grant_type: "authorization_code",

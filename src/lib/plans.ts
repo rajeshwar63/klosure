@@ -84,9 +84,11 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     shortLabel: 'Klosure',
     isTeam: true,
     monthlyPerSeat: {
+      // Launch pricing — $49/seat/mo. Goes to $79 once Google integration
+      // (email + meeting capture) ships. INR/AED kept at rough $49 parity.
       INR: 3999,
-      AED: 290,
-      USD: 79,
+      AED: 180,
+      USD: 49,
     },
     poolDefaults: {
       meeting_minutes_per_seat: 900,
@@ -202,11 +204,13 @@ export function totalPriceForTeam(
 }
 
 // =============================================================================
-// Launch discount — kept as a struct for future promos. The $79 is the
-// founding price; no discount is applied.
+// Launch discount — kept as a struct for future promos. The $49 is the
+// founding price; no discount is applied. `active=false` suppresses the
+// "X% OFF" banner on landing/billing pages — flip to true and set
+// percentOff > 0 when running a real promo.
 // =============================================================================
 export const LAUNCH_DISCOUNT = {
-  active: true,
+  active: false,
   percentOff: 0,
   label: 'Founding member',
 } as const
