@@ -18,7 +18,6 @@ import TrialCountdownBadge from '../billing/TrialCountdownBadge.jsx'
 const REP_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
   { id: 'deals', icon: '≡', label: 'Deals' },
-  { id: 'train-klo', icon: '✦', label: 'Train Klo' },
 ]
 
 const MANAGER_NAV = [
@@ -27,7 +26,6 @@ const MANAGER_NAV = [
   { id: 'reps', icon: '◎', label: 'Reps' },
   { id: 'team-deals', icon: '◫', label: 'Team Deals' },
   { id: 'askklo', icon: '✦', label: 'Ask Klo' },
-  { id: 'settings', icon: '⚙', label: 'Settings' },
 ]
 
 const STORAGE_KEY_MANAGER_SECTION = 'klosure:sidebarManagerOpen'
@@ -287,9 +285,23 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Bottom utility nav — pinned above the trial/team badges. */}
+      {/* Bottom utility nav — pinned above the trial/team badges.
+          Settings is the unified hub: profile, integrations, train-klo,
+          billing, account. Visible to all roles. */}
       {!collapsed && (
-        <div className="border-t border-navy/5 px-2 pt-2 pb-1 shrink-0">
+        <div className="border-t border-navy/5 px-2 pt-2 pb-1 shrink-0 flex flex-col gap-0.5">
+          <SidebarNavItem
+            icon="✦"
+            label="Train Klo"
+            active={activeView === 'train-klo'}
+            onClick={handle('train-klo')}
+          />
+          <SidebarNavItem
+            icon="⚙"
+            label="Settings"
+            active={activeView === 'settings'}
+            onClick={handle('settings')}
+          />
           <SidebarNavItem
             icon="₹"
             label="Billing"
