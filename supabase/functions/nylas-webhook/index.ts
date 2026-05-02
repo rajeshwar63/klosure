@@ -60,10 +60,15 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 })
     }
 
-    // 2. Parse.
-    const payload = JSON.parse(rawBody) as NylasWebhookPayload
-    if (!Array.isArray(payload.deltas)) {
-      console.warn("payload missing deltas")
+    // 2. Parse. Nylas v3 sends one CloudEvent per webhook
+    //    (`{specversion, type, data: {object: {...}}}`); the legacy v2 batch
+    //    shape (`{deltas: [...]}`) is kept here only as a defensive fallback
+    //    in case Nylas ever flips a project back. The earlier handler only
+    //    accepted v2, which silently dropped every real Nylas v3 event.
+    const payload = JSON.parse(rawBody) as Record<string, unknown>
+    const deltas = extractDeltas(payload)
+    if (deltas.length === 0) {
+      console.warn("payload had no deltas (v3 cloudevent extraction failed)")
       return new Response("ok", { status: 200 })
     }
 
@@ -72,7 +77,7 @@ Deno.serve(async (req) => {
     let skipped = 0
     const triggers: Array<Promise<void>> = []
 
-    for (const delta of payload.deltas) {
+    for (const delta of deltas) {
       try {
         const result = await handleDelta(delta)
         if (result === "processed") processed++
@@ -102,7 +107,7 @@ Deno.serve(async (req) => {
     console.log(
       JSON.stringify({
         event: "nylas_webhook_complete",
-        deltas: payload.deltas.length,
+        deltas: deltas.length,
         processed,
         skipped,
         duration_ms: durationMs,
@@ -166,12 +171,34 @@ interface NylasDelta {
   date?: number
 }
 
-interface NylasWebhookPayload {
-  deltas: NylasDelta[]
-  [k: string]: unknown
-}
-
 type DeltaResult = "processed" | "duplicate" | "skipped"
+
+// Normalise a webhook body into the internal `{type, object, date}` shape.
+// Nylas v3 sends one CloudEvent per webhook (`{specversion,type,data:{object}}`)
+// — the original handler expected the v2 batched `{deltas:[...]}` shape and
+// silently dropped every real event. Both shapes are handled here so we don't
+// have to redeploy if Nylas changes the format on a project flag.
+function extractDeltas(payload: Record<string, unknown>): NylasDelta[] {
+  if (!payload || typeof payload !== "object") return []
+
+  const deltas = payload.deltas
+  if (Array.isArray(deltas)) return deltas as NylasDelta[]
+
+  if (typeof payload.type === "string" && payload.data && typeof payload.data === "object") {
+    const data = payload.data as { object?: NylasDelta["object"] }
+    if (data.object && typeof data.object === "object") {
+      return [
+        {
+          type: payload.type,
+          object: data.object,
+          date: typeof payload.time === "number" ? payload.time : undefined,
+        },
+      ]
+    }
+  }
+
+  return []
+}
 
 async function handleDelta(delta: NylasDelta): Promise<DeltaResult> {
   // Fast skip: if the grant isn't one we recognize, ignore. This guards
