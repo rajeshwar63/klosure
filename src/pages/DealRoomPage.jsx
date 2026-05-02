@@ -29,6 +29,7 @@ import DangerZoneFooter from '../components/deal/DangerZoneFooter.jsx'
 import AppPromptModal from '../components/ui/AppPromptModal.jsx'
 import AppToast from '../components/ui/AppToast.jsx'
 import ShareDealModal from '../components/deal/ShareDealModal.jsx'
+import KloMeetingBand from '../components/deal/KloMeetingBand.jsx'
 
 function DealPageSkeleton() {
   return (
@@ -407,6 +408,7 @@ export default function DealRoomPage() {
         onLost={handleLost}
         onReopen={openReopenDialog}
       />
+      <KloMeetingBand dealId={deal?.id} />
       <DealTabs
         activeTab={activeTab}
         onChange={handleTabChange}

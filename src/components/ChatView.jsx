@@ -230,6 +230,17 @@ export default function ChatView({
 }
 
 function MessageRow({ message }) {
+  // Phase A: Nylas-sourced email/meeting messages render as compact pills, not
+  // chat turns. Klo's reply that follows is the headline; the raw signal is
+  // reference material the seller can expand if they want.
+  const source = message?.metadata?.source
+  if (
+    message.sender_type === 'system' &&
+    (source === 'nylas_email' || source === 'nylas_notetaker')
+  ) {
+    return <SignalPill message={message} />
+  }
+
   const { sender_type, sender_name, content, created_at } = message
   const isKlo = sender_type === 'klo'
   const author = isKlo ? 'Klo' : sender_name || (sender_type === 'seller' ? 'You' : 'Buyer')
@@ -266,6 +277,95 @@ function MessageRow({ message }) {
       </p>
     </article>
   )
+}
+
+// SignalPill renders email and meeting events as a single muted line that
+// expands to show the raw content. The visual goal: keep Klo's voice front
+// and centre, demote the envelope to a footnote.
+function SignalPill({ message }) {
+  const [expanded, setExpanded] = useState(false)
+  const { content, created_at } = message
+  const source = message?.metadata?.source
+  const isEmail = source === 'nylas_email'
+  const summary = isEmail
+    ? summarizeEmailHeader(content)
+    : summarizeMeetingHeader(content)
+
+  return (
+    <article
+      className="px-4 md:px-6 py-2"
+      style={{
+        background: 'transparent',
+        borderBottom: '1px solid var(--klo-line)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full text-left flex items-center gap-2 py-1 hover:opacity-80"
+        aria-expanded={expanded}
+      >
+        <span aria-hidden className="text-[14px] leading-none">
+          {isEmail ? '📧' : '🎙'}
+        </span>
+        <span
+          className="text-[13px] truncate"
+          style={{ color: 'var(--klo-text-dim)' }}
+        >
+          {summary}
+        </span>
+        <span
+          className="kl-mono text-[11px] ml-auto shrink-0"
+          style={{ color: 'var(--klo-text-mute)' }}
+        >
+          · {formatTime(created_at)} · {expanded ? 'hide' : 'show'}
+        </span>
+      </button>
+      {expanded && (
+        <pre
+          className="mt-2 text-[12px] leading-relaxed whitespace-pre-wrap break-words rounded p-3 max-h-[400px] overflow-auto"
+          style={{
+            color: 'var(--klo-text-dim)',
+            background: 'var(--klo-bg-elev)',
+            border: '1px solid var(--klo-line)',
+            fontFamily:
+              'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+          }}
+        >
+          {content}
+        </pre>
+      )}
+    </article>
+  )
+}
+
+function summarizeEmailHeader(content) {
+  // nylas-process-email formats the body as:
+  //   EMAIL — <date>
+  //   From: <addr>
+  //   To: <list>
+  //   Subject: <subj>
+  //   <blank>
+  //   <body>
+  const lines = (content ?? '').split('\n', 6)
+  const fromLine = lines.find((l) => l.startsWith('From:')) ?? ''
+  const subjectLine = lines.find((l) => l.startsWith('Subject:')) ?? ''
+  const from = fromLine.replace(/^From:\s*/, '').trim() || 'unknown sender'
+  const subject = subjectLine.replace(/^Subject:\s*/, '').trim()
+  return subject ? `Email from ${from} · ${subject}` : `Email from ${from}`
+}
+
+function summarizeMeetingHeader(content) {
+  // nylas-process-meeting formats:
+  //   MEETING — <title> — <date> (<n> min)
+  //   Participants: ...
+  //   <blank>
+  //   TRANSCRIPT:
+  //   ...
+  const firstLine = (content ?? '').split('\n', 1)[0] ?? ''
+  // Strip the "MEETING — " prefix so the pill reads naturally.
+  const stripped = firstLine.replace(/^MEETING\s*—\s*/, '').trim()
+  return stripped ? `Meeting · ${stripped}` : 'Meeting transcript'
 }
 
 function KloTyping() {
