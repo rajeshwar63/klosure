@@ -14,6 +14,7 @@ import {
   ConfidencePill,
 } from '../shared/index.js'
 import SellerTimelineStrip from './SellerTimelineStrip.jsx'
+import DealCalendarTab from '../../pages/DealCalendarTab.jsx'
 
 const MIN_CONFIDENCE_TREND_POINTS = 3
 
@@ -447,6 +448,17 @@ function NextActionsCard({ actions, dealId }) {
   )
 }
 
+function MeetingsCard({ dealId }) {
+  return (
+    <div className="bg-white border border-navy/10 rounded-2xl">
+      <div className="px-5 py-4 border-b border-navy/5">
+        <h3 className="text-sm font-semibold text-navy">Meetings</h3>
+      </div>
+      <DealCalendarTab dealId={dealId} embedded />
+    </div>
+  )
+}
+
 function VendorTeamCard({ deal }) {
   const company = deal?.seller_company || 'Your team'
   return (
@@ -745,6 +757,8 @@ export default function SellerOverview({ deal }) {
         <ConfidenceChart history={momentumHistory} confidence={klo?.confidence} dealId={deal?.id} />
         <RisksList blockers={klo.blockers} />
       </div>
+
+      <MeetingsCard dealId={deal?.id} />
 
       <BuyerRecentMomentsFeed
         moments={klo.buyer_view?.recent_moments}

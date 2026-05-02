@@ -6,7 +6,6 @@ const STORAGE_KEY_PREFIX = 'klosure:dealTab:'
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'chat', label: 'Chat' },
-  { id: 'calendar', label: 'Calendar' },
   { id: 'buyer', label: 'Buyer view' },
 ]
 
@@ -14,8 +13,8 @@ export function loadDealTab(dealId, fallback = 'overview') {
   if (!dealId) return fallback
   try {
     const v = localStorage.getItem(STORAGE_KEY_PREFIX + dealId)
-    // Migration: history tab no longer exists; fall back to default.
-    if (v === 'history') return fallback
+    // Migration: history and calendar tabs were folded into Overview.
+    if (v === 'history' || v === 'calendar') return fallback
     return v && TABS.some((t) => t.id === v) ? v : fallback
   } catch {
     return fallback
