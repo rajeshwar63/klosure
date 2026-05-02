@@ -3,6 +3,8 @@ import { daysUntil, formatCurrency } from '../../lib/format.js'
 import BuyerStakeholderMap from '../buyer/BuyerStakeholderMap.jsx'
 import BuyerRecentMomentsFeed from '../buyer/BuyerRecentMomentsFeed.jsx'
 import PendingTasksTwoCol from '../shared/PendingTasksTwoCol.jsx'
+import { useAuth } from '../../hooks/useAuth.jsx'
+import { useProfile } from '../../hooks/useProfile.jsx'
 import {
   Eyebrow,
   HairlineGrid,
@@ -631,11 +633,36 @@ function RisksList({ blockers }) {
 }
 
 function deriveStakeholdersForSeller(klo) {
+  // klo_state.people[] is the source of truth for stakeholder identity
+  // (incl. email + company). buyer_view.stakeholder_takes is a derived view
+  // for engagement/notes. We merge by name so the seller-side display can
+  // show both Klo's take AND the email field needed for the Phase A
+  // "+ email" affordance.
+  const people = klo?.people ?? []
+  const peopleByName = new Map()
+  for (const p of people) {
+    const key = (p?.name ?? '').trim()
+    if (key) peopleByName.set(key, p)
+  }
+
   const fromView = klo?.buyer_view?.stakeholder_takes ?? []
-  if (fromView.length > 0) return fromView
-  return (klo?.people ?? []).map((p) => ({
+  if (fromView.length > 0) {
+    return fromView.map((s) => {
+      const key = (s?.name ?? '').trim()
+      const match = peopleByName.get(key)
+      return {
+        ...s,
+        email: s?.email ?? match?.email ?? null,
+        company: s?.company ?? match?.company ?? null,
+      }
+    })
+  }
+
+  return people.map((p) => ({
     name: p.name,
     role: p.role,
+    company: p.company ?? null,
+    email: p.email ?? null,
     engagement: 'unknown',
     klo_note: null,
   }))
@@ -658,6 +685,12 @@ function deriveActions(klo) {
 
 export default function SellerOverview({ deal }) {
   const klo = deal?.klo_state ?? null
+  const { user } = useAuth()
+  const { profile } = useProfile()
+  const currentUserName = useMemo(
+    () => profile?.name || user?.email || 'Seller',
+    [profile?.name, user?.email],
+  )
 
   const stakeholders = useMemo(() => deriveStakeholdersForSeller(klo), [klo])
   const actions = useMemo(() => deriveActions(klo), [klo])
@@ -696,6 +729,10 @@ export default function SellerOverview({ deal }) {
           stakeholders={stakeholders}
           title="Buyer-side stakeholders"
           emptyCopy="Klo will surface buyer-side stakeholders from your deal conversations."
+          canEditEmail
+          dealId={deal?.id}
+          dealMode={deal?.mode ?? 'solo'}
+          currentUserName={currentUserName}
         />
         <VendorTeamCard deal={deal} />
       </div>
