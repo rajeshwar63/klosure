@@ -342,13 +342,34 @@ async function handleNotetakerUpdate(
     return json({ ok: false, error: "msg_insert_failed" }, 500)
   }
 
-  await sb.functions
-    .invoke("klo-respond", {
-      body: { deal_id: event.deal_id, triggering_message_id: msgRow.id },
-    })
-    .catch((err) => {
-      console.error("klo-respond invoke failed", err)
-    })
+  // Direct fetch + service-role apikey because:
+  // 1. sb.functions.invoke() does not propagate the service-role key in
+  //    edge-function context.
+  // 2. Project's new-format keys (sb_publishable_/sb_secret_) are not JWTs,
+  //    so klo-respond must be deployed with verify_jwt: false.
+  // 3. await ensures Deno doesn't recycle the worker before the call resolves.
+  const kloRes = await fetch(`${SUPABASE_URL}/functions/v1/klo-respond`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({
+      deal_id: event.deal_id,
+      triggering_message_id: msgRow.id,
+    }),
+  }).catch((err) => {
+    console.error("klo-respond fetch failed", err)
+    return null
+  })
+  if (kloRes && !kloRes.ok) {
+    console.error(
+      "klo-respond non-2xx",
+      kloRes.status,
+      (await kloRes.text().catch(() => "")).slice(0, 200),
+    )
+  }
 
   // Increment meeting usage and check pool thresholds.
   const { data: grantInfo } = await sb

@@ -138,18 +138,34 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "msg_insert_failed" }, 500)
     }
 
-    // 6. Trigger klo-respond. It will see the new system message in the
-    // history and extract from it.
-    await sb.functions
-      .invoke("klo-respond", {
-        body: {
-          deal_id: matchedDealId,
-          triggering_message_id: emailMsg.id,
-        },
-      })
-      .catch((err) => {
-        console.error("klo-respond invoke failed", err)
-      })
+    // 6. Trigger klo-respond. Direct fetch with service-role apikey because
+    //    sb.functions.invoke() does not propagate the service-role key in
+    //    edge-function context, AND because the project's new-format keys
+    //    (sb_publishable_/sb_secret_) are not JWTs — so klo-respond must be
+    //    deployed with verify_jwt: false. We await so Deno doesn't recycle
+    //    the worker before the call resolves.
+    const kloRes = await fetch(`${SUPABASE_URL}/functions/v1/klo-respond`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: SERVICE_ROLE_KEY,
+      },
+      body: JSON.stringify({
+        deal_id: matchedDealId,
+        triggering_message_id: emailMsg.id,
+      }),
+    }).catch((err) => {
+      console.error("klo-respond fetch failed", err)
+      return null
+    })
+    if (kloRes && !kloRes.ok) {
+      console.error(
+        "klo-respond non-2xx",
+        kloRes.status,
+        (await kloRes.text().catch(() => "")).slice(0, 200),
+      )
+    }
 
     // 7. Mark the email_event as processed and link to the deal.
     await sb
