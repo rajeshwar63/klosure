@@ -114,6 +114,8 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     highlights: [
       'Klo coaching on every conversation',
       'Email + Note Taker (Gmail, Outlook, Zoom, Meet, Teams)',
+      'Unlimited email + calendar events',
+      '15 hours of Notetaker meetings per seat',
       'AI Dashboard for Rep and Client',
       'Manager dashboard with team rollup',
       'Daily focus + weekly brief for Manager and Rep',
