@@ -204,13 +204,40 @@ async function matchDealForEvent(
     .eq("status", "active")
     .order("updated_at", { ascending: false })
 
-  // Pass 1: exact email match across all deals (strongest signal).
-  for (const deal of deals ?? []) {
+  if (!deals || deals.length === 0) return { dealId: null, address: null }
+
+  // Klo's coaching loop occasionally rewrites klo_state.people without the
+  // email field, so we union with deal_context.stakeholders — that's the
+  // durable email-of-record source captured at deal creation.
+  const dealIds = deals.map((d) => d.id)
+  const { data: contexts } = await sb
+    .from("deal_context")
+    .select("deal_id, stakeholders")
+    .in("deal_id", dealIds)
+
+  const stakeholdersByDeal = new Map<string, Array<{ email?: string }>>()
+  for (const ctx of contexts ?? []) {
+    stakeholdersByDeal.set(
+      ctx.deal_id as string,
+      (ctx.stakeholders ?? []) as Array<{ email?: string }>,
+    )
+  }
+
+  function emailsForDeal(deal: { id: string; klo_state: unknown }): string[] {
     const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
       []) as Array<{ email?: string }>
-    const peopleEmails = new Set(
-      people.map((p) => (p.email ?? "").toLowerCase().trim()).filter(Boolean),
-    )
+    const stakeholders = stakeholdersByDeal.get(deal.id) ?? []
+    const out = new Set<string>()
+    for (const p of [...people, ...stakeholders]) {
+      const addr = (p.email ?? "").toLowerCase().trim()
+      if (addr) out.add(addr)
+    }
+    return [...out]
+  }
+
+  // Pass 1: exact email match across all deals (strongest signal).
+  for (const deal of deals) {
+    const peopleEmails = new Set(emailsForDeal(deal))
     if (peopleEmails.size === 0) continue
     for (const ext of externals) {
       if (peopleEmails.has(ext.email.toLowerCase())) {
@@ -221,12 +248,10 @@ async function matchDealForEvent(
 
   // Pass 2: domain fallback. If any participant shares a domain with a known
   // stakeholder on a deal (excluding free-mail providers), treat as a match.
-  for (const deal of deals ?? []) {
-    const people = ((deal.klo_state as { people?: Array<{ email?: string }> })?.people ??
-      []) as Array<{ email?: string }>
+  for (const deal of deals) {
     const peopleDomains = new Set(
-      people
-        .map((p) => domainOf((p.email ?? "").toLowerCase().trim()))
+      emailsForDeal(deal)
+        .map((e) => domainOf(e))
         .filter((d): d is string => !!d && !isCommonDomain(d)),
     )
     if (peopleDomains.size === 0) continue
