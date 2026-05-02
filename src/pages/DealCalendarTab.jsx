@@ -1,6 +1,7 @@
-// Calendar tab for the deal page. Lists every meeting Nylas has synced for
-// this deal (upcoming + past), grouped by upcoming/past, with an expandable
-// detail per row that holds the seller's freeform Notes (Deal Moments).
+// Meetings list for a deal. Lists every meeting Nylas has synced (upcoming +
+// past), grouped by upcoming/past, with an expandable detail per row that
+// holds the seller's freeform Notes (Deal Moments). Used as a card inside
+// SellerOverview via `embedded`.
 //
 // Status icon legend:
 //   📅  scheduled but Klo not in (or no transcript yet)
@@ -79,7 +80,7 @@ function partyShort(participants) {
   return `${names.slice(0, 3).join(', ')} +${names.length - 3}`
 }
 
-export default function DealCalendarTab({ dealId }) {
+export default function DealCalendarTab({ dealId, embedded = false }) {
   const [meetings, setMeetings] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
@@ -117,9 +118,19 @@ export default function DealCalendarTab({ dealId }) {
     return { upcoming: up, past: dn }
   }, [meetings])
 
+  const skeletonShellClass = embedded
+    ? 'px-5 py-5'
+    : 'max-w-3xl mx-auto px-4 md:px-6 py-8'
+  const emptyShellClass = embedded
+    ? 'px-5 py-8 text-center'
+    : 'max-w-3xl mx-auto px-4 md:px-6 py-12 text-center'
+  const listShellClass = embedded
+    ? 'px-5 py-5'
+    : 'max-w-3xl mx-auto px-4 md:px-6 py-6'
+
   if (!loaded) {
     return (
-      <div className="max-w-3xl mx-auto px-4 md:px-6 py-8">
+      <div className={skeletonShellClass}>
         <div className="h-20 rounded-xl bg-navy/5 animate-pulse" />
       </div>
     )
@@ -127,7 +138,7 @@ export default function DealCalendarTab({ dealId }) {
 
   if (meetings.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto px-4 md:px-6 py-12 text-center">
+      <div className={emptyShellClass}>
         <p className="text-[15px]" style={{ color: 'var(--klo-text-dim)' }}>
           No meetings on this deal yet.
         </p>
@@ -141,13 +152,14 @@ export default function DealCalendarTab({ dealId }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
+    <div className={listShellClass}>
       {upcoming.length > 0 && (
         <Section
           title="Upcoming"
           meetings={upcoming}
           expandedId={expandedId}
           setExpandedId={setExpandedId}
+          isLast={past.length === 0}
         />
       )}
       {past.length > 0 && (
@@ -156,15 +168,16 @@ export default function DealCalendarTab({ dealId }) {
           meetings={past}
           expandedId={expandedId}
           setExpandedId={setExpandedId}
+          isLast
         />
       )}
     </div>
   )
 }
 
-function Section({ title, meetings, expandedId, setExpandedId }) {
+function Section({ title, meetings, expandedId, setExpandedId, isLast }) {
   return (
-    <section className="mb-8">
+    <section className={isLast ? '' : 'mb-6'}>
       <h3
         className="kl-mono text-[11px] uppercase font-medium mb-2 px-1"
         style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.05em' }}
