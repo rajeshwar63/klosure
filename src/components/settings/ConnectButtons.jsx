@@ -1,9 +1,10 @@
-// Phase A — connect Gmail / Outlook buttons. Drops the user into Nylas's
+// Phase B — connect Gmail / Outlook buttons. Drops the user into Klosure's
 // hosted OAuth flow via a full-page redirect; the callback page handles the
-// return.
+// return. The user sees Google/Microsoft for the consent step, then comes
+// back to Klosure — no vendor name in our UI.
 
 import { useState } from 'react'
-import { startConnect } from '../../services/nylas.js'
+import { startConnect } from '../../services/aurinko.js'
 
 export default function ConnectButtons() {
   const [busy, setBusy] = useState(null)
@@ -32,12 +33,12 @@ export default function ConnectButtons() {
         {busy === 'google' ? 'Opening Google…' : 'Connect Gmail & Google Calendar'}
       </button>
       <button
-        onClick={() => handleConnect('microsoft')}
+        onClick={() => handleConnect('office365')}
         disabled={!!busy}
         className="w-full bg-white border border-navy/10 hover:border-navy/30 text-navy font-medium py-3 px-4 rounded-xl flex items-center gap-3 disabled:opacity-50"
       >
         <MicrosoftLogo />
-        {busy === 'microsoft' ? 'Opening Microsoft…' : 'Connect Outlook & M365 Calendar'}
+        {busy === 'office365' ? 'Opening Microsoft…' : 'Connect Outlook & M365 Calendar'}
       </button>
       {error && (
         <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">

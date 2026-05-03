@@ -1,17 +1,18 @@
 // =============================================================================
-// Nylas service — Phase A
+// Aurinko + Recall service — Phase B
 // =============================================================================
-// Frontend wrappers around the nylas-* edge functions. Used by the settings
-// page (sprint 09) and the OAuth callback page (sprint 03).
+// Frontend wrappers around the aurinko-* edge functions. The user sees only
+// "Klosure" in the UI; the underlying provider names live here and in the
+// edge functions.
 // =============================================================================
 
 import { supabase } from '../lib/supabase.js'
 
 export async function startConnect({ provider }) {
-  if (provider !== 'google' && provider !== 'microsoft') {
+  if (provider !== 'google' && provider !== 'office365') {
     return { ok: false, error: 'invalid_provider' }
   }
-  const { data, error } = await supabase.functions.invoke('nylas-auth-start', {
+  const { data, error } = await supabase.functions.invoke('aurinko-auth-start', {
     body: { provider },
   })
   if (error) return { ok: false, error: error.message }
@@ -19,7 +20,7 @@ export async function startConnect({ provider }) {
 }
 
 export async function finishConnect({ code, state }) {
-  const { data, error } = await supabase.functions.invoke('nylas-auth-finish', {
+  const { data, error } = await supabase.functions.invoke('aurinko-auth-finish', {
     body: { code, state },
   })
   if (error) return { ok: false, error: error.message }
@@ -27,13 +28,12 @@ export async function finishConnect({ code, state }) {
 }
 
 export async function listGrants() {
-  // Disconnected (revoked) grants are hidden from the UI — they linger in the
-  // table because Nylas issues a fresh grant_id on reconnect, but the user
-  // shouldn't see the stale row alongside the new active one.
+  // Hide revoked grants from the UI — Aurinko issues a fresh accountId on
+  // reconnect, so the stale row would otherwise sit beside the new active one.
   const { data, error } = await supabase
-    .from('nylas_grants')
+    .from('aurinko_grants')
     .select(
-      'id, nylas_grant_id, provider, email_address, sync_state, granted_at, last_seen_at, last_error',
+      'id, aurinko_account_id, provider, email_address, sync_state, granted_at, last_seen_at, last_error',
     )
     .neq('sync_state', 'revoked')
     .order('granted_at', { ascending: false })
@@ -41,19 +41,17 @@ export async function listGrants() {
   return { ok: true, grants: data ?? [] }
 }
 
-export async function disconnectGrant({ grantId }) {
-  // Soft-delete: mark sync_state='revoked' first, the webhook handler will
-  // skip events for revoked grants. We also call Nylas to revoke server-side.
+export async function disconnectGrant({ accountId }) {
+  // Soft-delete: mark sync_state='revoked' first; the webhook handler skips
+  // events for revoked grants. Then call Aurinko to revoke server-side.
   const { error: updateErr } = await supabase
-    .from('nylas_grants')
+    .from('aurinko_grants')
     .update({ sync_state: 'revoked', last_seen_at: new Date().toISOString() })
-    .eq('nylas_grant_id', grantId)
+    .eq('aurinko_account_id', accountId)
   if (updateErr) return { ok: false, error: updateErr.message }
 
-  // Fire-and-forget the Nylas-side revoke. The local row is already revoked;
-  // even if Nylas is down we won't accept further events for this grant.
   await supabase.functions
-    .invoke('nylas-revoke-grant', { body: { grantId } })
+    .invoke('aurinko-revoke-grant', { body: { accountId } })
     .catch(() => {})
 
   return { ok: true }

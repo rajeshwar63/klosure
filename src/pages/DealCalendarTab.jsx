@@ -1,4 +1,4 @@
-// Meetings list for a deal. Lists every meeting Nylas has synced (upcoming +
+// Meetings list for a deal. Lists every meeting that's been synced (upcoming +
 // past), grouped by upcoming/past, with an expandable detail per row that
 // shows participants and the transcript. Used as a card inside SellerOverview
 // via `embedded`.

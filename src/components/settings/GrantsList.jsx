@@ -1,9 +1,9 @@
-// Phase A — basic grants list (sprint 03). Settings page (sprint 09) uses
-// GrantsListEnhanced which adds deal-coverage stats; this remains as a
-// minimal version for any consumer that doesn't need the wrapper data.
+// Phase B — basic grants list. Settings page (sprint 09) uses GrantsListEnhanced
+// which adds deal-coverage stats; this remains as a minimal version for any
+// consumer that doesn't need the wrapper data.
 
 import { useEffect, useState } from 'react'
-import { listGrants, disconnectGrant } from '../../services/nylas.js'
+import { listGrants, disconnectGrant } from '../../services/aurinko.js'
 
 export default function GrantsList() {
   const [grants, setGrants] = useState([])
@@ -21,7 +21,7 @@ export default function GrantsList() {
     refresh()
   }, [])
 
-  async function handleDisconnect(grantId, label) {
+  async function handleDisconnect(accountId, label) {
     if (
       !confirm(
         `Disconnect ${label}? Klo will stop reading email and meetings from this account.`,
@@ -29,7 +29,7 @@ export default function GrantsList() {
     ) {
       return
     }
-    const result = await disconnectGrant({ grantId })
+    const result = await disconnectGrant({ accountId })
     if (!result.ok) {
       alert(`Could not disconnect: ${result.error}`)
       return
@@ -51,7 +51,7 @@ export default function GrantsList() {
     <ul className="space-y-2">
       {grants.map((g) => (
         <li
-          key={g.nylas_grant_id}
+          key={g.aurinko_account_id}
           className="bg-white border border-navy/10 rounded-xl p-3 flex justify-between items-center"
         >
           <div>
@@ -63,7 +63,7 @@ export default function GrantsList() {
           </div>
           {g.sync_state !== 'revoked' && (
             <button
-              onClick={() => handleDisconnect(g.nylas_grant_id, g.email_address)}
+              onClick={() => handleDisconnect(g.aurinko_account_id, g.email_address)}
               className="text-sm text-red-600 hover:underline"
             >
               Disconnect
