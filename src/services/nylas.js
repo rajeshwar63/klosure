@@ -27,11 +27,15 @@ export async function finishConnect({ code, state }) {
 }
 
 export async function listGrants() {
+  // Disconnected (revoked) grants are hidden from the UI — they linger in the
+  // table because Nylas issues a fresh grant_id on reconnect, but the user
+  // shouldn't see the stale row alongside the new active one.
   const { data, error } = await supabase
     .from('nylas_grants')
     .select(
       'id, nylas_grant_id, provider, email_address, sync_state, granted_at, last_seen_at, last_error',
     )
+    .neq('sync_state', 'revoked')
     .order('granted_at', { ascending: false })
   if (error) return { ok: false, error: error.message, grants: [] }
   return { ok: true, grants: data ?? [] }
