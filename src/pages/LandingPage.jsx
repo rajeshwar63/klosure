@@ -13,8 +13,6 @@ const CURRENCY_LABELS = {
   INR: 'Indian Rupees',
 }
 
-const PHONE_DISPLAY = '+91 93985 74255'
-const PHONE_TEL = '+919398574255'
 const EMAIL = 'support@klosure.ai'
 const LINKEDIN = 
 
@@ -575,26 +573,7 @@ function Contact() {
               </svg>
               <span>{EMAIL}</span>
             </a>
-            <span className="contact-sep">·</span>
-            <a href={`tel:${PHONE_TEL}`} className="contact-pill">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M14 11.3v2a1.3 1.3 0 0 1-1.5 1.3 13 13 0 0 1-5.7-2 12.7 12.7 0 0 1-3.9-3.9 13 13 0 0 1-2-5.8A1.3 1.3 0 0 1 2.2 1.4h2A1.3 1.3 0 0 1 5.5 2.5c.1.7.2 1.3.5 2a1.3 1.3 0 0 1-.3 1.4l-.8.8a10.7 10.7 0 0 0 4 4l.8-.8a1.3 1.3 0 0 1 1.4-.3c.6.2 1.3.4 2 .5a1.3 1.3 0 0 1 1.1 1.3z" />
-              </svg>
-              <span>{PHONE_DISPLAY}</span>
-            </a>
           </div>
-
-          <div className="contact-foot">— Raja Komatipalli, Founder. 15+ years in B2B sales.</div>
         </div>
       </div>
     </section>
