@@ -18,6 +18,7 @@ import TrialCountdownBadge from '../billing/TrialCountdownBadge.jsx'
 const REP_NAV = [
   { id: 'today', icon: '◆', label: 'Today' },
   { id: 'deals', icon: '≡', label: 'Deals' },
+  { id: 'me-askklo', icon: '✦', label: 'Ask Klo' },
 ]
 
 const MANAGER_NAV = [

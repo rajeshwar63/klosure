@@ -23,6 +23,7 @@ const BillingManagePage = lazy(() => import('./pages/BillingManagePage.jsx'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage.jsx'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage.jsx'))
 const AskKloPage = lazy(() => import('./pages/AskKloPage.jsx'))
+const AskRepKloPage = lazy(() => import('./pages/AskRepKloPage.jsx'))
 const TrainKloPage = lazy(() => import('./pages/TrainKloPage.jsx'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
@@ -82,6 +83,7 @@ export default function App() {
         <Route element={<RequireAuth><ShellWrapper /></RequireAuth>}>
           <Route path="/today" element={<SellerHomePage />} />
           <Route path="/deals" element={<DealsListPage />} />
+          <Route path="/askklo" element={<AskRepKloPage />} />
           <Route path="/deals/new" element={<NewDealPage />} />
           <Route path="/deals/:id" element={<DealRoomPage />} />
           <Route path="/team" element={<ManagerHomePage />} />
