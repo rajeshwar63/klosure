@@ -5,12 +5,12 @@ import './LandingPage.css'
 
 // Phase A sprint 08: collapsed pricing.
 const SHOWN_PLANS = ['klosure', 'enterprise']
-const CURRENCIES = ['USD', 'INR', 'AED']
+const CURRENCIES = ['USD', 'AED', 'INR']
 
 const CURRENCY_LABELS = {
   USD: 'US Dollars',
-  INR: 'Indian Rupees',
   AED: 'UAE Dirhams',
+  INR: 'Indian Rupees',
 }
 
 const PHONE_DISPLAY = '+91 93985 74255'
