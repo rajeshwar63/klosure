@@ -6,6 +6,7 @@
 // =============================================================================
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import ConnectButtons from '../components/settings/ConnectButtons.jsx'
 import GrantsListEnhanced from '../components/settings/GrantsListEnhanced.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
@@ -15,6 +16,17 @@ export default function SettingsConnectionsPage() {
   const { user } = useAuth()
   const [coverage, setCoverage] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // After Nylas OAuth, the callback page redirects here with ?connected=1.
+  // Bump refreshTick to force GrantsListEnhanced + coverage to re-fetch, then
+  // strip the flag from the URL so a later refresh doesn't re-trigger it.
+  useEffect(() => {
+    if (searchParams.get('connected') === '1') {
+      setRefreshTick((t) => t + 1)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     if (!user) return
@@ -47,7 +59,7 @@ export default function SettingsConnectionsPage() {
       </div>
 
       <div className="mt-6">
-        <ConnectButtons onConnected={() => setRefreshTick((t) => t + 1)} />
+        <ConnectButtons />
       </div>
 
       <div className="mt-8 pt-6 border-t border-navy/10">
@@ -56,6 +68,7 @@ export default function SettingsConnectionsPage() {
         </h2>
         <GrantsListEnhanced
           coverage={coverage}
+          refreshKey={refreshTick}
           onChanged={() => setRefreshTick((t) => t + 1)}
         />
       </div>

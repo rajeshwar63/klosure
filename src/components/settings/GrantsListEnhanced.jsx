@@ -4,13 +4,13 @@
 import { useEffect, useState } from 'react'
 import { listGrants, disconnectGrant, startConnect } from '../../services/nylas.js'
 
-export default function GrantsListEnhanced({ coverage, onChanged }) {
+export default function GrantsListEnhanced({ coverage, onChanged, refreshKey = 0 }) {
   const [grants, setGrants] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     refresh()
-  }, [])
+  }, [refreshKey])
 
   async function refresh() {
     const r = await listGrants()

@@ -38,7 +38,13 @@ export default function NylasCallbackPage() {
           return
         }
         setStatus('done')
-        setTimeout(() => navigate('/settings/connections', { replace: true }), 1500)
+        // The `connected=1` flag tells SettingsConnectionsPage to force a
+        // re-fetch of the grants list so the new account appears without a
+        // manual page refresh.
+        setTimeout(
+          () => navigate('/settings/connections?connected=1', { replace: true }),
+          1500,
+        )
       })
       .catch((e) => {
         setStatus('error')
