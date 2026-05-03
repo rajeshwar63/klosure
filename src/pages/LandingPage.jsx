@@ -58,42 +58,19 @@ export default function LandingPage() {
   )
 }
 
-function LogoMark({ withDefs = false }) {
+function LogoMark() {
   return (
     <svg
       className="logo-mark"
-      viewBox="0 0 24 24"
-      fill="none"
+      viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      {withDefs && (
-        <defs>
-          <linearGradient id="kloGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#7BA8FF" />
-            <stop offset="100%" stopColor="#3B6FD9" />
-          </linearGradient>
-        </defs>
-      )}
-      <rect
-        x="3.2"
-        y="3.2"
-        width="17.6"
-        height="17.6"
-        rx="3.6"
-        transform="rotate(45 12 12)"
-        stroke="url(#kloGrad)"
-        strokeWidth="1.6"
-      />
-      <rect
-        x="7.4"
-        y="7.4"
-        width="9.2"
-        height="9.2"
-        rx="1.6"
-        transform="rotate(45 12 12)"
-        fill="url(#kloGrad)"
-      />
+      <rect width="64" height="64" rx="14" fill="#1A1A2E" />
+      <g transform="translate(32 32)">
+        <polygon points="0,-22 22,0 0,22 -22,0" fill="#4F8EF7" />
+        <polygon points="0,-11 11,0 0,11 -11,0" fill="#1A1A2E" />
+      </g>
     </svg>
   )
 }
@@ -103,7 +80,7 @@ function NavBar() {
     <nav className="klo-nav">
       <div className="container nav-inner">
         <Link to="/" className="logo" aria-label="Klosure">
-          <LogoMark withDefs />
+          <LogoMark />
           <span>Klosure</span>
         </Link>
         <div className="nav-links">
