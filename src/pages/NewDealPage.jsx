@@ -101,9 +101,16 @@ export default function NewDealPage() {
       }))
       .filter((s) => s.name)
 
-    // Validate emails if provided. Empty email is allowed; invalid is not.
+    // Email is required for every stakeholder so Klo can scan their messages and meetings.
+    const missingEmail = cleanStakeholders.find((s) => !s.email)
+    if (missingEmail) {
+      setError(`Email is required for ${missingEmail.name}. Klo needs it to scan messages and meetings.`)
+      setSubmitting(false)
+      return
+    }
+
     const badEmail = cleanStakeholders.find(
-      (s) => s.email && !EMAIL_RE.test(s.email),
+      (s) => !EMAIL_RE.test(s.email),
     )
     if (badEmail) {
       setError(`"${badEmail.email}" doesn't look like a valid email.`)
@@ -278,53 +285,55 @@ export default function NewDealPage() {
 
           <Card
             title="Stakeholders"
-            subtitle="Who's involved on the buyer side? Email is optional but lets Klo read messages and meetings with that person."
+            subtitle="Who's involved on the buyer side? Klo scans messages and meetings for each person, so email is required."
           >
             <div className="space-y-3">
               {stakeholders.map((s, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="grid grid-cols-12 gap-2 items-center">
-                    <input
-                      className="col-span-4 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                      placeholder="Name"
-                      value={s.name}
-                      onChange={(e) => updateStakeholder(i, 'name', e.target.value)}
-                    />
-                    <input
-                      className="col-span-4 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                      placeholder="Role"
-                      value={s.role}
-                      onChange={(e) => updateStakeholder(i, 'role', e.target.value)}
-                    />
-                    <input
-                      className="col-span-3 border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                      placeholder="Company"
-                      value={s.company}
-                      onChange={(e) => updateStakeholder(i, 'company', e.target.value)}
-                    />
+                <div key={i} className="border border-navy/15 rounded-xl p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+                      <input
+                        className="border border-navy/15 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+                        placeholder="Name *"
+                        value={s.name}
+                        onChange={(e) => updateStakeholder(i, 'name', e.target.value)}
+                      />
+                      <input
+                        className="border border-navy/15 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+                        placeholder="Role"
+                        value={s.role}
+                        onChange={(e) => updateStakeholder(i, 'role', e.target.value)}
+                      />
+                      <input
+                        className="border border-navy/15 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+                        placeholder="Company"
+                        value={s.company}
+                        onChange={(e) => updateStakeholder(i, 'company', e.target.value)}
+                      />
+                      <input
+                        type="email"
+                        inputMode="email"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        className="border border-navy/15 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
+                        placeholder={
+                          s.name.trim()
+                            ? `${s.name.split(' ')[0]}'s email *`
+                            : 'Email *'
+                        }
+                        value={s.email}
+                        onChange={(e) => updateStakeholder(i, 'email', e.target.value)}
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => removeStakeholder(i)}
-                      className="col-span-1 text-navy/40 hover:text-red-500 text-lg"
+                      className="text-navy/40 hover:text-red-500 hover:bg-red-50 text-xl w-7 h-7 flex items-center justify-center rounded shrink-0 mt-0.5 leading-none"
                       aria-label="Remove stakeholder"
                     >
                       ×
                     </button>
                   </div>
-                  <input
-                    type="email"
-                    inputMode="email"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    className="w-full border border-navy/15 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-klo"
-                    placeholder={
-                      s.name.trim()
-                        ? `${s.name.split(' ')[0]}'s email (optional)`
-                        : 'Email (optional)'
-                    }
-                    value={s.email}
-                    onChange={(e) => updateStakeholder(i, 'email', e.target.value)}
-                  />
                 </div>
               ))}
               <button
