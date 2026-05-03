@@ -348,13 +348,13 @@ export default function Sidebar({
             >
               {userInitials(user)}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
               <p className="text-[12px] font-medium text-navy truncate">
                 {user?.name || user?.email || 'You'}
               </p>
               {role === 'manager' && (
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-klo mt-0.5 inline-block">
-                  Mgr
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-klo shrink-0">
+                  Manager
                 </span>
               )}
             </div>
