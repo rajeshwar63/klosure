@@ -457,8 +457,8 @@ async function handleNotetakerUpdate(
     return json({ ok: true, skipped: "event_not_found" })
   }
 
-  // Only act when transcript becomes available.
-  if (event.notetaker_state !== "ready" || !event.transcript_url) {
+  // Only act when the bot has finished and media is available on Nylas.
+  if (event.notetaker_state !== "ready") {
     return json({ ok: true, waiting: true, state: event.notetaker_state })
   }
 
@@ -478,7 +478,31 @@ async function handleNotetakerUpdate(
     return json({ ok: true, skipped: "no_deal_id" })
   }
 
-  const transcript = await fetchTranscript(event.transcript_url)
+  // Nylas v3 doesn't include media URLs in the notetaker.media webhook payload
+  // — they live at /v3/grants/{grant}/notetakers/{id}/media. Fetch on demand
+  // when state is "ready" and we haven't cached the URL yet.
+  let transcriptUrl = event.transcript_url as string | null
+  if (!transcriptUrl) {
+    transcriptUrl = await fetchTranscriptUrlFromMedia(grantId, event.nylas_notetaker_id)
+    if (transcriptUrl) {
+      await sb
+        .from("meeting_events")
+        .update({ transcript_url: transcriptUrl })
+        .eq("id", event.id)
+    }
+  }
+  if (!transcriptUrl) {
+    await sb
+      .from("meeting_events")
+      .update({
+        processed_at: new Date().toISOString(),
+        processing_error: "no_transcript_url",
+      })
+      .eq("id", event.id)
+    return json({ ok: false, error: "no_transcript_url" }, 502)
+  }
+
+  const transcript = await fetchTranscript(transcriptUrl)
   if (!transcript) {
     await sb
       .from("meeting_events")
@@ -600,6 +624,28 @@ async function handleNotetakerUpdate(
     .eq("id", event.id)
 
   return json({ ok: true, deal_id: event.deal_id, message_id: msgRow.id })
+}
+
+async function fetchTranscriptUrlFromMedia(
+  grantId: string,
+  notetakerId: string | null,
+): Promise<string | null> {
+  if (!notetakerId) return null
+  try {
+    const res = await fetch(
+      `${NYLAS_API_URL}/v3/grants/${grantId}/notetakers/${notetakerId}/media`,
+      { headers: { Authorization: `Bearer ${NYLAS_API_KEY}` } },
+    )
+    if (!res.ok) {
+      console.error("media endpoint fetch failed", res.status)
+      return null
+    }
+    const body = await res.json()
+    return body?.data?.transcript?.url ?? null
+  } catch (e) {
+    console.error("media endpoint fetch error", e)
+    return null
+  }
 }
 
 async function fetchTranscript(url: string): Promise<string | null> {

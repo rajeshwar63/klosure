@@ -408,6 +408,7 @@ async function handleNotetaker(
       processing: "media_processing",
       media_uploading: "media_processing",
       media_uploaded: "ready",
+      media_available: "ready",
       completed: "ready",
       failed: "failed",
     }
