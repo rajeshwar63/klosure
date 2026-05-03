@@ -165,7 +165,7 @@ Klo also emits a small array of "moves the seller should make this week" — the
 // =============================================================================
 // Phase A — email + meeting input rules
 // =============================================================================
-// Some messages in chat history are Nylas-sourced signals tagged
+// Some messages in chat history are inbox/calendar-sourced signals tagged
 // sender_type='system'. The model needs explicit guidance on how to treat
 // them. Appended to the extraction prompt; not part of the buyer-facing
 // EXTRACTION_RULES.md document.

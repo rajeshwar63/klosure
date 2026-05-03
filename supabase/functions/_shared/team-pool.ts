@@ -1,9 +1,9 @@
 // =============================================================================
 // Team pool helpers — Phase A sprint 07
 // =============================================================================
-// Pool capacity check + 80%/100% notification dispatch. Used by
-// nylas-process-meeting to decide whether to dispatch a Notetaker bot, and
-// to fire emails to the team owner when consumption crosses thresholds.
+// Pool capacity check + 80%/100% notification dispatch. Used by the calendar
+// processor to decide whether to dispatch a Recall bot, and to fire emails
+// to the team owner when consumption crosses thresholds.
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"

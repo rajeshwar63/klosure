@@ -18,7 +18,7 @@ export default function SettingsConnectionsPage() {
   const [refreshTick, setRefreshTick] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // After Nylas OAuth, the callback page redirects here with ?connected=1.
+  // After OAuth, the callback page redirects here with ?connected=1.
   // Bump refreshTick to force GrantsListEnhanced + coverage to re-fetch, then
   // strip the flag from the URL so a later refresh doesn't re-trigger it.
   useEffect(() => {
@@ -122,8 +122,8 @@ export default function SettingsConnectionsPage() {
 
 async function loadCoverage(userId) {
   const { data: grants } = await supabase
-    .from('nylas_grants')
-    .select('nylas_grant_id, email_address, sync_state')
+    .from('aurinko_grants')
+    .select('aurinko_account_id, email_address, sync_state')
 
   const { data: deals } = await supabase
     .from('deals')

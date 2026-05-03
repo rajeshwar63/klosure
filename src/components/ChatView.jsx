@@ -230,16 +230,13 @@ export default function ChatView({
 }
 
 function MessageRow({ message }) {
-  // Phase A: Nylas-sourced email/calendar/meeting messages render as compact
+  // System-sourced email / calendar / meeting messages render as compact
   // pills, not chat turns. Klo's reply that follows is the headline; the raw
   // signal is reference material the seller can expand if they want.
+  // We accept both the Phase A nylas_* sources (legacy rows) and the Phase B
+  // aurinko_*/recall_* sources, so old rooms keep rendering correctly.
   const source = message?.metadata?.source
-  if (
-    message.sender_type === 'system' &&
-    (source === 'nylas_email' ||
-      source === 'nylas_calendar_event' ||
-      source === 'nylas_notetaker')
-  ) {
+  if (message.sender_type === 'system' && SOURCE_CONFIG[source]) {
     return <SignalPill message={message} />
   }
 
@@ -285,6 +282,11 @@ function MessageRow({ message }) {
 // line that expands to show the raw content. The visual goal: keep Klo's
 // voice front and centre, demote the envelope to a footnote.
 const SOURCE_CONFIG = {
+  // Phase B (Aurinko + Recall):
+  aurinko_email: { emoji: '📧', summarize: summarizeEmailHeader },
+  aurinko_calendar_event: { emoji: '📅', summarize: summarizeCalendarHeader },
+  recall_notetaker: { emoji: '🎙', summarize: summarizeMeetingHeader },
+  // Phase A legacy (Nylas) — keep so rooms with old rows still render.
   nylas_email: { emoji: '📧', summarize: summarizeEmailHeader },
   nylas_calendar_event: { emoji: '📅', summarize: summarizeCalendarHeader },
   nylas_notetaker: { emoji: '🎙', summarize: summarizeMeetingHeader },
@@ -294,7 +296,7 @@ function SignalPill({ message }) {
   const [expanded, setExpanded] = useState(false)
   const { content, created_at } = message
   const source = message?.metadata?.source
-  const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.nylas_email
+  const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.aurinko_email
   const summary = config.summarize(content)
   const cancelled = (content ?? '').startsWith('[CANCELLED] ')
 
@@ -350,7 +352,7 @@ function SignalPill({ message }) {
 }
 
 function summarizeEmailHeader(content) {
-  // nylas-process-email formats the body as:
+  // The email processor formats the body as:
   //   EMAIL — <date>
   //   From: <addr>
   //   To: <list>
@@ -366,7 +368,7 @@ function summarizeEmailHeader(content) {
 }
 
 function summarizeMeetingHeader(content) {
-  // nylas-process-meeting formats:
+  // The meeting processor formats:
   //   MEETING — <title> — <date> (<n> min)
   //   Participants: ...
   //   <blank>
@@ -379,7 +381,7 @@ function summarizeMeetingHeader(content) {
 }
 
 function summarizeCalendarHeader(content) {
-  // nylas-process-meeting formats:
+  // The calendar processor formats:
   //   CALENDAR — <title> — <date> (<n> min)
   //   Participants: ...
   //   Provider: ...

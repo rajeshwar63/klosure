@@ -1,8 +1,8 @@
-// Phase A sprint 09 — grants list with deal-coverage stats and richer status
-// rendering. Wraps the basic GrantsList shape from sprint 03.
+// Phase B — grants list with deal-coverage stats and richer status rendering.
+// Wraps the basic GrantsList shape with extra context.
 
 import { useEffect, useState } from 'react'
-import { listGrants, disconnectGrant, startConnect } from '../../services/nylas.js'
+import { listGrants, disconnectGrant, startConnect } from '../../services/aurinko.js'
 
 export default function GrantsListEnhanced({ coverage, onChanged, refreshKey = 0 }) {
   const [grants, setGrants] = useState([])
@@ -18,7 +18,7 @@ export default function GrantsListEnhanced({ coverage, onChanged, refreshKey = 0
     setLoading(false)
   }
 
-  async function handleDisconnect(grantId, label) {
+  async function handleDisconnect(accountId, label) {
     if (
       !confirm(
         `Disconnect ${label}?\n\nKlo will stop reading email and meetings from this account. Existing deal data is preserved.`,
@@ -26,7 +26,7 @@ export default function GrantsListEnhanced({ coverage, onChanged, refreshKey = 0
     ) {
       return
     }
-    const r = await disconnectGrant({ grantId })
+    const r = await disconnectGrant({ accountId })
     if (!r.ok) {
       alert(`Could not disconnect: ${r.error}`)
       return
@@ -69,10 +69,10 @@ export default function GrantsListEnhanced({ coverage, onChanged, refreshKey = 0
     <ul className="space-y-2">
       {grants.map((g) => (
         <GrantRow
-          key={g.nylas_grant_id}
+          key={g.aurinko_account_id}
           grant={g}
           coverage={coverage}
-          onDisconnect={() => handleDisconnect(g.nylas_grant_id, g.email_address)}
+          onDisconnect={() => handleDisconnect(g.aurinko_account_id, g.email_address)}
           onReconnect={() => handleReconnect(g.provider)}
         />
       ))}

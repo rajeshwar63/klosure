@@ -728,7 +728,7 @@ async function loadDealContext(deal_id: string): Promise<DealContext> {
 
   // recipientRole = role of the most recent non-Klo non-system message sender.
   // If the trigger was a system message (email/meeting), Klo's reply is for
-  // the seller — buyers don't see Nylas-sourced content.
+  // the seller — buyers don't see inbox- or calendar-sourced content.
   const lastNonKloNonSystem = [...messages]
     .reverse()
     .find((m) => m.sender_type !== "klo" && m.sender_type !== "system")

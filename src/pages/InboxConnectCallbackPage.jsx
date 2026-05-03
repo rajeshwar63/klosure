@@ -1,12 +1,14 @@
-// Phase A — OAuth callback handler.
-// Nylas redirects here with ?code=...&state=... after the user completes auth.
-// We POST those to nylas-auth-finish and redirect back to settings.
+// Phase B — OAuth callback handler.
+// Aurinko redirects here with ?code=...&state=... after the user finishes
+// the Google / Microsoft consent step. We POST those to aurinko-auth-finish
+// and redirect back to settings. The user sees only Klosure copy here — no
+// vendor names.
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { finishConnect } from '../services/nylas.js'
+import { finishConnect } from '../services/aurinko.js'
 
-export default function NylasCallbackPage() {
+export default function InboxConnectCallbackPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [error, setError] = useState(null)

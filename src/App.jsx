@@ -29,9 +29,9 @@ const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
 const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
-// Phase A — Nylas connect flow.
+// Inbox + calendar connect flow (Phase B — Aurinko under the hood).
 const SettingsConnectionsPage = lazy(() => import('./pages/SettingsConnectionsPage.jsx'))
-const NylasCallbackPage = lazy(() => import('./pages/NylasCallbackPage.jsx'))
+const InboxConnectCallbackPage = lazy(() => import('./pages/InboxConnectCallbackPage.jsx'))
 // Phase A follow-up — unified Settings hub. The layout component renders a
 // left-rail sub-nav and an <Outlet />; the sub-pages live as nested routes.
 const SettingsLayoutPage = lazy(() => import('./pages/SettingsLayoutPage.jsx'))
@@ -109,10 +109,10 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* Nylas hosted-auth callback. Outside the shell — full-screen confirming page. */}
+        {/* Inbox + calendar hosted-auth callback. Outside the shell — full-screen confirming page. */}
         <Route
           path="/settings/connect/callback"
-          element={<RequireAuth><NylasCallbackPage /></RequireAuth>}
+          element={<RequireAuth><InboxConnectCallbackPage /></RequireAuth>}
         />
 
         {/* Razorpay return — full-screen confirming-payment page outside the shell. */}
