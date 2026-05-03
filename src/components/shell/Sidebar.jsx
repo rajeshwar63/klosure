@@ -162,18 +162,37 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Top nav — rep-level destinations, always visible regardless of role */}
+      {/* Top nav — rep-level destinations, rendered as side-by-side tabs */}
       {!collapsed && (
-        <nav className="px-2 pt-3 pb-2 flex flex-col gap-0.5">
-          {REP_NAV.map((item) => (
-            <SidebarNavItem
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              active={activeView === item.id}
-              onClick={handle(item.id)}
-            />
-          ))}
+        <nav
+          role="tablist"
+          aria-label="Primary"
+          className="px-2 pt-3 pb-2 flex items-center gap-1"
+        >
+          {REP_NAV.map((item) => {
+            const isActive = activeView === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={handle(item.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[13px] transition-colors ${
+                  isActive
+                    ? 'bg-[var(--color-background-info)] text-[var(--color-text-info)] font-semibold'
+                    : 'text-navy/70 hover:bg-navy/5'
+                }`}
+              >
+                {item.icon != null && (
+                  <span className="text-[13px] leading-none" aria-hidden>
+                    {item.icon}
+                  </span>
+                )}
+                <span className="truncate">{item.label}</span>
+              </button>
+            )
+          })}
         </nav>
       )}
 

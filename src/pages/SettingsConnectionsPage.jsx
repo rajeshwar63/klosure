@@ -37,6 +37,15 @@ export default function SettingsConnectionsPage() {
         <CheckIcon /> Read-only. Disconnect anytime.
       </div>
 
+      <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-[14px] text-amber-900 leading-relaxed">
+        <strong className="font-semibold">
+          Beta access — available to selected test users only.
+        </strong>{' '}
+        Inbox &amp; calendar connections are currently limited to participants in
+        our private beta program. General availability for all users is planned
+        for the <strong className="font-semibold">v2 release in June 2026</strong>.
+      </div>
+
       <div className="mt-6">
         <ConnectButtons onConnected={() => setRefreshTick((t) => t + 1)} />
       </div>
