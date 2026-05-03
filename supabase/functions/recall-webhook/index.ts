@@ -118,11 +118,18 @@ function constantTimeEq(a: string, b: string): boolean {
 
 async function handleEvent(payload: Record<string, unknown>): Promise<string> {
   // Recall webhook envelope:
-  //   { event: 'bot.status_change' | 'bot.done' | 'transcript.done',
-  //     data: { bot_id, status, ... } }
+  //   { event: 'bot.in_call_recording' | 'bot.done' | 'bot.fatal' |
+  //            'transcript.done' | ...,
+  //     data: { bot: { id }, code, sub_code, ... } }
+  // Status is encoded in the event type itself (no separate status field).
   const eventType = String(payload.event ?? "").toLowerCase()
   const data = (payload.data ?? {}) as Record<string, unknown>
-  const botId = String(data.bot_id ?? data.id ?? "")
+  const botId = String(
+    (data.bot as { id?: string } | undefined)?.id
+      ?? data.bot_id
+      ?? data.id
+      ?? "",
+  )
   if (!botId) return "skipped_no_bot_id"
 
   const { data: bot } = await sb
@@ -135,13 +142,18 @@ async function handleEvent(payload: Record<string, unknown>): Promise<string> {
     return "skipped_unknown_bot"
   }
 
-  if (eventType.startsWith("bot.status_change") || eventType.startsWith("bot.")) {
-    const status = String(data.status ?? data.status_code ?? "").toLowerCase()
-    const mapped = mapStatus(status)
+  if (eventType.startsWith("bot.")) {
+    const subcode = String(data.sub_code ?? "")
+    const lastError = subcode ? `${eventType}:${subcode}` : null
+    const mapped = mapEventType(eventType)
     if (mapped) {
       await sb
         .from("recall_bots")
-        .update({ bot_state: mapped, updated_at: new Date().toISOString() })
+        .update({
+          bot_state: mapped,
+          last_error: mapped === "failed" ? lastError : null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", bot.id)
 
       // Mirror the status onto meeting_events for the calendar UI.
@@ -156,11 +168,11 @@ async function handleEvent(payload: Record<string, unknown>): Promise<string> {
       }
     }
 
-    // When the call has ended, kick the transcript processor.
-    if (mapped === "done" || eventType === "bot.done") {
+    // Kick the transcript processor when the bot has finished.
+    if (eventType === "bot.done") {
       triggerProcessor(botId)
     }
-    return `status_${mapped ?? status}`
+    return `status_${mapped ?? eventType}`
   }
 
   if (eventType.startsWith("transcript.")) {
@@ -172,20 +184,21 @@ async function handleEvent(payload: Record<string, unknown>): Promise<string> {
   return "skipped_unhandled"
 }
 
-function mapStatus(status: string): string | null {
-  switch (status) {
-    case "joining_call":
-    case "in_waiting_room":
+function mapEventType(eventType: string): string | null {
+  // Maps Recall's per-status event types onto our recall_bots.bot_state enum.
+  switch (eventType) {
+    case "bot.joining_call":
+    case "bot.in_waiting_room":
       return "joining"
-    case "in_call_not_recording":
-    case "in_call_recording":
-    case "recording":
+    case "bot.in_call_not_recording":
+      return "in_call"
+    case "bot.in_call_recording":
       return "recording"
-    case "call_ended":
-    case "done":
+    case "bot.call_ended":
+    case "bot.done":
       return "done"
-    case "fatal":
-    case "failed":
+    case "bot.fatal":
+    case "bot.recording_permission_denied":
       return "failed"
     default:
       return null
