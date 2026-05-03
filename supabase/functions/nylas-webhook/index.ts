@@ -389,23 +389,41 @@ async function handleNotetaker(
 
   if (delta.type === "notetaker.meeting_state") {
     const state = (nt.state ?? "").toLowerCase()
+    console.log("notetaker.meeting_state", { id: nt.id, state, raw_state: nt.state })
     // Map Nylas notetaker states to our enum.
+    // Nylas v3 lifecycle: connecting -> attempting_join -> waiting_for_admission
+    //   -> joining -> joined -> recording -> concluding -> concluded
+    //   -> media_uploading -> media_uploaded. Failure -> failed.
     const stateMap: Record<string, string> = {
       scheduled: "scheduled",
       connecting: "scheduled",
+      attempting_join: "scheduled",
+      waiting_for_admission: "scheduled",
       joining: "scheduled",
+      joined: "joined",
       in_meeting: "joined",
       recording: "recording",
+      concluding: "media_processing",
+      concluded: "media_processing",
       processing: "media_processing",
+      media_uploading: "media_processing",
+      media_uploaded: "ready",
       completed: "ready",
       failed: "failed",
     }
     if (stateMap[state]) updates.notetaker_state = stateMap[state]
   }
 
-  if (delta.type === "notetaker.media" && nt.media?.transcript_url) {
-    updates.transcript_url = nt.media.transcript_url
-    updates.notetaker_state = "ready"
+  if (delta.type === "notetaker.media") {
+    console.log("notetaker.media", {
+      id: nt.id,
+      has_transcript: !!nt.media?.transcript_url,
+      has_recording: !!nt.media?.recording_url,
+    })
+    if (nt.media?.transcript_url) {
+      updates.transcript_url = nt.media.transcript_url
+      updates.notetaker_state = "ready"
+    }
   }
 
   // Find the meeting_event row this notetaker belongs to. Match on event_id
