@@ -1,21 +1,20 @@
 // Meetings list for a deal. Lists every meeting Nylas has synced (upcoming +
 // past), grouped by upcoming/past, with an expandable detail per row that
-// holds the seller's freeform Notes (Deal Moments). Used as a card inside
-// SellerOverview via `embedded`.
+// shows participants and the transcript. Used as a card inside SellerOverview
+// via `embedded`.
 //
 // Status icon legend:
 //   📅  scheduled but Klo not in (or no transcript yet)
 //   🎙  Klo in / recorded / transcript ready
 //   🚫  cancelled
 //
-// Notes save on textarea blur (debounce-free; the user always finishes by
-// blurring). Realtime channel reflects external updates back into the list.
+// Deal moments themselves are captured by Klo from the transcript and posted
+// to the dealroom feed — this view does not collect them from the seller.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   loadAllMeetingsForDeal,
   subscribeAllMeetingsForDeal,
-  updateMeetingNotes,
 } from '../services/dealMeetings.js'
 
 const ATTENDED_STATES = new Set(['joined', 'recording', 'media_processing', 'ready'])
@@ -268,7 +267,6 @@ function MeetingDetail({ meeting }) {
       style={{ borderTop: '1px solid var(--klo-line)' }}
     >
       <DetailGrid meeting={meeting} />
-      <NotesEditor meeting={meeting} />
       {meeting.transcript_text && (
         <details className="mt-3">
           <summary
@@ -344,70 +342,3 @@ function DetailGrid({ meeting }) {
   )
 }
 
-function NotesEditor({ meeting }) {
-  const [draft, setDraft] = useState(meeting.notes ?? '')
-  const [saveState, setSaveState] = useState('idle')
-  const lastSavedRef = useRef(meeting.notes ?? '')
-
-  // Pull in remote updates while not actively editing.
-  useEffect(() => {
-    const remote = meeting.notes ?? ''
-    if (remote !== lastSavedRef.current && saveState !== 'saving') {
-      lastSavedRef.current = remote
-      setDraft(remote)
-    }
-  }, [meeting.notes, saveState])
-
-  const save = useCallback(async () => {
-    if (draft === lastSavedRef.current) return
-    setSaveState('saving')
-    const res = await updateMeetingNotes(meeting.id, draft)
-    if (res.ok) {
-      lastSavedRef.current = draft
-      setSaveState('saved')
-      setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 1200)
-    } else {
-      setSaveState('error')
-    }
-  }, [draft, meeting.id])
-
-  return (
-    <div className="mt-4">
-      <div className="flex items-baseline justify-between mb-1.5">
-        <label
-          className="kl-mono text-[11px] uppercase"
-          style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.04em' }}
-        >
-          Deal moment · notes
-        </label>
-        <span
-          className="kl-mono text-[10px]"
-          style={{
-            color:
-              saveState === 'error'
-                ? 'var(--klo-danger)'
-                : 'var(--klo-text-mute)',
-          }}
-        >
-          {saveState === 'saving' && 'Saving…'}
-          {saveState === 'saved' && 'Saved'}
-          {saveState === 'error' && 'Save failed — try again'}
-        </span>
-      </div>
-      <textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={save}
-        rows={4}
-        placeholder="What happened? Who said what? What's the next move?"
-        className="w-full text-[13px] leading-relaxed rounded-lg px-3 py-2 focus:outline-none resize-y"
-        style={{
-          color: 'var(--klo-text)',
-          background: 'var(--klo-bg)',
-          border: '1px solid var(--klo-line-strong)',
-          minHeight: '80px',
-        }}
-      />
-    </div>
-  )
-}
