@@ -235,8 +235,8 @@ async function handleDelta(delta: NylasDelta): Promise<DeltaResult> {
       return await handleEvent(delta, grant)
     case "event.deleted":
       return await handleEventDeleted(delta)
-    case "notetaker.media.updated":
-    case "notetaker.meeting_state.updated":
+    case "notetaker.media":
+    case "notetaker.meeting_state":
       return await handleNotetaker(delta, grant)
     case "grant.expired":
       await sb
@@ -387,11 +387,12 @@ async function handleNotetaker(
     updated_at: new Date().toISOString(),
   }
 
-  if (delta.type === "notetaker.meeting_state.updated") {
+  if (delta.type === "notetaker.meeting_state") {
     const state = (nt.state ?? "").toLowerCase()
     // Map Nylas notetaker states to our enum.
     const stateMap: Record<string, string> = {
       scheduled: "scheduled",
+      connecting: "scheduled",
       joining: "scheduled",
       in_meeting: "joined",
       recording: "recording",
@@ -402,7 +403,7 @@ async function handleNotetaker(
     if (stateMap[state]) updates.notetaker_state = stateMap[state]
   }
 
-  if (delta.type === "notetaker.media.updated" && nt.media?.transcript_url) {
+  if (delta.type === "notetaker.media" && nt.media?.transcript_url) {
     updates.transcript_url = nt.media.transcript_url
     updates.notetaker_state = "ready"
   }
