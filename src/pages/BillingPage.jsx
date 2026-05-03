@@ -20,12 +20,12 @@ import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
 
 // Phase A sprint 08: collapsed to one paid plan + enterprise contact-sales card.
 const SHOWN_PLANS = ['klosure', 'enterprise']
-const CURRENCIES = ['USD', 'INR', 'AED']
+const CURRENCIES = ['USD', 'AED', 'INR']
 
 const CURRENCY_LABELS = {
   USD: 'US Dollars',
-  INR: 'Indian Rupees',
   AED: 'UAE Dirhams',
+  INR: 'Indian Rupees',
 }
 
 export default function BillingPage() {
