@@ -105,21 +105,21 @@ export default function ManagerHomePage() {
         </p>
       </header>
 
-      <QuarterGlanceStrip deals={dealsActive} />
-
-      <div className="my-4">
-        <TeamPoolPanel teamId={team?.id} />
-      </div>
-
-      <ByRepRollup rollUp={pipeline?.rollUp ?? []} />
-
       <KloTeamBriefCard
         brief={brief}
         loading={briefLoading}
         pipeline={pipeline}
       />
 
+      <QuarterGlanceStrip deals={dealsActive} />
+
+      <ByRepRollup rollUp={pipeline?.rollUp ?? []} />
+
       <DealsSlippingList deals={dealsActive} />
+
+      <div className="mt-6">
+        <TeamPoolPanel teamId={team?.id} />
+      </div>
     </div>
   )
 }

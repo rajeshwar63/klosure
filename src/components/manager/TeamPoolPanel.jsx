@@ -11,6 +11,8 @@ import { loadTeamPool } from '../../services/teamPool.js'
 export default function TeamPoolPanel({ teamId }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Collapsed by default — managers typically check pool usage once a month.
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     if (!teamId) return
@@ -39,74 +41,81 @@ export default function TeamPoolPanel({ teamId }) {
       : pct >= 80
         ? 'Approaching pool limit'
         : 'Within pool'
+  const statusColor =
+    pct >= 100 ? 'text-red-700' : pct >= 80 ? 'text-amber-700' : 'text-emerald-700'
 
   return (
     <div
-      className="bg-white rounded-2xl p-5"
+      className="bg-white rounded-2xl"
       style={{ boxShadow: 'inset 0 0 0 0.5px rgba(26,26,46,0.12)' }}
     >
-      <div className="flex items-baseline justify-between mb-4">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="w-full flex items-center gap-3 px-5 py-4 text-left"
+      >
         <span className="text-[12px] font-semibold tracking-wider text-navy/55">
           TEAM POOL · {monthLabel}
         </span>
-        <span className="text-[11px] text-navy/40">
-          {pool.seatCount} seat{pool.seatCount !== 1 && 's'}
+        <span className="text-navy/30">·</span>
+        <span className="text-[12px] text-navy/60 tabular-nums">
+          {usedHours}h of {totalHours}h ({pct}%)
         </span>
-      </div>
-
-      <div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-[14px] font-medium text-navy">Meeting capture</span>
-          <span
-            className={`text-[12px] font-semibold ${
-              pct >= 100
-                ? 'text-red-700'
-                : pct >= 80
-                  ? 'text-amber-700'
-                  : 'text-emerald-700'
-            }`}
-          >
-            {statusText}
+        <span className={`text-[12px] font-semibold ${statusColor}`}>
+          {statusText}
+        </span>
+        <span className="ml-auto flex items-center gap-3">
+          <span className="text-[11px] text-navy/40">
+            {pool.seatCount} seat{pool.seatCount !== 1 && 's'}
           </span>
-        </div>
-        <div className="mt-2 h-2 bg-navy/5 rounded-full overflow-hidden">
-          <div
-            className={`h-full ${barColor} transition-all`}
-            style={{ width: `${Math.min(100, pct)}%` }}
-          />
-        </div>
-        <div className="mt-1 flex justify-between text-[12px] text-navy/60">
-          <span>
-            {usedHours}h of {totalHours}h ({pct}%)
+          <span className="text-klo text-base leading-none">
+            {expanded ? '⌃' : '⌄'}
           </span>
-          <span>Resets {resetDate}</span>
-        </div>
-      </div>
+        </span>
+      </button>
 
-      {byRep.length > 0 && (
-        <div className="mt-5 pt-4 border-t border-navy/5">
-          <div className="text-[11px] font-semibold tracking-wider text-navy/40 mb-2">
-            BY REP
-          </div>
-          <ul className="space-y-2">
-            {byRep.map((r) => (
-              <RepRow
-                key={r.user_id}
-                rep={r}
-                totalMinutes={pool.meetingMinutesTotal / pool.seatCount}
+      {expanded && (
+        <div className="px-5 pb-5">
+          <div>
+            <div className="mt-2 h-2 bg-navy/5 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${barColor} transition-all`}
+                style={{ width: `${Math.min(100, pct)}%` }}
               />
-            ))}
-          </ul>
+            </div>
+            <div className="mt-1 flex justify-between text-[12px] text-navy/60">
+              <span>Meeting capture</span>
+              <span>Resets {resetDate}</span>
+            </div>
+          </div>
+
+          {byRep.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-navy/5">
+              <div className="text-[11px] font-semibold tracking-wider text-navy/40 mb-2">
+                BY REP
+              </div>
+              <ul className="space-y-2">
+                {byRep.map((r) => (
+                  <RepRow
+                    key={r.user_id}
+                    rep={r}
+                    totalMinutes={pool.meetingMinutesTotal / pool.seatCount}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-4 text-[11px] text-navy/40">
+            Need more capacity?{' '}
+            <a href="mailto:rajeshwar@klosure.ai" className="underline">
+              Email us
+            </a>
+            .
+          </div>
         </div>
       )}
-
-      <div className="mt-4 text-[11px] text-navy/40">
-        Need more capacity?{' '}
-        <a href="mailto:rajeshwar@klosure.ai" className="underline">
-          Email us
-        </a>
-        .
-      </div>
     </div>
   )
 }
