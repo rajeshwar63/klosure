@@ -44,16 +44,33 @@ Deno.serve(async (req) => {
 
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const { data: grant } = await sb.from("aurinko_grants")
-      .select("user_id, sync_state, access_token")
+      .select(
+        "user_id, sync_state, access_token, email_subscription_id, calendar_subscription_id",
+      )
       .eq("aurinko_account_id", accountId)
       .maybeSingle()
     if (!grant || grant.user_id !== userId) {
       return json({ ok: false, error: "grant_not_owned" }, 403)
     }
 
-    // Revoke on Aurinko. Best-effort; we mark local revoked even on failure
-    // so the user can't keep using a half-revoked grant.
+    // Tear down webhook subscriptions and revoke the account on Aurinko.
+    // All best-effort: we still mark local revoked even on failure so the
+    // user can't keep using a half-revoked grant.
     if (grant.access_token) {
+      for (const subId of [grant.email_subscription_id, grant.calendar_subscription_id]) {
+        if (!subId) continue
+        try {
+          const res = await fetch(`${AURINKO_API_BASE}/subscriptions/${subId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${grant.access_token}` },
+          })
+          if (!res.ok) {
+            console.warn("aurinko subscription delete returned", subId, res.status)
+          }
+        } catch (e) {
+          console.warn("aurinko subscription delete failed", subId, e)
+        }
+      }
       try {
         const res = await fetch(`${AURINKO_API_BASE}/auth/account`, {
           method: "DELETE",
@@ -73,6 +90,8 @@ Deno.serve(async (req) => {
         last_seen_at: new Date().toISOString(),
         access_token: null,
         token_expires_at: null,
+        email_subscription_id: null,
+        calendar_subscription_id: null,
       })
       .eq("aurinko_account_id", accountId)
 

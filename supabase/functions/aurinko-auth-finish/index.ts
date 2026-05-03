@@ -20,6 +20,7 @@ const AURINKO_API_BASE = Deno.env.get("AURINKO_API_BASE") ?? "https://api.aurink
 const AURINKO_APP_ID = Deno.env.get("AURINKO_APP_ID") ?? ""
 const AURINKO_CLIENT_SECRET = Deno.env.get("AURINKO_CLIENT_SECRET") ?? ""
 const STATE_SECRET = Deno.env.get("AURINKO_AUTH_STATE_SECRET") ?? ""
+const WEBHOOK_URL = `${SUPABASE_URL}/functions/v1/aurinko-webhook`
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -119,6 +120,14 @@ Deno.serve(async (req) => {
 
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
 
+    // Create the inbox + calendar webhook subscriptions on Aurinko's side.
+    // These fire to our aurinko-webhook edge function whenever a message
+    // or calendar event changes. Best-effort — auth still succeeds even if
+    // subscription creation fails (we log and let the user re-trigger via
+    // a reconnect).
+    const emailSubId = await createSubscription(accessToken, "/email/messages")
+    const calendarSubId = await createSubscription(accessToken, "/calendars/primary/events")
+
     const { error: insertErr } = await sb.from("aurinko_grants")
       .upsert({
         user_id: userId,
@@ -133,6 +142,8 @@ Deno.serve(async (req) => {
         last_seen_at: new Date().toISOString(),
         granted_at: new Date().toISOString(),
         user_email: userRow?.email ?? "",
+        email_subscription_id: emailSubId,
+        calendar_subscription_id: calendarSubId,
       }, { onConflict: "aurinko_account_id" })
 
     if (insertErr) {
@@ -145,12 +156,43 @@ Deno.serve(async (req) => {
       account_id: accountId,
       email_address: emailAddress,
       provider,
+      email_subscription_id: emailSubId,
+      calendar_subscription_id: calendarSubId,
     })
   } catch (err) {
     console.error("aurinko-auth-finish error", err)
     return json({ ok: false, error: "exception", detail: String(err) }, 500)
   }
 })
+
+async function createSubscription(
+  accessToken: string,
+  resource: string,
+): Promise<number | null> {
+  try {
+    const res = await fetch(`${AURINKO_API_BASE}/subscriptions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        resource,
+        notificationUrl: WEBHOOK_URL,
+      }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.warn("aurinko subscription create failed", resource, res.status, body)
+      return null
+    }
+    const id = Number(body.id ?? body.subscriptionId ?? 0)
+    return id || null
+  } catch (e) {
+    console.warn("aurinko subscription create error", resource, e)
+    return null
+  }
+}
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
