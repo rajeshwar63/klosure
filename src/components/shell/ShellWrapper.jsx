@@ -15,6 +15,7 @@ import ProfileModal from '../ui/ProfileModal.jsx'
 export function resolveActiveView(pathname) {
   if (pathname === '/today') return 'today'
   if (pathname === '/deals') return 'deals'
+  if (pathname === '/askklo') return 'me-askklo'
   if (pathname.startsWith('/deals/')) {
     const id = pathname.split('/')[2]
     if (id && id !== 'new') return `deal:${id}`
@@ -33,6 +34,7 @@ export function resolveActiveView(pathname) {
 export function resolvePageTitle(pathname, deals) {
   if (pathname === '/today') return 'Today'
   if (pathname === '/deals') return 'Deals'
+  if (pathname === '/askklo') return 'Ask Klo'
   if (pathname === '/deals/new') return 'New deal'
   if (pathname.startsWith('/deals/')) {
     const id = pathname.split('/')[2]

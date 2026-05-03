@@ -96,6 +96,10 @@ export default function AppShell({
       navigate('/deals')
       return
     }
+    if (view === 'me-askklo') {
+      navigate('/askklo')
+      return
+    }
     if (view === 'this-week') {
       navigate('/team')
       return
