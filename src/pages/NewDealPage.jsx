@@ -259,7 +259,7 @@ export default function NewDealPage() {
               <input
                 value={companyDraft}
                 onChange={(e) => setCompanyDraft(e.target.value)}
-                placeholder="Klosure"
+                placeholder="Acme Inc."
                 className="flex-1 border border-navy/15 rounded-lg px-3 py-2.5 focus:outline-none focus:border-klo focus:ring-2 focus:ring-klo/20"
               />
               <button
@@ -275,8 +275,8 @@ export default function NewDealPage() {
         )}
         <form onSubmit={handleSubmit} className={`space-y-5 ${needsCompany ? 'opacity-50 pointer-events-none' : ''}`} aria-disabled={needsCompany}>
           <Card>
-            <Field label="Deal title" required value={form.title} onChange={(v) => update('title', v)} placeholder="DIB — Learning Experience Platform" />
-            <Field label="Buyer company" value={form.buyer_company} onChange={(v) => update('buyer_company', v)} placeholder="Dubai Islamic Bank" />
+            <Field label="Deal title" required value={form.title} onChange={(v) => update('title', v)} placeholder="Acme Corp — CRM Platform" />
+            <Field label="Buyer company" value={form.buyer_company} onChange={(v) => update('buyer_company', v)} placeholder="Acme Corp" />
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Deal value (USD)" type="number" min="0" value={form.value} onChange={(v) => update('value', v)} placeholder="120000" />
               <Field label="Deadline" type="date" value={form.deadline} onChange={(v) => update('deadline', v)} />
