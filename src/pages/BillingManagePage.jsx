@@ -17,11 +17,15 @@
 //     the user actually sees the confirmation.
 // =============================================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
-import { cancelSubscription } from '../services/billing.js'
-import { PLANS } from '../lib/plans.ts'
+import { cancelSubscription, updateSubscriptionSeats } from '../services/billing.js'
+import {
+  PLANS,
+  totalAmountForTeam,
+  formatCurrencyAmount,
+} from '../lib/plans.ts'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 
 const PAID_STATUSES = new Set(['paid_active', 'paid_grace'])
@@ -137,6 +141,8 @@ export default function BillingManagePage() {
           )}
         </section>
 
+        <ManageSeatsPanel status={status} planSlug={planSlug} refresh={refresh} />
+
         {!cancelResult ? (
           <section
             className="rounded-2xl p-5 mt-4"
@@ -251,5 +257,206 @@ export default function BillingManagePage() {
         </p>
       </main>
     </div>
+  )
+}
+
+// Manage Seats — admin-only block to add/remove seats on the team
+// subscription. Add-seats charges immediately (prorated); reduce-seats
+// schedules at next cycle (industry standard).
+function ManageSeatsPanel({ status, planSlug, refresh }) {
+  const plan = PLANS[planSlug]
+  const isTeamPaid = plan?.isTeam && (planSlug === 'coach' || planSlug === 'closer')
+  const currentSeats = status?.seat_cap ?? 1
+  const pendingSeats = status?.pending_seat_cap ?? null
+  const memberCount = status?.seats_used ?? 1
+  const currency = status?.currency ?? 'INR'
+  const renewsOn = status?.current_period_end
+    ? new Date(status.current_period_end).toLocaleDateString()
+    : null
+
+  const [target, setTarget] = useState(currentSeats)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [done, setDone] = useState(null)
+
+  useEffect(() => {
+    setTarget(currentSeats)
+  }, [currentSeats])
+
+  if (!isTeamPaid) return null
+
+  const minTarget = Math.max(1, memberCount)
+  const isIncrease = target > currentSeats
+  const isDecrease = target < currentSeats
+  const isNoop = target === currentSeats
+  const totalNow = totalAmountForTeam(planSlug, currency, currentSeats)
+  const totalAfter = totalAmountForTeam(planSlug, currency, target)
+
+  async function handleApply() {
+    setErr('')
+    setDone(null)
+    if (target < minTarget) {
+      setErr(
+        memberCount > 1
+          ? `You have ${memberCount} active members. Remove members first or pick at least ${memberCount} seats.`
+          : 'Minimum 1 seat.',
+      )
+      return
+    }
+    setBusy(true)
+    const res = await updateSubscriptionSeats({ seatCount: target })
+    setBusy(false)
+    if (!res.ok) {
+      setErr(res.error || 'Update failed. Please email support@klosure.ai.')
+      return
+    }
+    await refresh()
+    setDone(res)
+  }
+
+  return (
+    <section
+      className="rounded-2xl p-5 mt-4"
+      style={{ background: 'var(--klo-bg-elev)', border: '1px solid var(--klo-line)' }}
+    >
+      <MonoKicker>Seats</MonoKicker>
+      <h2 className="mt-2 text-[16px] font-semibold" style={{ color: 'var(--klo-text)' }}>
+        Manage seats
+      </h2>
+      <p className="mt-1 text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+        You have <strong>{currentSeats}</strong> seat{currentSeats === 1 ? '' : 's'} —{' '}
+        {memberCount} in use.
+        {totalNow !== null && (
+          <>
+            {' '}
+            Today's bill:{' '}
+            <strong>{formatCurrencyAmount(totalNow, currency)}</strong>/mo.
+          </>
+        )}
+      </p>
+      {pendingSeats != null && (
+        <p className="mt-2 text-[13px]" style={{ color: 'var(--klo-warn)' }}>
+          Scheduled change: drops to <strong>{pendingSeats}</strong> seat
+          {pendingSeats === 1 ? '' : 's'}
+          {renewsOn ? ` on ${renewsOn}` : ' at the next billing cycle'}.
+        </p>
+      )}
+
+      <div className="mt-4 flex items-center gap-3 flex-wrap">
+        <label className="kl-mono text-[11px] uppercase" style={{ color: 'var(--klo-text-mute)' }}>
+          New seat count
+        </label>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setTarget((n) => Math.max(minTarget, n - 1))}
+            disabled={target <= minTarget || busy}
+            aria-label="Decrease seats"
+            className="w-8 h-8 rounded-md text-[16px] font-semibold disabled:opacity-30"
+            style={{
+              background: 'var(--klo-bg)',
+              border: '1px solid var(--klo-line-strong)',
+              color: 'var(--klo-text)',
+            }}
+          >
+            −
+          </button>
+          <span
+            className="text-[16px] font-semibold tabular-nums w-10 text-center"
+            style={{ color: 'var(--klo-text)' }}
+          >
+            {target}
+          </span>
+          <button
+            type="button"
+            onClick={() => setTarget((n) => Math.min(200, n + 1))}
+            disabled={target >= 200 || busy}
+            aria-label="Increase seats"
+            className="w-8 h-8 rounded-md text-[16px] font-semibold disabled:opacity-30"
+            style={{
+              background: 'var(--klo-bg)',
+              border: '1px solid var(--klo-line-strong)',
+              color: 'var(--klo-text)',
+            }}
+          >
+            +
+          </button>
+        </div>
+        {totalAfter !== null && (
+          <span className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+            → <strong>{formatCurrencyAmount(totalAfter, currency)}</strong>/mo
+          </span>
+        )}
+      </div>
+
+      {!isNoop && (
+        <p
+          className="mt-3 text-[12px] leading-relaxed"
+          style={{ color: 'var(--klo-text-dim)' }}
+        >
+          {isIncrease ? (
+            <>
+              <strong>Add {target - currentSeats} seat{target - currentSeats === 1 ? '' : 's'}.</strong>{' '}
+              Billed immediately, prorated for the rest of this cycle. Your monthly
+              bill becomes {totalAfter !== null && formatCurrencyAmount(totalAfter, currency)} from the
+              next cycle{renewsOn ? ` (${renewsOn})` : ''}.
+            </>
+          ) : (
+            <>
+              <strong>Reduce to {target} seat{target === 1 ? '' : 's'}.</strong>{' '}
+              Takes effect at the next billing cycle{renewsOn ? ` (${renewsOn})` : ''}.
+              You keep all {currentSeats} seats until then; no mid-cycle refund.
+            </>
+          )}
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleApply}
+          disabled={busy || isNoop}
+          className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+          style={{ background: 'var(--klo-text)', color: 'white' }}
+        >
+          {busy
+            ? 'Updating…'
+            : isNoop
+            ? 'No change'
+            : isIncrease
+            ? 'Add seats now'
+            : 'Schedule reduction'}
+        </button>
+        {!isNoop && (
+          <button
+            type="button"
+            onClick={() => setTarget(currentSeats)}
+            disabled={busy}
+            className="px-4 py-2 rounded-lg text-sm"
+            style={{
+              background: 'transparent',
+              color: 'var(--klo-text-dim)',
+              border: '1px solid var(--klo-line-strong)',
+            }}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      {err && (
+        <p className="mt-3 text-[13px]" style={{ color: 'var(--klo-danger)' }}>
+          {err}
+        </p>
+      )}
+      {done && (
+        <p className="mt-3 text-[13px]" style={{ color: 'var(--klo-good)' }}>
+          {done.change === 'increased_immediately'
+            ? `Done — your team now has ${done.seat_cap} seats.`
+            : done.change === 'decrease_scheduled_at_cycle_end'
+            ? `Scheduled — drops to ${done.pending_seat_cap} seat${done.pending_seat_cap === 1 ? '' : 's'} at the next billing cycle.`
+            : 'Updated.'}
+        </p>
+      )}
+    </section>
   )
 }

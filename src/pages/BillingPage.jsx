@@ -1,26 +1,39 @@
 // Phase 12.1 — real billing page with plan cards.
-// Phase 12.3 — INR upgrade buttons go live via Razorpay. AED still says
-// "Contact sales — AED billing soon" (Phase 12.3.1).
+// Phase 12.3 — INR upgrade buttons go live via Razorpay.
+// Phase A sprint 09 — 3-tier pricing (Coach / Closer / Command), seat counter
+// with live total, trial banner, and a concierge form for USD / AED visitors
+// while international card processing pends activation (Razorpay #18895606).
 // Danger zone (account deletion) is preserved from the previous billing page;
 // the spec doesn't address it but removing it would regress an existing
 // shipped feature.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useProfile } from '../hooks/useProfile.jsx'
 import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
-import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
+import {
+  PLANS,
+  priceDisplayFor,
+  LAUNCH_DISCOUNT,
+  totalAmountForTeam,
+  formatCurrencyAmount,
+} from '../lib/plans.ts'
 import { getRazorpayPlanId, RAZORPAY_KEY_ID } from '../lib/razorpay-plans.ts'
 import { startUpgrade, verifySubscription } from '../services/billing.js'
+import { requestIntlBillingLead } from '../services/intlBilling.js'
 import { requestAccountDeletion } from '../services/accountDeletion.js'
 import { Eyebrow, MonoKicker } from '../components/shared/index.js'
 import CreateTeamSection from '../components/billing/CreateTeamSection.jsx'
 
-// Phase A sprint 08: collapsed to one paid plan + enterprise contact-sales card.
-const SHOWN_PLANS = ['klosure', 'enterprise']
+// Phase A sprint 09: Coach + Closer + Command (renamed from klosure / enterprise).
+const SHOWN_PLANS = ['coach', 'closer', 'command']
 const CURRENCIES = ['USD', 'AED', 'INR']
+// Razorpay only charges INR until international activation lands. Other
+// currencies render display-only prices and route the Subscribe button to a
+// concierge form instead of checkout.
+const CHARGEABLE_CURRENCIES = new Set(['INR'])
 
 const CURRENCY_LABELS = {
   USD: 'US Dollars',
@@ -34,9 +47,15 @@ export default function BillingPage() {
   const { status, planSlug, isTrialing, daysLeftInTrial, isReadOnly, loading } = useAccountStatus()
   const navigate = useNavigate()
 
-  // Default to USD now that pricing is anchored at $79/seat/mo. The user can
-  // toggle to INR/AED if their local currency is preferable.
-  const [currency, setCurrency] = useState(status?.currency || 'USD')
+  // Default to INR — that's the only chargeable currency until Razorpay
+  // international activation completes. USD/AED visitors can still toggle to
+  // see prices in their currency, but the Subscribe button routes to the
+  // concierge form rather than Razorpay checkout.
+  const [currency, setCurrency] = useState(status?.currency || 'INR')
+
+  // Concierge form (USD/AED leads) — opens when an international visitor
+  // clicks the "Get an invoice" CTA on a plan card.
+  const [intlPanel, setIntlPanel] = useState(null) // { plan, currency } | null
 
   // Account-deletion form state (preserved from previous BillingPage).
   const [deleteForm, setDeleteForm] = useState({ password: '', mfaCode: '', typed: '' })
@@ -149,6 +168,35 @@ export default function BillingPage() {
 
         <CreateTeamSection />
 
+        {/* 14-day trial banner. Shown to anyone who isn't already paid_active —
+            it's the safety net for international visitors who can't auto-debit
+            yet, plus it nudges trialers to stay engaged. */}
+        {(!status || status.status !== 'paid_active') && (
+          <div
+            className="mt-8 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap"
+            style={{
+              background: 'var(--klo-bg-elev)',
+              border: '1px solid var(--klo-line)',
+              color: 'var(--klo-text)',
+            }}
+            role="note"
+          >
+            <span
+              className="kl-mono text-[11px] font-bold px-2 py-0.5 rounded"
+              style={{
+                background: 'var(--klo-accent)',
+                color: 'white',
+                letterSpacing: '0.06em',
+              }}
+            >
+              14-DAY TRIAL
+            </span>
+            <span className="text-[13px]">
+              Start free for 14 days. No card needed. Cancel anytime.
+            </span>
+          </div>
+        )}
+
         {LAUNCH_DISCOUNT.active && (
           <div
             className="mt-8 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap"
@@ -201,8 +249,8 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Two-card grid: Klosure (the only paid plan) + Enterprise contact-sales. */}
-        <div className="mt-6 grid gap-4 md:grid-cols-2 max-w-3xl mx-auto">
+        {/* Three-card grid: Coach (entry), Closer (featured), Command (enterprise). */}
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
           {SHOWN_PLANS.map((slug) => (
             <PlanCard
               key={slug}
@@ -210,16 +258,26 @@ export default function BillingPage() {
               currency={currency}
               isCurrent={slug === effectivePlan}
               user={user}
+              onIntlInvoice={(p) => setIntlPanel({ plan: p, currency })}
             />
           ))}
         </div>
 
+        {intlPanel && (
+          <IntlBillingPanel
+            plan={intlPanel.plan}
+            currency={intlPanel.currency}
+            user={user}
+            onClose={() => setIntlPanel(null)}
+          />
+        )}
+
         <p className="mt-8 text-[12px]" style={{ color: 'var(--klo-text-mute)' }}>
-          Upgrade flow ships next. Until then, contact{' '}
+          Questions? Email{' '}
           <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
             support@klosure.ai
-          </a>{' '}
-          for early access pricing.
+          </a>
+          .
         </p>
 
         <div className="mt-8 text-center">
@@ -445,15 +503,27 @@ function loadRazorpayCheckout() {
   })
 }
 
-function PlanCard({ plan, currency, isCurrent, user }) {
+function PlanCard({ plan, currency, isCurrent, user, onIntlInvoice }) {
   const navigate = useNavigate()
-  const isEnterprise = plan.slug === 'enterprise'
+  const isEnterprise = plan.slug === 'command'
+  const isFeatured = plan.slug === 'closer'
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [seatCount, setSeatCount] = useState(1)
 
-  // null Razorpay plan ID means: not buyable in this currency yet (AED) or
-  // not a paid tier (trial/enterprise). Enterprise routes to a sales conversation.
-  const planAvailable = !isEnterprise && !!getRazorpayPlanId(plan.slug, currency)
+  // Razorpay only charges INR right now. AED/USD are display-only — they
+  // route to the concierge form so we don't lose the lead while international
+  // activation pends.
+  const isChargeable = CHARGEABLE_CURRENCIES.has(currency)
+  const razorpayPlanId = isEnterprise ? null : getRazorpayPlanId(plan.slug, currency)
+  const planAvailable = !isEnterprise && isChargeable && !!razorpayPlanId
+
+  // Live total = per-seat × seat_count (only for paid plans with a price in
+  // the selected currency).
+  const totalAmount = useMemo(
+    () => (isEnterprise ? null : totalAmountForTeam(plan.slug, currency, seatCount)),
+    [isEnterprise, plan.slug, currency, seatCount],
+  )
 
   async function handleUpgrade() {
     setErr('')
@@ -471,7 +541,7 @@ function PlanCard({ plan, currency, isCurrent, user }) {
     // Create the subscription on Razorpay (via our edge function). This
     // returns a subscription_id; Razorpay's checkout modal authenticates
     // the mandate against that id.
-    const res = await startUpgrade({ planSlug: plan.slug, currency })
+    const res = await startUpgrade({ planSlug: plan.slug, currency, seatCount })
     if (!res.ok || !res.subscription_id) {
       setBusy(false)
       setErr(res.error || 'Upgrade failed. Please try again.')
@@ -518,26 +588,48 @@ function PlanCard({ plan, currency, isCurrent, user }) {
     buttonLabel = 'Current plan'
   } else if (isEnterprise) {
     buttonLabel = 'Talk to sales'
-  } else if (!planAvailable) {
-    buttonLabel =
-      currency === 'INR'
-        ? 'Talk to sales'
-        : `Contact sales — ${currency} billing soon`
+  } else if (!isChargeable) {
+    // Non-INR — route to concierge form rather than disable.
+    buttonLabel = 'Start free trial'
+  } else if (!razorpayPlanId) {
+    buttonLabel = 'Talk to sales'
   } else if (busy) {
     buttonLabel = 'Opening checkout…'
   } else {
-    buttonLabel = 'Upgrade'
+    buttonLabel = `Subscribe — ${formatCurrencyAmount(totalAmount ?? 0, currency)}/mo`
   }
 
   return (
     <div
       className="rounded-2xl p-5 flex flex-col"
       style={{
-        background: isCurrent ? 'var(--klo-accent-soft)' : 'var(--klo-bg-elev)',
-        border: isCurrent ? '2px solid var(--klo-accent)' : '1px solid var(--klo-line)',
+        background: isCurrent
+          ? 'var(--klo-accent-soft)'
+          : isFeatured
+          ? 'var(--klo-bg-elev)'
+          : 'var(--klo-bg-elev)',
+        border: isCurrent
+          ? '2px solid var(--klo-accent)'
+          : isFeatured
+          ? '2px solid var(--klo-accent)'
+          : '1px solid var(--klo-line)',
       }}
     >
-      <MonoKicker>{plan.shortLabel}</MonoKicker>
+      <div className="flex items-center justify-between">
+        <MonoKicker>{plan.shortLabel}</MonoKicker>
+        {isFeatured && !isCurrent && (
+          <span
+            className="kl-mono text-[10px] font-bold px-2 py-0.5 rounded"
+            style={{
+              background: 'var(--klo-accent)',
+              color: 'white',
+              letterSpacing: '0.06em',
+            }}
+          >
+            MOST POPULAR
+          </span>
+        )}
+      </div>
       <h3
         className="mt-2 text-[20px] font-semibold"
         style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
@@ -621,6 +713,78 @@ function PlanCard({ plan, currency, isCurrent, user }) {
         ))}
       </ul>
 
+      {/* Seat counter — only on paid tiers when chargeable in this currency.
+          For non-INR or enterprise, hide (concierge / sales call sets seats). */}
+      {!isEnterprise && isChargeable && razorpayPlanId && !isCurrent && (
+        <div
+          className="mt-5 rounded-lg p-3"
+          style={{ background: 'var(--klo-bg)', border: '1px solid var(--klo-line)' }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div
+                className="kl-mono text-[10px] font-semibold uppercase"
+                style={{ color: 'var(--klo-text-mute)', letterSpacing: '0.08em' }}
+              >
+                Seats
+              </div>
+              <div className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+                Pay only for who you onboard. Add more later.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSeatCount((n) => Math.max(1, n - 1))}
+                aria-label="Decrease seats"
+                disabled={seatCount <= 1}
+                className="w-8 h-8 rounded-md text-[16px] font-semibold disabled:opacity-30"
+                style={{
+                  background: 'var(--klo-bg-elev)',
+                  border: '1px solid var(--klo-line-strong)',
+                  color: 'var(--klo-text)',
+                }}
+              >
+                −
+              </button>
+              <span
+                className="text-[16px] font-semibold tabular-nums w-8 text-center"
+                style={{ color: 'var(--klo-text)' }}
+              >
+                {seatCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSeatCount((n) => Math.min(200, n + 1))}
+                aria-label="Increase seats"
+                disabled={seatCount >= 200}
+                className="w-8 h-8 rounded-md text-[16px] font-semibold disabled:opacity-30"
+                style={{
+                  background: 'var(--klo-bg-elev)',
+                  border: '1px solid var(--klo-line-strong)',
+                  color: 'var(--klo-text)',
+                }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          {totalAmount !== null && (
+            <div
+              className="mt-2 pt-2 text-[12px] flex items-center justify-between"
+              style={{ borderTop: '1px solid var(--klo-line)', color: 'var(--klo-text-dim)' }}
+            >
+              <span>
+                {seatCount} × {formatCurrencyAmount(plan.monthlyPerSeat[currency] ?? 0, currency)}
+              </span>
+              <span style={{ color: 'var(--klo-text)' }}>
+                <strong>{formatCurrencyAmount(totalAmount, currency)}</strong>/mo
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {isEnterprise ? (
         <a
           href="mailto:support@klosure.ai"
@@ -633,6 +797,32 @@ function PlanCard({ plan, currency, isCurrent, user }) {
         >
           {buttonLabel}
         </a>
+      ) : !isChargeable ? (
+        <>
+          <button
+            type="button"
+            onClick={() => onIntlInvoice?.(plan)}
+            disabled={isCurrent}
+            className="mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: isCurrent ? 'transparent' : 'var(--klo-text)',
+              color: isCurrent ? 'var(--klo-text)' : 'white',
+              border: isCurrent ? '1px solid var(--klo-line-strong)' : 'none',
+            }}
+          >
+            {isCurrent ? 'Current plan' : 'Start 14-day free trial'}
+          </button>
+          {!isCurrent && (
+            <button
+              type="button"
+              onClick={() => onIntlInvoice?.(plan)}
+              className="mt-2 text-[12px] hover:underline"
+              style={{ color: 'var(--klo-accent)', background: 'none', border: 'none' }}
+            >
+              Or get an invoice in 24 hrs →
+            </button>
+          )}
+        </>
       ) : (
         <button
           type="button"
@@ -653,14 +843,159 @@ function PlanCard({ plan, currency, isCurrent, user }) {
           {err}
         </p>
       )}
-      {!planAvailable && !isCurrent && !isEnterprise && currency !== 'INR' && (
-        <p className="mt-2 text-[11px]" style={{ color: 'var(--klo-text-mute)' }}>
-          Email{' '}
-          <a href="mailto:support@klosure.ai" style={{ color: 'var(--klo-accent)' }}>
-            support@klosure.ai
-          </a>{' '}
-          for {currency} billing.
-        </p>
+    </div>
+  )
+}
+
+// Concierge form for USD / AED visitors. Captures their email + plan choice
+// to a Supabase `intl_billing_leads` table and (best-effort) emails the
+// founder via Resend so we can hand-craft a payment link within 24 hours.
+function IntlBillingPanel({ plan, currency, user, onClose }) {
+  const [email, setEmail] = useState(user?.email ?? '')
+  const [seats, setSeats] = useState(1)
+  const [notes, setNotes] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setErr('')
+    if (!email.trim()) {
+      setErr('Email is required.')
+      return
+    }
+    setBusy(true)
+    const res = await requestIntlBillingLead({
+      email: email.trim(),
+      planSlug: plan.slug,
+      currency,
+      seats,
+      notes: notes.trim(),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      setErr(res.error || 'Something went wrong. Please email support@klosure.ai.')
+      return
+    }
+    setDone(true)
+  }
+
+  return (
+    <div
+      className="mt-6 rounded-2xl p-5"
+      style={{
+        background: 'var(--klo-bg-elev)',
+        border: '1px solid var(--klo-accent)',
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <MonoKicker>International billing · {plan.shortLabel}</MonoKicker>
+          <h3
+            className="mt-1 text-[18px] font-semibold"
+            style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+          >
+            We'll send you an invoice in 24 hours
+          </h3>
+          <p className="mt-1 text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+            Auto-debit for international cards activates in early June. In the
+            meantime, drop your email and we'll send a Razorpay payment link
+            sized for your team. You can also start your 14-day trial right now
+            — no payment required.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="text-[18px]"
+          style={{ color: 'var(--klo-text-mute)', background: 'none', border: 'none' }}
+        >
+          ×
+        </button>
+      </div>
+
+      {done ? (
+        <div
+          className="mt-4 rounded-lg p-3 text-[13px]"
+          style={{
+            background: 'var(--klo-bg)',
+            border: '1px solid var(--klo-line)',
+            color: 'var(--klo-text)',
+          }}
+        >
+          Got it — we'll be in touch within 24 hours at <strong>{email}</strong>.
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div>
+            <label className="kl-mono text-[11px] uppercase" style={{ color: 'var(--klo-text-mute)' }}>
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[14px]"
+              style={{
+                background: 'var(--klo-bg)',
+                border: '1px solid var(--klo-line-strong)',
+                color: 'var(--klo-text)',
+              }}
+            />
+          </div>
+          <div>
+            <label className="kl-mono text-[11px] uppercase" style={{ color: 'var(--klo-text-mute)' }}>
+              Seats (estimated)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={seats}
+              onChange={(e) => setSeats(Math.max(1, Number(e.target.value) || 1))}
+              className="mt-1 w-32 rounded-lg px-3 py-2.5 text-[14px]"
+              style={{
+                background: 'var(--klo-bg)',
+                border: '1px solid var(--klo-line-strong)',
+                color: 'var(--klo-text)',
+              }}
+            />
+          </div>
+          <div>
+            <label className="kl-mono text-[11px] uppercase" style={{ color: 'var(--klo-text-mute)' }}>
+              Notes (optional)
+            </label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anything we should know? Payment preference (wire / card), preferred currency, billing entity, etc."
+              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
+              style={{
+                background: 'var(--klo-bg)',
+                border: '1px solid var(--klo-line-strong)',
+                color: 'var(--klo-text)',
+              }}
+            />
+          </div>
+          {err && (
+            <p className="text-[12px]" style={{ color: 'var(--klo-danger)' }}>
+              {err}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={busy}
+            className="px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
+            style={{ background: 'var(--klo-text)', color: 'white', border: 'none' }}
+          >
+            {busy ? 'Sending…' : 'Send me an invoice'}
+          </button>
+        </form>
       )}
     </div>
   )

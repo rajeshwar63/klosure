@@ -26,10 +26,13 @@ const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? ""
 // off) and set the resulting offer_id here. Empty/unset = no offer attached.
 const RAZORPAY_LAUNCH_OFFER_ID = Deno.env.get("RAZORPAY_LAUNCH_OFFER_ID") ?? ""
 
-// Phase A sprint 08: pricing collapsed to one plan. Every paid checkout is a
-// team plan; we auto-create a single-seat team for solo users via the
-// ensure_team_for_user RPC.
-const PAID_PLANS = new Set(["klosure"])
+// Phase A sprint 09: 'coach' and 'closer' are the two paid checkout slugs.
+// Every paid checkout is a team plan; we auto-create a single-seat team for
+// solo users via the ensure_team_for_user RPC. 'klosure' is kept as a
+// recognised slug for any in-flight client code that hasn't been redeployed
+// yet — server normalises it to 'closer'.
+const PAID_PLANS = new Set(["coach", "closer", "klosure"])
+const NORMALISE_PLAN: Record<string, string> = { klosure: "closer" }
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -58,18 +61,27 @@ Deno.serve(async (req) => {
 
     // 2. Parse request body.
     const body = await req.json().catch(() => ({}))
-    const planSlug = String(body.plan_slug ?? "")
+    const rawPlanSlug = String(body.plan_slug ?? "")
     const razorpayPlanId = String(body.razorpay_plan_id ?? "")
-    if (!planSlug || !razorpayPlanId) {
+    const rawSeatCount = Number(body.seat_count ?? 1)
+    if (!rawPlanSlug || !razorpayPlanId) {
       return json({ ok: false, error: "missing_plan" }, 400)
     }
     if (!razorpayPlanId.startsWith("plan_")) {
       return json({ ok: false, error: "invalid_plan_id" }, 400)
     }
 
-    if (!PAID_PLANS.has(planSlug)) {
+    if (!PAID_PLANS.has(rawPlanSlug)) {
       return json({ ok: false, error: "invalid_plan_for_checkout" }, 400)
     }
+    const planSlug = NORMALISE_PLAN[rawPlanSlug] ?? rawPlanSlug
+
+    // Clamp seat count to a sane range — UI already enforces 1..200, but the
+    // edge function is the security boundary so we re-validate.
+    const seatCount = Math.max(
+      1,
+      Math.min(200, Number.isFinite(rawSeatCount) ? Math.floor(rawSeatCount) : 1),
+    )
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
     // Pull the user record up-front for name/phone.
@@ -144,10 +156,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Create the subscription.
+    // 6. Create the subscription. `quantity` is the per-seat multiplier —
+    // Razorpay charges plan.amount × quantity each cycle. Update Subscription
+    // (PATCH) is used later to add or remove seats.
     const subRes = await rzpFetch("/subscriptions", "POST", {
       plan_id: razorpayPlanId,
       customer_id: razorpayCustomerId,
+      quantity: seatCount,
       total_count: 60,           // 5 years of monthly cycles; user can cancel anytime
       customer_notify: 1,
       // Razorpay validates offer_id only when present, so omit the key
@@ -157,6 +172,7 @@ Deno.serve(async (req) => {
         klosure_user_id: userId,
         klosure_team_id: teamId ?? "",
         klosure_plan_slug: planSlug,
+        klosure_seat_count: String(seatCount),
       },
     })
     if (subRes.status !== 200 && subRes.status !== 201) {
@@ -167,11 +183,15 @@ Deno.serve(async (req) => {
     const subscriptionId: string = subscription.id
     const shortUrl: string = subscription.short_url
 
-    // 7. Store subscription_id + customer_id on user/team.
+    // 7. Store subscription_id + customer_id on user/team. seat_cap is set
+    // optimistically here; the webhook (subscription.activated) re-confirms it
+    // on the next event so this stays in sync if Razorpay overrides the qty.
     if (isTeamPlan && teamId) {
       await sb.from("teams").update({
         razorpay_customer_id: razorpayCustomerId,
         razorpay_subscription_id: subscriptionId,
+        seat_cap: seatCount,
+        pending_seat_cap: null,
       }).eq("id", teamId)
     } else {
       await sb.from("users").update({

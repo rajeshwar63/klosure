@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
 import './LandingPage.css'
 
-// Phase A sprint 08: collapsed pricing.
-const SHOWN_PLANS = ['klosure', 'enterprise']
+// Phase A sprint 09: 3-tier pricing — Coach / Closer / Command.
+const SHOWN_PLANS = ['coach', 'closer', 'command']
 const CURRENCIES = ['USD', 'AED', 'INR']
 
 const CURRENCY_LABELS = {
@@ -483,8 +483,10 @@ function Pricing() {
 }
 
 function PricingCard({ plan, currency }) {
-  const isEnterprise = plan.slug === 'enterprise'
-  const isFeatured = plan.slug === 'klosure'
+  // 'command' is the new enterprise/contact-sales tier.
+  const isEnterprise = plan.slug === 'command'
+  // 'closer' is the headline tier — Coach + Email + Notetaker.
+  const isFeatured = plan.slug === 'closer'
   const priceInfo = priceDisplayFor(plan.slug, currency)
 
   return (

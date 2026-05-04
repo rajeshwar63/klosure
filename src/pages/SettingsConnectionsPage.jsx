@@ -6,14 +6,20 @@
 // =============================================================================
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import ConnectButtons from '../components/settings/ConnectButtons.jsx'
 import GrantsListEnhanced from '../components/settings/GrantsListEnhanced.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import { supabase } from '../lib/supabase.js'
 
 export default function SettingsConnectionsPage() {
   const { user } = useAuth()
+  const { planSlug, can, isTrialing } = useAccountStatus()
+  // Email + meeting capture is part of Closer (and above). Coach users see an
+  // upgrade CTA in place of the connect buttons. Trialers see the full UX
+  // because the trial mirrors Closer-level features.
+  const hasInboxEntitlement = isTrialing || can('email_capture')
   const [coverage, setCoverage] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -58,9 +64,34 @@ export default function SettingsConnectionsPage() {
         for the <strong className="font-semibold">v2 release in June 2026</strong>.
       </div>
 
-      <div className="mt-6">
-        <ConnectButtons />
-      </div>
+      {hasInboxEntitlement ? (
+        <div className="mt-6">
+          <ConnectButtons />
+        </div>
+      ) : (
+        <div className="mt-6 rounded-xl border border-navy/15 bg-navy/[0.02] p-5">
+          <div className="text-[12px] font-semibold uppercase tracking-wider text-navy/55">
+            Closer plan required
+          </div>
+          <h2 className="mt-1 text-[18px] font-semibold text-navy">
+            Connect Gmail, Outlook, Zoom, Meet & Teams
+          </h2>
+          <p className="mt-1 text-[14px] text-navy/70 leading-relaxed">
+            You're on <strong>Coach</strong>. Email + Notetaker capture is part
+            of <strong>Closer</strong> (₹7,500 / seat / mo) — Klo reads emails
+            tied to your deals and joins customer meetings to keep deal records
+            current automatically.
+          </p>
+          <div className="mt-3">
+            <Link
+              to="/billing"
+              className="inline-flex items-center rounded-lg bg-navy px-4 py-2 text-[13px] font-semibold text-white"
+            >
+              Upgrade to Closer →
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 pt-6 border-t border-navy/10">
         <h2 className="text-[13px] font-semibold tracking-wider text-navy/55 mb-3">

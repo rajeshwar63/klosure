@@ -1,36 +1,44 @@
 // =============================================================================
-// Razorpay plan ID lookup — Phase A sprint 08
+// Razorpay plan ID lookup — Phase A sprint 09 (Coach / Closer split)
 // =============================================================================
-// Single 'klosure' plan replaces the 4-tier structure. Trial / enterprise
-// have no Razorpay plan IDs (trial is unbilled; enterprise is contact-sales).
+// Two paid plans (coach + closer), each requires a per-currency Razorpay plan
+// ID. Today only INR is wired — international card processing is pending
+// activation (Razorpay ticket #18895606), so AED + USD return null and the
+// BillingPage routes those users to a concierge form instead of checkout.
 //
-// Test mode is the default for dev + preview. The legacy plan IDs from the
-// pre-Phase-A 6-tier structure stay in the reverse map below so any old test
-// subscriptions still in flight resolve gracefully — the webhook handler
-// normalises them onto 'klosure'.
+// Trial / Command (enterprise) have no Razorpay plan IDs — trial is unbilled,
+// Command is contact-sales.
+//
+// Plan IDs live in source for now (single-tenant deployment, low rotation
+// risk). When we add USD + AED, just fill in the corresponding rows.
 // =============================================================================
 
 import type { PlanSlug, Currency } from './plans'
 
-const RAZORPAY_MODE = (import.meta.env.VITE_RAZORPAY_MODE ?? 'test') as 'test' | 'live'
+const RAZORPAY_MODE = (import.meta.env.VITE_RAZORPAY_MODE ?? 'live') as 'test' | 'live'
 
-// Replace the placeholder once the new test plan is created in Razorpay.
 const TEST_PLANS: Record<string, string | null> = {
-  'klosure:INR': 'plan_<paste-new-test-plan-id-here>',
-  'klosure:AED': null,
-  'klosure:USD': null,
+  'coach:INR': null,
+  'coach:AED': null,
+  'coach:USD': null,
+  'closer:INR': null,
+  'closer:AED': null,
+  'closer:USD': null,
 }
 
 const LIVE_PLANS: Record<string, string | null> = {
-  'klosure:INR': null,
-  'klosure:AED': null,
-  'klosure:USD': null,
+  'coach:INR': 'plan_SlMh7xd9N4El0k',     // ₹4500/seat/mo
+  'coach:AED': null,                       // pending intl activation
+  'coach:USD': null,                       // pending intl activation
+  'closer:INR': 'plan_SlMhXsDUplIPhn',    // ₹7500/seat/mo
+  'closer:AED': null,                      // pending intl activation
+  'closer:USD': null,                      // pending intl activation
 }
 
 const PLAN_MAP = RAZORPAY_MODE === 'live' ? LIVE_PLANS : TEST_PLANS
 
 export function getRazorpayPlanId(slug: PlanSlug, currency: Currency): string | null {
-  if (slug === 'trial' || slug === 'enterprise') return null
+  if (slug === 'trial' || slug === 'command') return null
   return PLAN_MAP[`${slug}:${currency}`] ?? null
 }
 
