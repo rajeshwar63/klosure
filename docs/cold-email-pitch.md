@@ -8,9 +8,9 @@ One question, not a pitch — when your reps say "90% closing this month," do yo
 
 We all know it — leads aren't the real problem. Closure is.
 
-Klosure.ai is a shared deal room where your rep AND their buyer sit on the same side — with Klo, our AI deal coach, moving both of them to closure.
+Klosure.ai is an AI deal coach. Klo sits inside every deal, picks up every signal across the lifecycle, and coaches both your rep and their buyer toward closure.
 
-Rest assured, Klo picks up every small signal from the buyer — email, meetings, chat — so your reps aren't spending even a minute updating tools anymore.
+No more pipeline reviews built on guesses. No more reps spending hours updating CRM fields nobody trusts.
 
 — [Your name]
 klosure.ai
