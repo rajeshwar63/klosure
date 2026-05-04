@@ -6,7 +6,7 @@ Solution covers both reps/buyers AND the manager (Klo replaces dashboards).
 
 ---
 
-**Subject:** Do you actually trust your commit deals?
+**Subject:** 90% commit. 50% close. Why?
 
 When a rep says "90% commit" this month — is it really 90%? Or closer to 50%?
 
