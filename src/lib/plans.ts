@@ -84,13 +84,12 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     shortLabel: 'Klosure',
     isTeam: true,
     monthlyPerSeat: {
-      // Launch pricing — $49/seat/mo. Goes to $79 once Google integration
-      // (email + meeting capture) ships. INR is 4499 to cover GST + the
-      // higher payment-processor fees on local cards. All prices exclude
-      // applicable taxes.
+      // $79/seat/mo USD now that Google integration (email + meeting capture)
+      // has shipped. INR is 4499 to cover GST + the higher payment-processor
+      // fees on local cards. All prices exclude applicable taxes.
       INR: 4499,
       AED: 180,
-      USD: 49,
+      USD: 79,
     },
     poolDefaults: {
       meeting_minutes_per_seat: 900,
@@ -195,8 +194,8 @@ function formatAmount(amount: number, currency: Currency): string {
 export function formatPrice(slug: PlanSlug, currency: Currency): string {
   const p = priceFor(slug, currency)
   if (p === null) return 'Contact sales'
-  // Returns "$49/seat" — the surrounding card template appends "/mo" as a
-  // smaller suffix span, so the two combined render as "$49/seat /mo".
+  // Returns "$79/seat" — the surrounding card template appends "/mo" as a
+  // smaller suffix span, so the two combined render as "$79/seat /mo".
   return `${formatAmount(p, currency)}/seat`
 }
 
@@ -211,8 +210,8 @@ export function totalPriceForTeam(
 }
 
 // =============================================================================
-// Launch discount — kept as a struct for future promos. The $49 is the
-// founding price; no discount is applied. `active=false` suppresses the
+// Launch discount — kept as a struct for future promos. The $79 is the
+// standard price; no discount is applied. `active=false` suppresses the
 // "X% OFF" banner on landing/billing pages — flip to true and set
 // percentOff > 0 when running a real promo.
 // =============================================================================

@@ -34,7 +34,7 @@ export default function BillingPage() {
   const { status, planSlug, isTrialing, daysLeftInTrial, isReadOnly, loading } = useAccountStatus()
   const navigate = useNavigate()
 
-  // Default to USD now that pricing is anchored at $49/seat/mo. The user can
+  // Default to USD now that pricing is anchored at $79/seat/mo. The user can
   // toggle to INR/AED if their local currency is preferable.
   const [currency, setCurrency] = useState(status?.currency || 'USD')
 
