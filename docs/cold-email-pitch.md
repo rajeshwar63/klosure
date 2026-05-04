@@ -1,20 +1,21 @@
 # Klosure.ai — Cold Email Pitch (Mobile)
 
-Short. Mobile. Opens with a question. Frames Klosure as a SaaS deal workspace. "Signal" runs as the through-line.
+Structure: Disrupt → Agitate → Reframe → Minimal solution → Soft CTA.
+Short. Mobile. SaaS framing. "Signal" lands in the solution line.
 
 ---
 
-**Subject:** When a rep says "90% closing" — do you believe them?
+**Subject:** Do you actually trust your commit deals?
 
-Quick question, not a pitch — when your reps say "90% closing this month," do you actually believe them? Or do you mentally cut it to 50%?
+Be honest — when your reps say a deal is "committed" this month, do you actually trust the number? Or do you mentally cut it?
 
-We all know it — leads aren't the real problem. Closure is.
+Most sales leaders still walk into forecast calls and get blindsided. The signals were always there — a buyer goes quiet, a champion gets reassigned, a meeting gets pushed — but they're buried in inboxes, chats, and meeting notes nobody reads.
 
-Klosure.ai is a deal workspace for sales teams. Every deal gets its own room — your rep works it solo, or invites the buyer in. Klo, the built-in AI deal coach, picks up every signal in the room — chat, emails, meetings — and moves both sides toward closure.
+It's not a pipeline problem. It's a deal-execution problem.
 
-No signal missed. Pipeline updates itself. A forecast you'd actually bet on.
+Klosure.ai is a deal workspace where Klo, our AI deal coach, reads every signal in the deal — chat, email, meetings — and keeps both your rep and their buyer moving toward closure.
 
-Worth a quick 15 mins next week?
+Worth exploring?
 
 — [Your name]
 klosure.ai
