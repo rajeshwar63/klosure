@@ -10,11 +10,12 @@
 import { supabase } from '../lib/supabase.js'
 import { getRazorpayPlanId } from '../lib/razorpay-plans.ts'
 
-export async function startUpgrade({ planSlug, currency }) {
+export async function startUpgrade({ planSlug, currency, seatCount = 1 }) {
   const razorpayPlanId = getRazorpayPlanId(planSlug, currency)
   if (!razorpayPlanId) {
     return { ok: false, error: 'unsupported_currency_for_plan' }
   }
+  const seats = Math.max(1, Math.min(200, Math.floor(Number(seatCount) || 1)))
 
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData?.session?.access_token
@@ -27,7 +28,37 @@ export async function startUpgrade({ planSlug, currency }) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ plan_slug: planSlug, razorpay_plan_id: razorpayPlanId }),
+    body: JSON.stringify({
+      plan_slug: planSlug,
+      razorpay_plan_id: razorpayPlanId,
+      seat_count: seats,
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, error: text || `request failed (${res.status})` }
+  }
+  return res.json()
+}
+
+// Update subscription quantity (add or remove seats). Add-seats applies
+// immediately and creates a prorated addon for the remaining days; remove-
+// seats schedules at next cycle (industry standard, no mid-cycle refund).
+export async function updateSubscriptionSeats({ seatCount }) {
+  const seats = Math.max(1, Math.min(200, Math.floor(Number(seatCount) || 1)))
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData?.session?.access_token
+  if (!token) return { ok: false, error: 'not_signed_in' }
+
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL
+  const res = await fetch(`${baseUrl}/functions/v1/razorpay-update-subscription`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ seat_count: seats }),
   })
 
   if (!res.ok) {

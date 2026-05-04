@@ -1,15 +1,26 @@
 // =============================================================================
-// Plan definitions — Phase A sprint 08
+// Plan definitions — Phase A sprint 09 (Coach / Closer / Command split)
 // =============================================================================
-// One plan: 'klosure'. Plus 'trial' and 'enterprise' as edge states.
+// Three plan slugs:
+//   - 'coach'   — $49 / AED 180 / ₹4500 per seat/mo. Core Klo coaching.
+//                 NO email + Notetaker integration.
+//   - 'closer'  — $79 / AED 290 / ₹7500 per seat/mo. Coach + Email + Notetaker.
+//                 (Renamed from the old 'klosure' slug.)
+//   - 'command' — Enterprise contact-sales tier. SSO, custom seats, dedicated
+//                 support. (Renamed from 'enterprise'.)
 //
-// 'klosure' is a per-seat plan. Pricing is monthly; teams pay
-// (price_per_seat × seat_count). Pool quotas (meeting minutes, voice minutes,
-// chat messages) are computed at the team level via team_pool table from
-// sprint 02.
+// Plus 'trial' as the unbilled 14-day onboarding state.
+//
+// Pricing is monthly per-seat. Teams pay (price_per_seat × seat_count). Pool
+// quotas (meeting minutes, voice minutes, chat messages) are computed at the
+// team level via team_pool table from sprint 02.
+//
+// Razorpay charges INR only until international card processing is activated
+// (ticket #18895606). USD / AED prices are display-only on landing for global
+// marketing reach; the BillingPage routes non-INR users to a concierge form.
 // =============================================================================
 
-export type PlanSlug = 'trial' | 'klosure' | 'enterprise'
+export type PlanSlug = 'trial' | 'coach' | 'closer' | 'command'
 
 export type Currency = 'INR' | 'AED' | 'USD'
 
@@ -78,22 +89,59 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     hiddenFromPricingPage: true,
   },
 
-  klosure: {
-    slug: 'klosure',
-    label: 'Klosure',
-    shortLabel: 'Klosure',
+  coach: {
+    slug: 'coach',
+    label: 'Coach',
+    shortLabel: 'Coach',
+    isTeam: true,
+    // Anchor INR price (₹4500) is what Razorpay actually bills. USD ($49) and
+    // AED (180) are display-only until international payments activate.
+    monthlyPerSeat: {
+      INR: 4500,
+      AED: 180,
+      USD: 49,
+    },
+    poolDefaults: {
+      meeting_minutes_per_seat: 0,    // no Notetaker on Coach
+      voice_minutes_per_seat: 60,
+      chat_messages_per_seat: 1500,
+    },
+    features: {
+      klo_coaching: true,
+      manager_view: true,
+      forecast_view: true,
+      askklo: true,
+      seller_profile: true,
+      daily_focus: true,
+      weekly_brief: true,
+      realtime_buyer_link: true,
+      // Email + Notetaker are Closer-tier only.
+      email_capture: false,
+      meeting_capture: false,
+      voice: false,
+    },
+    description: 'Klo coaching, dashboards, manager rollup — per seat, monthly',
+    highlights: [
+      'Klo coaching on every conversation',
+      'AI Dashboard for Rep',
+      'AI Dashboard for the Client',
+      'Manager dashboard with team rollup',
+      'Daily focus + weekly brief for Manager and Rep',
+    ],
+  },
+
+  closer: {
+    slug: 'closer',
+    label: 'Closer',
+    shortLabel: 'Closer',
     isTeam: true,
     monthlyPerSeat: {
-      // $79/seat/mo USD now that Google integration (email + meeting capture)
-      // has shipped. INR (₹7500) covers GST + the higher payment-processor
-      // fees on local cards; AED (290) covers regional processing. All prices
-      // exclude applicable taxes.
       INR: 7500,
       AED: 290,
       USD: 79,
     },
     poolDefaults: {
-      meeting_minutes_per_seat: 900,
+      meeting_minutes_per_seat: 900,    // 15 hrs/seat/mo Notetaker
       voice_minutes_per_seat: 100,
       chat_messages_per_seat: 1500,
     },
@@ -110,23 +158,21 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       meeting_capture: true,
       voice: false,
     },
-    description: 'Everything Klosure does, per seat, per month',
+    description: 'Coach + Email & Notetaker across Gmail, Outlook, Zoom, Meet, Teams',
     highlights: [
-      'Klo coaching on every conversation',
+      'Everything in Coach',
       'Email + Note Taker (Gmail, Outlook, Zoom, Meet, Teams)',
-      'Unlimited email + calendar events',
+      'Unlimited email events',
+      'Unlimited calendar events',
       '15 hours of Notetaker meetings per seat',
-      'AI Dashboard for Rep and Client',
-      'Manager dashboard with team rollup',
-      'Daily focus + weekly brief for Manager and Rep',
       'Pooled meeting hours across the team',
     ],
   },
 
-  enterprise: {
-    slug: 'enterprise',
-    label: 'Enterprise',
-    shortLabel: 'Enterprise',
+  command: {
+    slug: 'command',
+    label: 'Command',
+    shortLabel: 'Command',
     isTeam: true,
     monthlyPerSeat: { INR: null, AED: null, USD: null },
     poolDefaults: {
@@ -147,13 +193,12 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
       meeting_capture: true,
       voice: false,
     },
-    description: 'For 30+ rep orgs needing custom contracts',
+    description: 'Enterprise pricing for larger orgs',
     highlights: [
+      'Enterprise pricing',
+      'SSO (SAML)',
       'Custom seat counts',
-      'Custom pool quotas',
-      'SSO & SAML (Phase 14+)',
-      'Dedicated onboarding',
-      'Custom contracts & invoicing',
+      'Dedicated support',
     ],
   },
 }
@@ -210,10 +255,26 @@ export function totalPriceForTeam(
   return formatAmount(perSeat * seatCount, currency)
 }
 
+// Plain numeric total (per-seat × seat_count). Returns null for contact-sales
+// tiers. Use formatAmount for display.
+export function totalAmountForTeam(
+  slug: PlanSlug,
+  currency: Currency,
+  seatCount: number,
+): number | null {
+  const perSeat = priceFor(slug, currency)
+  if (perSeat === null) return null
+  return perSeat * seatCount
+}
+
+export function formatCurrencyAmount(amount: number, currency: Currency): string {
+  return formatAmount(amount, currency)
+}
+
 // =============================================================================
-// Launch discount — kept as a struct for future promos. The $79 is the
-// standard price; no discount is applied. `active=false` suppresses the
-// "X% OFF" banner on landing/billing pages — flip to true and set
+// Launch discount — kept as a struct for future promos. The standard prices
+// above ship at full rate; no discount is applied. `active=false` suppresses
+// the "X% OFF" banner on landing/billing pages — flip to true and set
 // percentOff > 0 when running a real promo.
 // =============================================================================
 export const LAUNCH_DISCOUNT = {

@@ -22,6 +22,9 @@
 //   subscription.halted
 //   subscription.cancelled
 //   subscription.completed
+//   subscription.updated      (Phase A sprint 09 — needed for seat changes;
+//                              fires when quantity is changed via the Update
+//                              Subscription API)
 //
 // Webhook URL (test + live both point at this same function — secret differs):
 //   https://<project-ref>.supabase.co/functions/v1/razorpay-webhook
@@ -43,10 +46,12 @@ import {
 
 const APP_URL = Deno.env.get("APP_URL") ?? "https://klosure.ai"
 const PLAN_LABELS: Record<string, string> = {
-  klosure: "Klosure",
-  enterprise: "Enterprise",
-  // Legacy slugs preserved for historical webhook events; everything maps to
-  // the unified Klosure label.
+  coach: "Klosure Coach",
+  closer: "Klosure Closer",
+  command: "Klosure Command",
+  // Legacy slugs (pre-Phase-A-sprint-09) preserved for historical events.
+  klosure: "Klosure Closer",
+  enterprise: "Klosure Command",
   pro: "Klosure",
   team_starter: "Klosure",
   team_growth: "Klosure",
@@ -207,6 +212,30 @@ Deno.serve(async (req) => {
         processed_at: new Date().toISOString(),
       })
       .eq("id", eventRowId)
+
+    // Sync teams.seat_cap from the Razorpay subscription quantity. This is
+    // the source-of-truth path for seat changes:
+    //   - subscription.activated  → first-time set
+    //   - subscription.updated    → admin added/removed seats mid-cycle
+    //   - subscription.charged    → renewal cycle; apply pending downsize if any
+    // For terminal events (halted/cancelled/completed) we leave seat_cap alone
+    // — the team is going read-only via update_subscription_state anyway.
+    if (
+      ownerRow?.team_id &&
+      typeof subscription.quantity === "number" &&
+      subscription.quantity >= 1 &&
+      (status === "active" || status === "pending")
+    ) {
+      const updates: Record<string, unknown> = { seat_cap: subscription.quantity }
+      // On charge events (renewal), if a downsize was scheduled and Razorpay
+      // has now applied it (quantity == pending_seat_cap), clear the pending
+      // marker. This is best-effort — the next "updated" event would do the
+      // same.
+      if (eventType === "subscription.charged") {
+        updates.pending_seat_cap = null
+      }
+      await sb.from("teams").update(updates).eq("id", ownerRow.team_id)
+    }
 
     // Fire transactional emails based on the event type. Best-effort — never
     // block the 200 ack on email send failures (Razorpay would otherwise

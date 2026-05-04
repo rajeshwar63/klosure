@@ -6,27 +6,30 @@
 // one place avoids the two paths drifting out of sync.
 // =============================================================================
 
-// Server-side Razorpay plan_id → klosure plan slug. Mirrors the maps in
-// src/lib/razorpay-plans.ts. Both webhook and verify prefer the
-// klosure_plan_slug stored on the subscription's notes (set at create time)
-// and only fall back to this map.
-// Phase A sprint 08: collapsed to a single 'klosure' plan. Legacy plan IDs
-// from the previous 6-tier structure are kept here mapping to 'klosure' so any
-// old in-flight test subscriptions migrate gracefully when their next webhook
-// fires. Drop the legacy entries once no subscriptions reference them.
+// Server-side Razorpay plan_id → Klosure plan slug. Mirrors the LIVE_PLANS
+// map in src/lib/razorpay-plans.ts. Both webhook and verify prefer the
+// klosure_plan_slug stored on the subscription's notes (set at create time,
+// immune to plan-id table drift) and only fall back to this map.
+//
+// Phase A sprint 09: split into 'coach' + 'closer'. Legacy IDs (and the
+// previous 'klosure' label) are kept mapped to 'closer' so any in-flight
+// subscription created before the split routes to the right tier when its
+// next webhook fires. Drop the legacy entries once no subscriptions
+// reference them.
 export const PLAN_ID_TO_SLUG: Record<string, string> = {
-  // New unified plan (populate with the actual Razorpay plan_id once created):
-  "plan_<paste-new-test-plan-id-here>": "klosure",
-  // Legacy test mode — migrate gracefully:
-  "plan_SjJt4hH14l4xTF": "klosure",
-  "plan_SjJtU4Ic9gMKQT": "klosure",
-  "plan_SjJtqGy7KxXBv1": "klosure",
-  "plan_SjJu9eaMjFv92Y": "klosure",
-  // Legacy live mode:
-  "plan_SjJAkRxX87ZYuz": "klosure",
-  "plan_SjJi8s6ORnUzxb": "klosure",
-  "plan_SjJikkUK5hjVVw": "klosure",
-  "plan_SjJjCRGcjI8Os1": "klosure",
+  // Live (current):
+  "plan_SlMh7xd9N4El0k": "coach",     // ₹4500/seat/mo
+  "plan_SlMhXsDUplIPhn": "closer",    // ₹7500/seat/mo
+  // Legacy test/live IDs from the pre-split 'klosure' tier — map to 'closer'
+  // (the renamed klosure tier).
+  "plan_SjJt4hH14l4xTF": "closer",
+  "plan_SjJtU4Ic9gMKQT": "closer",
+  "plan_SjJtqGy7KxXBv1": "closer",
+  "plan_SjJu9eaMjFv92Y": "closer",
+  "plan_SjJAkRxX87ZYuz": "closer",
+  "plan_SjJi8s6ORnUzxb": "closer",
+  "plan_SjJikkUK5hjVVw": "closer",
+  "plan_SjJjCRGcjI8Os1": "closer",
 }
 
 export type SubscriptionStatus = "active" | "pending" | "halted" | "cancelled" | "completed"
@@ -58,6 +61,8 @@ export type SubscriptionEntity = {
   status?: string
   current_end?: number
   end_at?: number
+  /** Per-seat multiplier. plan.amount × quantity is what's billed each cycle. */
+  quantity?: number
   notes?: Record<string, unknown>
 }
 
