@@ -20,7 +20,7 @@ It's not a pipeline problem. It's a deal-execution problem.
 
 Klosure.ai is a deal workspace. Klo, our AI, reads every signal in every deal — chat, emails, meetings — and moves your reps and their buyers toward closure.
 
-You stop living in CRM dashboards. You start living with Klo — ask anything ("which deals are at risk?", "where's pipeline stuck?") and get the answer live.
+Now you interrogate your CRM — not just read status updates. Ask Klo "which deals are at risk?", "where's pipeline stuck?" — get the answer live.
 
 Worth exploring?
 
