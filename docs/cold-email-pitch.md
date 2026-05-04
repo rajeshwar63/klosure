@@ -1,6 +1,6 @@
 # Klosure.ai — Cold Email Pitch (Mobile)
 
-Short. Mobile. Opens with a question. Problem-first. Closes by bookending the opener.
+Short. Mobile. Opens with a question. Problem-first. Closes on the zero-CRM-updates differentiator.
 
 ---
 
@@ -12,7 +12,7 @@ We all know it — leads aren't the real problem. Closure is.
 
 Klosure.ai is an AI deal coach. Klo sits inside every deal, picks up every signal across the lifecycle, and coaches both your rep and their buyer toward closure.
 
-So next time a rep says 90% — you'll actually believe them.
+And the best part — nobody updates anything. Not your rep, not their buyer. Klo pulls every signal from chat, emails, and meetings, and keeps the deal current itself. No more CRM hygiene tax.
 
 Worth a quick 15 mins next week?
 
