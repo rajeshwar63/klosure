@@ -85,10 +85,11 @@ export const PLANS: Record<PlanSlug, PlanDefinition> = {
     isTeam: true,
     monthlyPerSeat: {
       // $79/seat/mo USD now that Google integration (email + meeting capture)
-      // has shipped. INR is 4499 to cover GST + the higher payment-processor
-      // fees on local cards. All prices exclude applicable taxes.
-      INR: 4499,
-      AED: 180,
+      // has shipped. INR (₹7500) covers GST + the higher payment-processor
+      // fees on local cards; AED (290) covers regional processing. All prices
+      // exclude applicable taxes.
+      INR: 7500,
+      AED: 290,
       USD: 79,
     },
     poolDefaults: {
