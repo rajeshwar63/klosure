@@ -1,39 +1,39 @@
 # Klosure.ai — Cold Email Pitch (Mobile)
 
-Short. Scannable on a phone. Opens with a question.
+Short. Mobile. Opens with a question. Problem-first — no feature pitching.
 
 ---
 
-**Subject:** How many of your deals are actually moving?
+**Subject:** Which deal is quietly dying on you?
 
 Hi [First name],
 
-Quick question — how many of your open deals are genuinely moving forward, and how many are just… polite?
+Be honest — which deal in your pipeline are you least sure about right now?
 
-Most reps find out at quarter-end. Too late.
+The buyer went warm, then quiet. They said "let's circle back next week." That was three weeks ago. You don't know if it's budget, the wrong champion, or you've just lost them.
 
-**Klosure.ai** puts you and your buyer in one AI-coached deal room. Klo, our AI, sits in the middle, tracks every commitment, and privately nudges both sides toward close.
+By the time you find out, the quarter's already gone.
 
-- Live deal summary — always current
-- Coaches you and your buyer separately
-- Commitments don't slip through the cracks
+That's the exact problem we're solving at Klosure.ai.
 
-Worth 10 minutes next week?
+Open to a 10-min chat next week?
 
 — [Your name]
 klosure.ai
 
 ---
 
-## Even shorter (SMS-length variant)
+## Even shorter variant
 
-**Subject:** Which of your deals is quietly dying?
+**Subject:** Why did that deal really stall?
 
 Hi [First name],
 
-Be honest — which open deal are you least sure about?
+How many of your "active" deals are actually dead — and you just don't know it yet?
 
-Klosure.ai is an AI-coached deal room. Klo coaches you and your buyer privately, tracks every commitment, and flags risk before the deal stalls.
+Most sellers find out one quarter too late. The buyer goes quiet, the follow-ups get ignored, and the post-mortem never really tells you why.
+
+That's what we're fixing at Klosure.ai.
 
 10 mins next week?
 
