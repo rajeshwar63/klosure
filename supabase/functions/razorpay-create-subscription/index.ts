@@ -21,22 +21,6 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID") ?? ""
 const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? ""
-// Optional Razorpay Offer applied to every new subscription while a launch
-// promo is running. NOTE: the offer's minimum amount in the Razorpay
-// dashboard MUST be ≤ the cheapest plan's per-seat price (currently Coach at
-// ₹4,500), otherwise Razorpay rejects the subscription with
-// "Order Amount is less than Offer Minimum amount". When the existing offer
-// can't be lowered, leave RAZORPAY_LAUNCH_OFFER_ID unset and re-attach it
-// manually in the dashboard for specific subscriptions instead.
-//
-// Phase A sprint 09: the offer attachment is also gated by an explicit
-// allow-list of plan slugs so a stale offer can't break Coach checkouts even
-// if the env var stays set.
-const RAZORPAY_LAUNCH_OFFER_ID = Deno.env.get("RAZORPAY_LAUNCH_OFFER_ID") ?? ""
-const RAZORPAY_LAUNCH_OFFER_PLANS = (Deno.env.get("RAZORPAY_LAUNCH_OFFER_PLANS") ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean)
 
 // Phase A sprint 09: 'coach' and 'closer' are the two paid checkout slugs.
 // Every paid checkout is a team plan; we auto-create a single-seat team for
@@ -171,25 +155,12 @@ Deno.serve(async (req) => {
     // 6. Create the subscription. `quantity` is the per-seat multiplier —
     // Razorpay charges plan.amount × quantity each cycle. Update Subscription
     // (PATCH) is used later to add or remove seats.
-    //
-    // The launch offer is attached only when BOTH env vars are set AND the
-    // plan is on the allow-list. Empty/unset RAZORPAY_LAUNCH_OFFER_PLANS = no
-    // offer attached to anything (safe default — prevents a stale offer from
-    // blocking checkouts on cheaper tiers). To run a promo, set both vars,
-    // e.g. RAZORPAY_LAUNCH_OFFER_PLANS="closer" if the offer's min amount is
-    // ≥ ₹7,500.
-    const offerApplies =
-      !!RAZORPAY_LAUNCH_OFFER_ID &&
-      RAZORPAY_LAUNCH_OFFER_PLANS.length > 0 &&
-      RAZORPAY_LAUNCH_OFFER_PLANS.includes(planSlug)
-
     const subRes = await rzpFetch("/subscriptions", "POST", {
       plan_id: razorpayPlanId,
       customer_id: razorpayCustomerId,
       quantity: seatCount,
       total_count: 60,           // 5 years of monthly cycles; user can cancel anytime
       customer_notify: 1,
-      ...(offerApplies ? { offer_id: RAZORPAY_LAUNCH_OFFER_ID } : {}),
       notes: {
         klosure_user_id: userId,
         klosure_team_id: teamId ?? "",

@@ -271,30 +271,12 @@ export function formatCurrencyAmount(amount: number, currency: Currency): string
   return formatAmount(amount, currency)
 }
 
-// =============================================================================
-// Launch discount — kept as a struct for future promos. The standard prices
-// above ship at full rate; no discount is applied. `active=false` suppresses
-// the "X% OFF" banner on landing/billing pages — flip to true and set
-// percentOff > 0 when running a real promo.
-// =============================================================================
-export const LAUNCH_DISCOUNT = {
-  active: false,
-  percentOff: 0,
-  label: 'Founding member',
-} as const
-
 export interface PriceDisplay {
-  hasDiscount: boolean
   primary: string
-  original: string | null
-  percentOff: number
 }
 
 export function priceDisplayFor(slug: PlanSlug, currency: Currency): PriceDisplay {
   return {
-    hasDiscount: false,
     primary: formatPrice(slug, currency),
-    original: null,
-    percentOff: 0,
   }
 }

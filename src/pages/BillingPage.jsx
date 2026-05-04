@@ -16,7 +16,6 @@ import { useAccountStatus } from '../hooks/useAccountStatus.jsx'
 import {
   PLANS,
   priceDisplayFor,
-  LAUNCH_DISCOUNT,
   totalAmountForTeam,
   formatCurrencyAmount,
 } from '../lib/plans.ts'
@@ -193,33 +192,6 @@ export default function BillingPage() {
             </span>
             <span className="text-[13px]">
               Start free for 14 days. No card needed. Cancel anytime.
-            </span>
-          </div>
-        )}
-
-        {LAUNCH_DISCOUNT.active && (
-          <div
-            className="mt-8 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap"
-            style={{
-              background: 'var(--klo-accent-soft)',
-              border: '1px solid var(--klo-accent)',
-              color: 'var(--klo-text)',
-            }}
-            role="note"
-          >
-            <span
-              className="kl-mono text-[11px] font-bold px-2 py-0.5 rounded"
-              style={{
-                background: 'var(--klo-accent)',
-                color: 'white',
-                letterSpacing: '0.06em',
-              }}
-            >
-              {LAUNCH_DISCOUNT.percentOff}% OFF
-            </span>
-            <span className="text-[13px]">
-              {LAUNCH_DISCOUNT.label} — {LAUNCH_DISCOUNT.percentOff}% off all
-              plans, applied automatically at checkout.
             </span>
           </div>
         )}
@@ -640,49 +612,19 @@ function PlanCard({ plan, currency, isCurrent, user, onIntlInvoice }) {
         {plan.description}
       </p>
 
-      {!isEnterprise && (() => {
-        const priceInfo = priceDisplayFor(plan.slug, currency)
-        return (
-          <>
-            {priceInfo.hasDiscount && (
-              <div
-                className="mt-3 inline-flex self-start items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold kl-mono"
-                style={{
-                  background: 'var(--klo-accent-soft)',
-                  color: 'var(--klo-accent)',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {LAUNCH_DISCOUNT.label} · {priceInfo.percentOff}% off
-              </div>
-            )}
-            <div className="mt-4 flex items-baseline gap-2 flex-wrap">
-              <span
-                className="text-[28px] font-bold tabular-nums"
-                style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
-              >
-                {priceInfo.primary}
-              </span>
-              <span className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
-                /mo
-              </span>
-              {priceInfo.original && (
-                <span
-                  className="text-[14px] tabular-nums"
-                  style={{
-                    color: 'var(--klo-text-mute)',
-                    textDecoration: 'line-through',
-                  }}
-                  aria-label="Original price"
-                >
-                  {priceInfo.original}
-                </span>
-              )}
-            </div>
-          </>
-        )
-      })()}
+      {!isEnterprise && (
+        <div className="mt-4 flex items-baseline gap-2 flex-wrap">
+          <span
+            className="text-[28px] font-bold tabular-nums"
+            style={{ color: 'var(--klo-text)', letterSpacing: '-0.02em' }}
+          >
+            {priceDisplayFor(plan.slug, currency).primary}
+          </span>
+          <span className="text-[13px]" style={{ color: 'var(--klo-text-dim)' }}>
+            /mo
+          </span>
+        </div>
+      )}
       {isEnterprise && (
         <div className="mt-4 flex items-baseline gap-1">
           <span
