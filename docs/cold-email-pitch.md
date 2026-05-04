@@ -1,41 +1,16 @@
 # Klosure.ai — Cold Email Pitch (Mobile)
 
-Short. Mobile. Opens with a question. Problem-first — no feature pitching.
+Short. Mobile. Opens with a question. Problem-first.
 
 ---
 
-**Subject:** Which deal is quietly dying on you?
+One question, not a pitch — when your reps say "90% closing this month," do you actually believe them? Or do you mentally cut it to 50%?
 
-Hi [First name],
+We all know it — leads aren't the real problem. Closure is.
 
-Be honest — which deal in your pipeline are you least sure about right now?
+Klosure.ai is a shared deal room where your rep AND their buyer sit on the same side — with Klo, our AI deal coach, moving both of them to closure.
 
-The buyer went warm, then quiet. They said "let's circle back next week." That was three weeks ago. You don't know if it's budget, the wrong champion, or you've just lost them.
-
-By the time you find out, the quarter's already gone.
-
-That's the exact problem we're solving at Klosure.ai.
-
-Open to a 10-min chat next week?
-
-— [Your name]
-klosure.ai
-
----
-
-## Even shorter variant
-
-**Subject:** Why did that deal really stall?
-
-Hi [First name],
-
-How many of your "active" deals are actually dead — and you just don't know it yet?
-
-Most sellers find out one quarter too late. The buyer goes quiet, the follow-ups get ignored, and the post-mortem never really tells you why.
-
-That's what we're fixing at Klosure.ai.
-
-10 mins next week?
+Rest assured, Klo picks up every small signal from the buyer — email, meetings, chat — so your reps aren't spending even a minute updating tools anymore.
 
 — [Your name]
 klosure.ai
