@@ -583,6 +583,8 @@ function Footer() {
           <span className="footer-legal-sep" aria-hidden>·</span>
           <Link to="/terms">Terms of Service</Link>
           <span className="footer-legal-sep" aria-hidden>·</span>
+          <Link to="/refund">Refund Policy</Link>
+          <span className="footer-legal-sep" aria-hidden>·</span>
           <a href="mailto:rajeshwar63@gmail.com">rajeshwar63@gmail.com</a>
         </div>
         <div className="footer-legal-copy">
