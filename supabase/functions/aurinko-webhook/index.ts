@@ -4,11 +4,16 @@
 // Single endpoint for all Aurinko subscription events.
 //
 // Behavior:
-//   1. Verify HMAC-SHA256 signature against AURINKO_SIGNING_KEY
-//   2. Parse the event — Aurinko sends one event per webhook
-//   3. Persist email or calendar deltas idempotently
-//   4. Trigger the appropriate downstream processor
-//   5. Return 200 fast (Aurinko retries on non-2xx)
+//   1. Handle Aurinko's URL-validation challenge first — Aurinko POSTs to the
+//      webhook URL with `?validationToken=<uuid_iso8601>` (sometimes also as a
+//      JSON body) before accepting a subscription, and expects the same token
+//      echoed back as plain-text body within ~5 seconds. Without this echo
+//      the subscription create call returns "notificationUrl.notValid".
+//   2. Verify HMAC-SHA256 signature against AURINKO_SIGNING_KEY
+//   3. Parse the event — Aurinko sends one event per webhook
+//   4. Persist email or calendar deltas idempotently
+//   5. Trigger the appropriate downstream processor
+//   6. Return 200 fast (Aurinko retries on non-2xx)
 //
 // Deploy:
 //   supabase functions deploy aurinko-webhook --no-verify-jwt
@@ -26,25 +31,54 @@ const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 })
 
 Deno.serve(async (req) => {
-  // Aurinko verifies the endpoint by sending a validation token at registration.
+  const url = new URL(req.url)
+  const rawBody = req.method === "POST" ? await req.text() : ""
+
+  // ----- Aurinko URL-validation challenge ----------------------------------
+  // Aurinko sends a one-shot validation request before activating a
+  // subscription. We need to echo back a token from the request — which can
+  // arrive in the query string OR in the body — as plain-text within ~5s,
+  // otherwise Aurinko marks the URL invalid and refuses to create the sub.
+
+  // 1. Most common: ?validationToken=<uuid_iso8601> (Microsoft Graph style;
+  //    this is what Aurinko uses today)
+  const queryToken = url.searchParams.get("validationToken")
+  if (queryToken) {
+    return new Response(queryToken, { status: 200, headers: { "Content-Type": "text/plain" } })
+  }
+
+  // 2. Body that's not JSON and short — likely the token itself
+  const trimmed = rawBody.trim()
+  if (trimmed && !trimmed.startsWith("{") && !trimmed.startsWith("[") && trimmed.length < 200) {
+    return new Response(trimmed, { status: 200, headers: { "Content-Type": "text/plain" } })
+  }
+
+  // 3. JSON body with { validationToken: "…" } — defensive fallback in case
+  //    Aurinko ever changes their validation envelope.
+  if (rawBody) {
+    try {
+      const parsed = JSON.parse(rawBody)
+      const token = parsed.validationToken ?? parsed.validation_token ?? parsed.challenge ?? null
+      if (token && typeof token === "string") {
+        return new Response(token, { status: 200, headers: { "Content-Type": "text/plain" } })
+      }
+    } catch { /* not JSON, fall through */ }
+  }
+
+  // GET pings without a validation token are useful for liveness checks.
   if (req.method === "GET") {
-    const url = new URL(req.url)
-    const token = url.searchParams.get("validationToken")
-    if (token) {
-      return new Response(token, { status: 200, headers: { "Content-Type": "text/plain" } })
-    }
     return new Response("ok", { status: 200 })
   }
+
   if (req.method !== "POST") {
     return new Response("method not allowed", { status: 405 })
   }
 
+  // ----- Real webhook event — verify signature then process ---------------
   const startTime = Date.now()
 
   try {
-    const rawBody = await req.text()
     const signature = req.headers.get("X-Aurinko-Signature") ?? ""
-
     const valid = await verifySignature(rawBody, signature, AURINKO_SIGNING_KEY)
     if (!valid) {
       console.warn("invalid aurinko webhook signature", { signature: signature.slice(0, 16) })

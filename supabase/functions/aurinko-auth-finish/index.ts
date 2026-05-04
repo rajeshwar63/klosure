@@ -123,10 +123,12 @@ Deno.serve(async (req) => {
     // Create the inbox + calendar webhook subscriptions on Aurinko's side.
     // These fire to our aurinko-webhook edge function whenever a message
     // or calendar event changes. Best-effort — auth still succeeds even if
-    // subscription creation fails (we log and let the user re-trigger via
-    // a reconnect).
-    const emailSubId = await createSubscription(accessToken, "/email/messages")
-    const calendarSubId = await createSubscription(accessToken, "/calendars/primary/events")
+    // subscription creation fails. Failures are surfaced via last_error so
+    // the UI / support can see why (the most common cause is the webhook
+    // URL not echoing Aurinko's validation token).
+    const emailSub = await createSubscription(accessToken, "/email/messages")
+    const calendarSub = await createSubscription(accessToken, "/calendars/primary/events")
+    const subErrors = [emailSub.error, calendarSub.error].filter(Boolean).join("; ")
 
     const { error: insertErr } = await sb.from("aurinko_grants")
       .upsert({
@@ -142,8 +144,9 @@ Deno.serve(async (req) => {
         last_seen_at: new Date().toISOString(),
         granted_at: new Date().toISOString(),
         user_email: userRow?.email ?? "",
-        email_subscription_id: emailSubId,
-        calendar_subscription_id: calendarSubId,
+        email_subscription_id: emailSub.id,
+        calendar_subscription_id: calendarSub.id,
+        last_error: subErrors || null,
       }, { onConflict: "aurinko_account_id" })
 
     if (insertErr) {
@@ -156,8 +159,9 @@ Deno.serve(async (req) => {
       account_id: accountId,
       email_address: emailAddress,
       provider,
-      email_subscription_id: emailSubId,
-      calendar_subscription_id: calendarSubId,
+      email_subscription_id: emailSub.id,
+      calendar_subscription_id: calendarSub.id,
+      subscription_errors: subErrors || null,
     })
   } catch (err) {
     console.error("aurinko-auth-finish error", err)
@@ -165,10 +169,15 @@ Deno.serve(async (req) => {
   }
 })
 
+interface SubscriptionResult {
+  id: number | null
+  error: string | null
+}
+
 async function createSubscription(
   accessToken: string,
   resource: string,
-): Promise<number | null> {
+): Promise<SubscriptionResult> {
   try {
     const res = await fetch(`${AURINKO_API_BASE}/subscriptions`, {
       method: "POST",
@@ -183,14 +192,14 @@ async function createSubscription(
     })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      console.warn("aurinko subscription create failed", resource, res.status, body)
-      return null
+      const detail = `${resource}: ${res.status} ${JSON.stringify(body).slice(0, 200)}`
+      console.warn("aurinko subscription create failed", detail)
+      return { id: null, error: detail }
     }
     const id = Number(body.id ?? body.subscriptionId ?? 0)
-    return id || null
+    return { id: id || null, error: null }
   } catch (e) {
-    console.warn("aurinko subscription create error", resource, e)
-    return null
+    return { id: null, error: `${resource}: ${String(e).slice(0, 200)}` }
   }
 }
 
