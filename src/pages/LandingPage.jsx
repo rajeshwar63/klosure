@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PLANS, priceDisplayFor, LAUNCH_DISCOUNT } from '../lib/plans.ts'
+import { PLANS, priceDisplayFor } from '../lib/plans.ts'
 import './LandingPage.css'
 
 // Phase A sprint 09: 3-tier pricing — Coach / Closer / Command.
@@ -438,18 +438,6 @@ function Pricing() {
           If this saves even one deal this quarter, it pays for itself.
         </p>
 
-        {LAUNCH_DISCOUNT.active && LAUNCH_DISCOUNT.percentOff > 0 && (
-          <div className="pricing-launch-banner" role="note">
-            <span className="pricing-launch-pill mono">
-              {LAUNCH_DISCOUNT.percentOff}% OFF
-            </span>
-            <span>
-              {LAUNCH_DISCOUNT.label} — {LAUNCH_DISCOUNT.percentOff}% off all
-              plans. Applied automatically at checkout.
-            </span>
-          </div>
-        )}
-
         <div className="pricing-toolbar">
           <span className="pricing-currency-note mono">
             Prices shown in {CURRENCY_LABELS[currency] ?? currency}.
@@ -495,11 +483,6 @@ function PricingCard({ plan, currency }) {
       <div className="price-name">{plan.label}</div>
       <p className="price-desc">{plan.description}</p>
 
-      {!isEnterprise && priceInfo.hasDiscount && (
-        <div className="price-launch-badge mono">
-          {LAUNCH_DISCOUNT.label} · {priceInfo.percentOff}% off
-        </div>
-      )}
       <div className="price-amount">
         {isEnterprise ? (
           <span className="num enterprise">Contact sales</span>
@@ -507,11 +490,6 @@ function PricingCard({ plan, currency }) {
           <>
             <span className="num">{priceInfo.primary}</span>
             <span className="per">/mo</span>
-            {priceInfo.original && (
-              <span className="price-original" aria-label="Original price">
-                {priceInfo.original}
-              </span>
-            )}
           </>
         )}
       </div>

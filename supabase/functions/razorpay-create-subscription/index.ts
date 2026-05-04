@@ -21,10 +21,6 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID") ?? ""
 const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? ""
-// Optional Razorpay Offer applied to every new subscription while the launch
-// promo is running. Configure the offer in the Razorpay dashboard (e.g. 30%
-// off) and set the resulting offer_id here. Empty/unset = no offer attached.
-const RAZORPAY_LAUNCH_OFFER_ID = Deno.env.get("RAZORPAY_LAUNCH_OFFER_ID") ?? ""
 
 // Phase A sprint 09: 'coach' and 'closer' are the two paid checkout slugs.
 // Every paid checkout is a team plan; we auto-create a single-seat team for
@@ -165,9 +161,6 @@ Deno.serve(async (req) => {
       quantity: seatCount,
       total_count: 60,           // 5 years of monthly cycles; user can cancel anytime
       customer_notify: 1,
-      // Razorpay validates offer_id only when present, so omit the key
-      // entirely when the launch offer isn't configured.
-      ...(RAZORPAY_LAUNCH_OFFER_ID ? { offer_id: RAZORPAY_LAUNCH_OFFER_ID } : {}),
       notes: {
         klosure_user_id: userId,
         klosure_team_id: teamId ?? "",
