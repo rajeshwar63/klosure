@@ -132,7 +132,7 @@ export default function TrainKloFormFields({ fields, setFields, errors = {}, ref
           type="text"
           value={fields.seller_company}
           onChange={(e) => set('seller_company', e.target.value)}
-          placeholder="Klosure"
+          placeholder="Acme Inc."
           maxLength={FIELD_MAX}
           className={inputClass(errors.sellerCompany)}
         />
@@ -164,7 +164,7 @@ export default function TrainKloFormFields({ fields, setFields, errors = {}, ref
           type="text"
           value={fields.what_you_sell}
           onChange={(e) => set('what_you_sell', e.target.value)}
-          placeholder="AI sales deal coaching SaaS for B2B revenue teams"
+          placeholder="Cloud-based project management software for small teams"
           maxLength={FIELD_MAX}
           className={inputClass(errors.whatYouSell)}
         />
@@ -180,7 +180,7 @@ export default function TrainKloFormFields({ fields, setFields, errors = {}, ref
           type="text"
           value={fields.icp}
           onChange={(e) => set('icp', e.target.value)}
-          placeholder="Mid-market B2B SaaS revenue teams (50-500 reps) in the Gulf and India"
+          placeholder="Mid-market SaaS companies (100-500 employees) in North America"
           maxLength={FIELD_MAX}
           className={inputClass(errors.icp)}
         />
@@ -196,7 +196,7 @@ export default function TrainKloFormFields({ fields, setFields, errors = {}, ref
           type="text"
           value={fields.region}
           onChange={(e) => set('region', e.target.value)}
-          placeholder="Gulf (UAE / KSA / Qatar) primary, India secondary"
+          placeholder="North America primary, Europe secondary"
           maxLength={FIELD_MAX}
           className={inputClass(errors.region)}
         />
