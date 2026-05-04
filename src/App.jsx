@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth.jsx'
 import { useProfile } from './hooks/useProfile.jsx'
 import LandingPage from './pages/LandingPage.jsx'
-import ComingSoonPage from './pages/ComingSoonPage.jsx'
 import AuthPage from './pages/AuthPage.jsx'
 import DealsListPage from './pages/DealsListPage.jsx'
 import BuyerJoinPage from './pages/BuyerJoinPage.jsx'
@@ -29,6 +28,7 @@ const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage.jsx'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage.jsx'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
 const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
+const RefundPage = lazy(() => import('./pages/RefundPage.jsx'))
 // Inbox + calendar connect flow (Phase B — Aurinko under the hood).
 const SettingsConnectionsPage = lazy(() => import('./pages/SettingsConnectionsPage.jsx'))
 const InboxConnectCallbackPage = lazy(() => import('./pages/InboxConnectCallbackPage.jsx'))
@@ -125,7 +125,7 @@ export default function App() {
             OAuth verification bot can fetch them. */}
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
-        <Route path="/refund" element={<ComingSoonPage title="Refund policy" />} />
+        <Route path="/refund" element={<RefundPage />} />
 
         {/* Buyer flow stays outside the shell. */}
         <Route path="/join/:token" element={<BuyerJoinPage />} />
