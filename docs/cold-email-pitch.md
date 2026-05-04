@@ -1,7 +1,8 @@
 # Klosure.ai — Cold Email Pitch (Mobile)
 
-Structure: Disrupt → Agitate → Reframe → Minimal solution → Soft CTA.
-Short. Mobile. Numbers-led disrupt. Agitate broken into short beats. SaaS framing. "Signal" runs through.
+Structure: Disrupt → Agitate → Reframe → Solution (rep + manager) → Soft CTA.
+Short. Mobile. Numbers-led disrupt. Agitate in short beats. SaaS framing. "Signal" runs through.
+Solution covers both reps/buyers AND the manager (Klo replaces dashboards).
 
 ---
 
@@ -17,7 +18,9 @@ Just buried in inboxes, chats, and meeting notes nobody reads.
 
 It's not a pipeline problem. It's a deal-execution problem.
 
-Klosure.ai is a deal workspace where Klo, our AI, reads every signal in the deal — chat, email, meetings — and keeps both your rep and their buyer moving toward closure.
+Klosure.ai is a deal workspace. Klo, our AI, reads every signal in every deal — chat, emails, meetings — and moves your reps and their buyers toward closure.
+
+You stop living in CRM dashboards. You start living with Klo — ask anything ("which deals are at risk?", "where's pipeline stuck?") and get the answer live.
 
 Worth exploring?
 
