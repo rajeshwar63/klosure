@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Effective date:** May 1, 2026
-**Last updated:** May 1, 2026
+**Last updated:** May 4, 2026
 
 This Privacy Policy describes how Klosure.ai ("Klosure," "we," "our," or "us") collects, uses, stores, and shares information when you use our B2B sales coaching platform available at klosure.ai (the "Service").
 
@@ -20,7 +20,7 @@ When you sign up and use Klosure, you give us:
 - **Account information** — name, email address, password (stored as a hash, never in plain text), and your role (seller or manager)
 - **Company information** — your company name, your team members' email addresses if you invite them
 - **Deal information** — buyer company names, deal values, deadlines, stakeholder names, notes, and chat messages you and your buyers exchange inside the platform
-- **Billing information** — handled entirely by Razorpay (our payment processor). We never see your full card number; Razorpay returns a token to us that we store to manage your subscription.
+- **Billing information** — handled entirely by Razorpay (our payment processor). We never see your full card number; Razorpay returns a token to us that we store to manage your subscription. Klosure is **not in PCI-DSS scope** because we never receive, store, or transmit cardholder data; all payment card data is handled directly by Razorpay (PCI-DSS Level 1 certified).
 
 ### 1.2 Information from connected accounts
 
@@ -48,6 +48,16 @@ When you use Klosure, we collect basic technical information:
 - Error logs to diagnose product issues
 
 We do not use third-party advertising trackers, retargeting pixels, or analytics that profile you across sites. We use Vercel for hosting and Supabase for our database; both providers see standard request logs.
+
+### 1.4 Cookies and similar technologies
+
+Klosure uses a small number of cookies and similar browser storage mechanisms, all of which are **strictly necessary** for the Service to function:
+
+- **Authentication cookies / local storage** — set by Supabase Auth to keep you signed in across pages
+- **Session preferences** — small entries in browser local storage to remember UI preferences (e.g., last opened deal, sidebar state)
+- **CSRF and security tokens** — short-lived tokens used to protect against cross-site request forgery during payment and OAuth flows
+
+We do **not** use third-party advertising, retargeting, social-media, or cross-site tracking cookies. We do not embed analytics tools that build profiles across the web. You can clear or block cookies via your browser settings; if you block strictly-necessary cookies, you will not be able to sign in.
 
 ---
 
@@ -150,6 +160,17 @@ To exercise any of these rights, email **support@klosure.com** with the subject 
 If you are in the European Economic Area, the United Kingdom, or a jurisdiction with similar data protection laws, you also have the right to lodge a complaint with your local supervisory authority.
 
 If you are in India, your data is processed under the Digital Personal Data Protection Act, 2023.
+
+**California residents (CCPA / CPRA).** If you are a California resident, you have additional rights under the California Consumer Privacy Act, as amended by the California Privacy Rights Act:
+
+- **Right to know** the categories and specific pieces of personal information we collect, the sources, the business purposes, and the categories of third parties with whom we share it (all disclosed in this Policy).
+- **Right to delete** the personal information we hold about you, subject to legal exceptions.
+- **Right to correct** inaccurate personal information.
+- **Right to opt out of "sale" or "sharing"** of personal information for cross-context behavioral advertising. **Klosure does not sell or share personal information** as those terms are defined under the CCPA/CPRA. We do not have a "Do Not Sell or Share My Personal Information" link because there is no such activity to opt out of.
+- **Right to limit use of sensitive personal information** — we do not use sensitive personal information for purposes that would trigger this right.
+- **Right to non-discrimination** — we will not deny service, charge different prices, or provide a different level of service because you exercised any of these rights.
+
+To exercise any CCPA right, email **support@klosure.com** with the subject line "California privacy request." We will verify your identity by matching the email address against your account before responding.
 
 ---
 
