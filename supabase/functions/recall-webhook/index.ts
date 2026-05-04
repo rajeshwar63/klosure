@@ -11,7 +11,6 @@
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
-import { decode as base64Decode } from "https://deno.land/std@0.224.0/encoding/base64.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -20,6 +19,17 @@ const RECALL_WEBHOOK_SECRET = Deno.env.get("RECALL_WEBHOOK_SECRET") ?? ""
 const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
+
+// base64 -> bytes using built-in atob. Importing from
+// https://deno.land/std@0.224.0/encoding/base64.ts caused 503 boot failures
+// on the Supabase edge runtime — never import std modules from edge functions
+// when a built-in works.
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64)
+  const out = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+  return out
+}
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
@@ -80,7 +90,7 @@ async function verifySvixSignature(args: {
   const rawSecret = args.secret.startsWith("whsec_") ? args.secret.slice(6) : args.secret
   let secretBytes: Uint8Array
   try {
-    secretBytes = base64Decode(rawSecret)
+    secretBytes = base64ToBytes(rawSecret)
   } catch {
     return false
   }

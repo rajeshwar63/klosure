@@ -112,7 +112,22 @@ Deno.serve(async (req) => {
       return json({ ok: true, skipped: "no_match" })
     }
 
-    // 7. Insert the system 'email' message.
+    // 7. Insert the system 'email' message — but only if no message for this
+    // Aurinko message_id already exists in this deal. Aurinko sometimes fires
+    // both messages.created and messages.updated for the same email; without
+    // this guard we get duplicate pills (the processed_at check above has a
+    // TOCTOU race when two webhooks arrive within a few hundred ms).
+    const { data: existing } = await sb
+      .from("messages")
+      .select("id")
+      .eq("deal_id", matched.dealId)
+      .eq("metadata->>aurinko_message_id", aurinko_message_id)
+      .maybeSingle()
+    if (existing) {
+      await markProcessed(event.id, "duplicate_message_skipped")
+      return json({ ok: true, skipped: "duplicate", message_id: existing.id })
+    }
+
     const emailSummary = formatEmailForChat({
       from: fromAddr || "unknown",
       to: toAddrs,
