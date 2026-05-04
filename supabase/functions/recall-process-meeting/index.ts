@@ -170,18 +170,36 @@ Deno.serve(async (req) => {
 
 async function fetchTranscript(botId: string): Promise<string | null> {
   if (!RECALL_API_KEY) return null
-  const res = await fetch(`${RECALL_API_BASE}/bot/${botId}/transcript`, {
+
+  // Recall deprecated /bot/<id>/transcript. The current path is to fetch the
+  // bot, follow recordings[0].media_shortcuts.transcript.data.download_url,
+  // and read the diarized JSON straight from S3 (signed URL — no auth needed).
+  const botRes = await fetch(`${RECALL_API_BASE}/bot/${botId}`, {
     headers: { Authorization: `Token ${RECALL_API_KEY}` },
   })
-  if (!res.ok) {
-    console.error("recall transcript fetch failed", res.status)
+  if (!botRes.ok) {
+    console.error("recall bot fetch failed", botRes.status)
     return null
   }
-  const body = await res.json().catch(() => null)
+  // deno-lint-ignore no-explicit-any
+  const bot: any = await botRes.json().catch(() => null)
+  const downloadUrl: string | undefined =
+    bot?.recordings?.[0]?.media_shortcuts?.transcript?.data?.download_url
+  if (!downloadUrl) {
+    console.error("recall transcript download_url missing")
+    return null
+  }
+
+  const transRes = await fetch(downloadUrl)
+  if (!transRes.ok) {
+    console.error("recall transcript S3 fetch failed", transRes.status)
+    return null
+  }
+  const body = await transRes.json().catch(() => null)
   if (!body) return null
 
-  // Recall's transcript shape: array of { speaker, words: [{ text, ... }] }.
-  // Some plans return { transcript: [...] }; be defensive.
+  // Diarized format is an array of { participant: { name }, words: [{text}] }.
+  // Older shapes nest under { transcript: [...] } — handle both defensively.
   // deno-lint-ignore no-explicit-any
   const segments: any[] = Array.isArray(body)
     ? body
@@ -190,7 +208,7 @@ async function fetchTranscript(botId: string): Promise<string | null> {
       : []
 
   const lines = segments.map((seg) => {
-    const speaker = seg.speaker ?? seg.participant?.name ?? "Speaker"
+    const speaker = seg.participant?.name ?? seg.speaker ?? "Speaker"
     const words: Array<{ text?: string }> = Array.isArray(seg.words) ? seg.words : []
     const text = words.map((w) => w.text ?? "").filter(Boolean).join(" ").trim()
     if (!text) return ""

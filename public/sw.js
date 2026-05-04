@@ -10,14 +10,18 @@
 //
 // Strategies:
 //   - Static app shell (HTML / JS / CSS / icons) → cache-first with revalidate.
-//   - Supabase /rest/v1 GET (deals, messages, commitments) → stale-while-
-//     revalidate. The user sees the last cached row instantly and the live row
-//     replaces it as soon as the network responds.
+//   - Supabase /rest/v1 GET (deals, messages, commitments) → network-first.
+//     We fall back to cache only when the network fails (Gulf cell-coverage
+//     hole). Online users always see fresh rows. The earlier stale-while-
+//     revalidate strategy returned the cached rows synchronously and threw
+//     away the fresh network response, so users saw stale chats until they
+//     hard-refreshed.
 //   - Anything non-GET, anything to /auth/v1, anything to /functions/v1 → pass-
 //     through. We refuse to cache writes or auth.
 // =============================================================================
 
-const VERSION = 'klosure-v1'
+// Bump VERSION on cache strategy changes so old service workers get evicted.
+const VERSION = 'klosure-v2'
 const SHELL_CACHE = `${VERSION}-shell`
 const DATA_CACHE = `${VERSION}-data`
 
@@ -65,7 +69,7 @@ self.addEventListener('fetch', (event) => {
   const isSameOrigin = url.origin === self.location.origin
 
   if (isSupabaseRest) {
-    event.respondWith(staleWhileRevalidate(req, DATA_CACHE))
+    event.respondWith(networkFirst(req, DATA_CACHE))
     return
   }
 
@@ -109,17 +113,7 @@ async function networkFirst(req, cacheName) {
   }
 }
 
-async function staleWhileRevalidate(req, cacheName) {
-  const cache = await caches.open(cacheName)
-  const hit = await cache.match(req)
-  const networkPromise = fetch(req)
-    .then((res) => {
-      if (res.ok) cache.put(req, res.clone())
-      return res
-    })
-    .catch(() => null)
-  return hit || (await networkPromise) || new Response('[]', {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
-}
+// staleWhileRevalidate intentionally removed in v2 — it returned cached
+// responses immediately AND threw away the fresh network response, so pages
+// that fetch once on mount never saw the live data. networkFirst above gives
+// us fresh-when-online + offline fallback, which is what we actually wanted.
